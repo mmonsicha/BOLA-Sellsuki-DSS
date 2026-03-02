@@ -14,6 +14,8 @@
     "@uiw/react-codemirror": "^4.25.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "flex-render": "^0.1.9",
+    "flex-render-react": "^0.1.7",
     "lucide-react": "^0.439.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
