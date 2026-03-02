@@ -13,8 +13,9 @@ import { flexMessageSnippets, insertSnippetIntoContent } from "@/utils/flexMessa
 import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { FlexPreview } from "flex-render-react";
-import "flex-render-react/css";
+import { render as renderFlexMessage } from "flex-render";
+import "flex-render/css";
+
 
 function getContainerType(content: string): string {
   try {
@@ -26,12 +27,13 @@ function getContainerType(content: string): string {
 }
 
 function LivePreviewPanel({ content }: { content: string }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let parsed: any = null;
+  let html: string | null = null;
   try {
-    parsed = JSON.parse(content);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed: any = JSON.parse(content);
+    html = renderFlexMessage(parsed);
   } catch {
-    // invalid JSON — show placeholder
+    // invalid JSON or unsupported format — show placeholder
   }
 
   return (
@@ -49,10 +51,12 @@ function LivePreviewPanel({ content }: { content: string }) {
             className="min-h-48 p-4 rounded-b-lg flex flex-col items-start gap-2 overflow-auto"
             style={{ backgroundColor: "#C6D0D9" }}
           >
-            {parsed ? (
-              <div className="w-full max-w-xs">
-                <FlexPreview json={parsed} />
-              </div>
+            {html ? (
+              <div
+                className="w-full max-w-xs"
+                // flex-render returns safe HTML (no user input, only LINE Flex JSON structure)
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
             ) : (
               <div className="w-full text-center py-8 text-sm italic" style={{ color: "#888" }}>
                 Enter valid JSON to see preview
