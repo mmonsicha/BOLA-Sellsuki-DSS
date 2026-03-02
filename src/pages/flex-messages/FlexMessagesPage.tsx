@@ -2,12 +2,12 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Layers, Trash2, Edit, AlertCircle } from "lucide-react";
+import { Plus, Layers, Trash2, Edit, AlertCircle, ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { workspaceApi } from "@/api/workspace";
+import { flexMessageTemplates, type FlexTemplate } from "@/utils/flexMessageTemplates";
 
-// Parse the container type from raw JSON content
 function getContainerType(content: string): string {
   try {
     const parsed = JSON.parse(content);
@@ -17,14 +17,68 @@ function getContainerType(content: string): string {
   }
 }
 
-interface CreateDialogProps {
-  workspaceId: string;
+// ─── Step 1: Template Picker ───────────────────────────────────────────────
+
+interface TemplatePickerProps {
+  onSelect: (t: FlexTemplate) => void;
   onClose: () => void;
 }
 
-function CreateFlexMessageDialog({ workspaceId, onClose }: CreateDialogProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-background rounded-lg shadow-xl w-full max-w-2xl flex flex-col"
+        style={{ maxHeight: "90vh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b flex-shrink-0">
+          <h2 className="text-lg font-semibold">Choose a Starter Template</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Pick one to get started — you can edit everything on the next page.
+          </p>
+        </div>
+
+        {/* Grid */}
+        <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-3 overflow-y-auto flex-1">
+          {flexMessageTemplates.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => onSelect(t)}
+              className="group flex flex-col items-center gap-2 p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all text-center cursor-pointer"
+            >
+              <span className="text-3xl">{t.icon}</span>
+              <span className="text-sm font-medium group-hover:text-primary">{t.name}</span>
+              <span className="text-xs text-muted-foreground leading-tight">{t.description}</span>
+              <Badge variant="outline" className="text-xs capitalize mt-auto">
+                {t.containerType}
+              </Badge>
+            </button>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t flex-shrink-0 flex justify-end">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 2: Name & Description Form ──────────────────────────────────────
+
+interface CreateFormProps {
+  template: FlexTemplate;
+  workspaceId: string;
+  onBack: () => void;
+  onClose: () => void;
+}
+
+function CreateForm({ template, workspaceId, onBack, onClose }: CreateFormProps) {
+  const [name, setName] = useState(template.name);
+  const [description, setDescription] = useState(template.description);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,9 +94,8 @@ function CreateFlexMessageDialog({ workspaceId, onClose }: CreateDialogProps) {
         workspace_id: workspaceId,
         name: name.trim(),
         description: description.trim(),
-        content: JSON.stringify({ type: "bubble", body: { type: "box", layout: "vertical", contents: [{ type: "text", text: "Hello, World!" }] } }, null, 2),
+        content: template.content,
       });
-      // Redirect to detail page to edit the content
       window.location.href = `/flex-messages/${res.data.id}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create");
@@ -51,9 +104,23 @@ function CreateFlexMessageDialog({ workspaceId, onClose }: CreateDialogProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-background rounded-lg shadow-xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold">New Flex Message Template</h2>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-background rounded-lg shadow-xl w-full max-w-md p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h2 className="text-lg font-semibold">Name Your Template</h2>
+            <p className="text-xs text-muted-foreground">
+              {template.icon} Starting from: <strong>{template.name}</strong>
+            </p>
+          </div>
+        </div>
 
         {error && (
           <div className="flex items-center gap-2 text-destructive text-sm">
@@ -63,11 +130,13 @@ function CreateFlexMessageDialog({ workspaceId, onClose }: CreateDialogProps) {
         )}
 
         <div className="space-y-1">
-          <label className="text-sm font-medium">Template Name <span className="text-destructive">*</span></label>
+          <label className="text-sm font-medium">
+            Template Name <span className="text-destructive">*</span>
+          </label>
           <input
             type="text"
             className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-            placeholder="e.g., Welcome Bubble, Product Carousel"
+            placeholder="e.g., Welcome Message, Product Card"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
@@ -88,10 +157,6 @@ function CreateFlexMessageDialog({ workspaceId, onClose }: CreateDialogProps) {
           />
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          A starter bubble template will be created. You can edit the JSON on the next page.
-        </p>
-
         <div className="flex gap-2 justify-end">
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={handleCreate} disabled={saving || !name.trim()}>
@@ -103,12 +168,20 @@ function CreateFlexMessageDialog({ workspaceId, onClose }: CreateDialogProps) {
   );
 }
 
+// ─── Main Page ────────────────────────────────────────────────────────────
+
+type DialogStep = "picker" | "form";
+
 export function FlexMessagesPage() {
   const [templates, setTemplates] = useState<FlexMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string>("");
-  const [showCreate, setShowCreate] = useState(false);
+
+  // Dialog state
+  const [dialogStep, setDialogStep] = useState<DialogStep | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<FlexTemplate | null>(null);
+
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,6 +201,14 @@ export function FlexMessagesPage() {
     load();
   }, []);
 
+  const openCreate = () => setDialogStep("picker");
+  const closeDialog = () => { setDialogStep(null); setSelectedTemplate(null); };
+
+  const handleTemplateSelect = (t: FlexTemplate) => {
+    setSelectedTemplate(t);
+    setDialogStep("form");
+  };
+
   const handleDelete = async (fm: FlexMessage) => {
     if (!confirm(`Delete "${fm.name}"? This cannot be undone.`)) return;
     setDeletingId(fm.id);
@@ -143,31 +224,34 @@ export function FlexMessagesPage() {
 
   return (
     <AppLayout title="Flex Messages">
-      {showCreate && workspaceId && (
-        <CreateFlexMessageDialog
+      {/* Template picker (step 1) */}
+      {dialogStep === "picker" && (
+        <TemplatePicker onSelect={handleTemplateSelect} onClose={closeDialog} />
+      )}
+
+      {/* Name form (step 2) */}
+      {dialogStep === "form" && selectedTemplate && (
+        <CreateForm
+          template={selectedTemplate}
           workspaceId={workspaceId}
-          onClose={() => setShowCreate(false)}
+          onBack={() => setDialogStep("picker")}
+          onClose={closeDialog}
         />
       )}
 
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground max-w-lg">
-              Create reusable LINE Flex Message templates. These JSON-based rich layouts can be attached to Broadcasts and Auto Push Messages for beautiful, structured messages.
-            </p>
-          </div>
-          <Button onClick={() => setShowCreate(true)}>
+          <p className="text-sm text-muted-foreground max-w-lg">
+            Create reusable LINE Flex Message templates. These JSON-based rich layouts can be attached to Broadcasts and Auto Push Messages.
+          </p>
+          <Button onClick={openCreate}>
             <Plus size={16} className="mr-2" />
             Create Flex Message
           </Button>
         </div>
 
-        {/* Content */}
-        {loading && (
-          <p className="text-muted-foreground text-sm">Loading templates...</p>
-        )}
+        {loading && <p className="text-muted-foreground text-sm">Loading templates...</p>}
 
         {error && (
           <div className="flex items-center gap-2 text-destructive text-sm">
@@ -184,9 +268,9 @@ export function FlexMessagesPage() {
               <p className="text-sm text-muted-foreground">
                 Create your first template to send beautiful rich messages via LINE.
               </p>
-              <Button onClick={() => setShowCreate(true)} className="mt-2">
+              <Button onClick={openCreate} className="mt-2">
                 <Plus size={14} className="mr-1" />
-                Create Flex Message
+                Create from Template
               </Button>
             </CardContent>
           </Card>
@@ -199,7 +283,6 @@ export function FlexMessagesPage() {
               return (
                 <Card key={fm.id} className="group relative hover:shadow-md transition-shadow">
                   <CardContent className="p-4 space-y-3">
-                    {/* Header row */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <h3 className="font-semibold text-sm truncate">{fm.name}</h3>
@@ -212,19 +295,16 @@ export function FlexMessagesPage() {
                       </Badge>
                     </div>
 
-                    {/* JSON preview */}
                     <div className="bg-muted rounded-md p-2 text-xs font-mono text-muted-foreground overflow-hidden" style={{ maxHeight: "4.5rem" }}>
                       <pre className="truncate whitespace-pre-wrap break-all line-clamp-3">
                         {fm.content}
                       </pre>
                     </div>
 
-                    {/* Date */}
                     <p className="text-xs text-muted-foreground">
                       {new Date(fm.created_at).toLocaleDateString()}
                     </p>
 
-                    {/* Actions */}
                     <div className="flex gap-2">
                       <Button
                         size="sm"

@@ -3,9 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/CopyButton";
-import { AlertCircle, ArrowLeft, ExternalLink, RefreshCw, Trash2, CheckCircle, XCircle } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+  AlertCircle, ArrowLeft, ExternalLink, RefreshCw,
+  Trash2, CheckCircle, XCircle,
+} from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
+import { flexMessageSnippets, insertSnippetIntoContent } from "@/utils/flexMessageSnippets";
+import CodeMirror from "@uiw/react-codemirror";
+import { json } from "@codemirror/lang-json";
+import { oneDark } from "@codemirror/theme-one-dark";
 
 function getContainerType(content: string): string {
   try {
@@ -35,7 +42,6 @@ export function FlexMessageDetailPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Load flex message
   useEffect(() => {
     const load = async () => {
       try {
@@ -65,7 +71,6 @@ export function FlexMessageDetailPage() {
   };
 
   const handleSave = async () => {
-    // Validate
     if (!name.trim()) {
       setSaveError("Name is required");
       return;
@@ -109,13 +114,16 @@ export function FlexMessageDetailPage() {
     }
   };
 
-  const handlePreview = () => {
-    window.open("https://developers.line.biz/flex-simulator/", "_blank", "noopener,noreferrer");
-  };
-
-  const handleContentChange = (value: string) => {
+  const handleContentChange = useCallback((value: string) => {
     setContent(value);
-    // Clear JSON error when user edits
+    if (jsonError) setJsonError(null);
+  }, [jsonError]);
+
+  const handleInsertSnippet = (key: string) => {
+    const snippet = flexMessageSnippets[key];
+    if (!snippet) return;
+    const updated = insertSnippetIntoContent(content, snippet.json);
+    setContent(updated);
     if (jsonError) setJsonError(null);
   };
 
@@ -150,17 +158,17 @@ export function FlexMessageDetailPage() {
 
   return (
     <AppLayout title="Flex Message">
-      {/* Toast notifications */}
+      {/* Toast */}
       {(saveSuccess || saveError) && (
         <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
           {saveSuccess && (
-            <div className="flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium">
               <CheckCircle size={16} />
               Saved successfully
             </div>
           )}
           {saveError && (
-            <div className="flex items-center gap-2 bg-destructive text-destructive-foreground px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 pointer-events-auto">
+            <div className="flex items-center gap-2 bg-destructive text-destructive-foreground px-4 py-3 rounded-lg shadow-lg text-sm font-medium pointer-events-auto">
               <XCircle size={16} />
               {saveError}
             </div>
@@ -168,7 +176,7 @@ export function FlexMessageDetailPage() {
         </div>
       )}
 
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-4xl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -190,27 +198,17 @@ export function FlexMessageDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="capitalize">{containerType}</Badge>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleting || saving}
-            >
-              {deleting
-                ? <RefreshCw size={14} className="animate-spin mr-1" />
-                : <Trash2 size={14} className="mr-1" />}
+            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting || saving}>
+              {deleting ? <RefreshCw size={14} className="animate-spin mr-1" /> : <Trash2 size={14} className="mr-1" />}
               {deleting ? "Deleting..." : "Delete"}
             </Button>
           </div>
         </div>
 
-        {/* Edit Form */}
+        {/* Settings */}
         <Card>
-          <CardHeader>
-            <CardTitle>Template Settings</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Template Settings</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            {/* Name */}
             <div className="space-y-1">
               <label className="text-sm font-medium">
                 Template Name <span className="text-destructive">*</span>
@@ -224,8 +222,6 @@ export function FlexMessageDetailPage() {
                 disabled={saving}
               />
             </div>
-
-            {/* Description */}
             <div className="space-y-1">
               <label className="text-sm font-medium">Description</label>
               <textarea
@@ -243,22 +239,17 @@ export function FlexMessageDetailPage() {
         {/* JSON Editor */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle>Flex Message JSON</CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleFormatJson}
-                  disabled={saving}
-                >
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button variant="outline" size="sm" onClick={handleFormatJson} disabled={saving}>
                   Format JSON
                 </Button>
                 <CopyButton value={content} />
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handlePreview}
+                  onClick={() => window.open("https://developers.line.biz/flex-simulator/", "_blank", "noopener,noreferrer")}
                 >
                   <ExternalLink size={14} className="mr-1" />
                   Preview in Simulator
@@ -266,20 +257,51 @@ export function FlexMessageDetailPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
+            {/* Quick-Insert Toolbar */}
+            <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-md border">
+              <span className="text-xs font-medium text-muted-foreground mr-1">Insert:</span>
+              {Object.entries(flexMessageSnippets).map(([key, snippet]) => (
+                <button
+                  key={key}
+                  onClick={() => handleInsertSnippet(key)}
+                  title={snippet.description}
+                  disabled={saving}
+                  className="px-2.5 py-1 text-xs rounded border border-border bg-background hover:bg-accent hover:border-primary transition-colors font-mono disabled:opacity-50"
+                >
+                  + {snippet.label}
+                </button>
+              ))}
+              <span className="ml-auto text-xs text-muted-foreground hidden sm:block">
+                Adds to body.contents
+              </span>
+            </div>
+
             <p className="text-xs text-muted-foreground">
-              Paste a valid LINE Flex Message container JSON (type: "bubble" or "carousel").
-              Use the <strong>Preview in Simulator</strong> button to open LINE's Flex Message Simulator — paste the JSON there to preview it.
+              Valid LINE Flex Message container JSON (<code className="bg-muted px-1 rounded">type: "bubble"</code> or{" "}
+              <code className="bg-muted px-1 rounded">type: "carousel"</code>).
+              Use <strong>Preview in Simulator</strong> to see how it looks in the LINE app.
             </p>
-            <textarea
-              className="w-full border rounded-md px-3 py-2 text-xs font-mono bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-y"
-              value={content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              rows={20}
-              disabled={saving}
-              spellCheck={false}
-              placeholder='{"type": "bubble", "body": {"type": "box", "layout": "vertical", "contents": []}}'
-            />
+
+            {/* CodeMirror Editor */}
+            <div className="rounded-md overflow-hidden border">
+              <CodeMirror
+                value={content}
+                height="480px"
+                extensions={[json()]}
+                theme={oneDark}
+                onChange={handleContentChange}
+                editable={!saving}
+                basicSetup={{
+                  lineNumbers: true,
+                  foldGutter: true,
+                  bracketMatching: true,
+                  closeBrackets: true,
+                  autocompletion: true,
+                }}
+              />
+            </div>
+
             {jsonError && (
               <div className="flex items-center gap-2 text-destructive text-sm">
                 <AlertCircle size={14} />
