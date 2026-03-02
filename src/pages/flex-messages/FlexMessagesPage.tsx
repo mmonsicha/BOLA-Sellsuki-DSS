@@ -1,0 +1,257 @@
+import { AppLayout } from "@/components/layout/AppLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Layers, Trash2, Edit, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
+import { workspaceApi } from "@/api/workspace";
+
+// Parse the container type from raw JSON content
+function getContainerType(content: string): string {
+  try {
+    const parsed = JSON.parse(content);
+    return parsed.type === "carousel" ? "carousel" : "bubble";
+  } catch {
+    return "bubble";
+  }
+}
+
+interface CreateDialogProps {
+  workspaceId: string;
+  onClose: () => void;
+}
+
+function CreateFlexMessageDialog({ workspaceId, onClose }: CreateDialogProps) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      setError("Name is required");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await flexMessageApi.create({
+        workspace_id: workspaceId,
+        name: name.trim(),
+        description: description.trim(),
+        content: JSON.stringify({ type: "bubble", body: { type: "box", layout: "vertical", contents: [{ type: "text", text: "Hello, World!" }] } }, null, 2),
+      });
+      // Redirect to detail page to edit the content
+      window.location.href = `/flex-messages/${res.data.id}`;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-background rounded-lg shadow-xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold">New Flex Message Template</h2>
+
+        {error && (
+          <div className="flex items-center gap-2 text-destructive text-sm">
+            <AlertCircle size={14} />
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Template Name <span className="text-destructive">*</span></label>
+          <input
+            type="text"
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="e.g., Welcome Bubble, Product Carousel"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            autoFocus
+            disabled={saving}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Description</label>
+          <textarea
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="What is this template used for?"
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={saving}
+          />
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          A starter bubble template will be created. You can edit the JSON on the next page.
+        </p>
+
+        <div className="flex gap-2 justify-end">
+          <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleCreate} disabled={saving || !name.trim()}>
+            {saving ? "Creating..." : "Create & Edit"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function FlexMessagesPage() {
+  const [templates, setTemplates] = useState<FlexMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string>("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const wsRes = await workspaceApi.list({ page: 1, page_size: 1 });
+        const id = wsRes?.data?.[0]?.id ?? "00000000-0000-0000-0000-000000000001";
+        setWorkspaceId(id);
+        const res = await flexMessageApi.list({ workspace_id: id });
+        setTemplates(res.data ?? []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load templates");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const handleDelete = async (fm: FlexMessage) => {
+    if (!confirm(`Delete "${fm.name}"? This cannot be undone.`)) return;
+    setDeletingId(fm.id);
+    try {
+      await flexMessageApi.delete(fm.id);
+      setTemplates((prev) => prev.filter((t) => t.id !== fm.id));
+    } catch {
+      alert("Failed to delete template");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <AppLayout title="Flex Messages">
+      {showCreate && workspaceId && (
+        <CreateFlexMessageDialog
+          workspaceId={workspaceId}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
+
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground max-w-lg">
+              Create reusable LINE Flex Message templates. These JSON-based rich layouts can be attached to Broadcasts and Auto Push Messages for beautiful, structured messages.
+            </p>
+          </div>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus size={16} className="mr-2" />
+            Create Flex Message
+          </Button>
+        </div>
+
+        {/* Content */}
+        {loading && (
+          <p className="text-muted-foreground text-sm">Loading templates...</p>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-2 text-destructive text-sm">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && templates.length === 0 && (
+          <Card>
+            <CardContent className="py-16 text-center space-y-3">
+              <Layers size={40} className="mx-auto text-muted-foreground" />
+              <p className="text-muted-foreground font-medium">No Flex Message templates yet</p>
+              <p className="text-sm text-muted-foreground">
+                Create your first template to send beautiful rich messages via LINE.
+              </p>
+              <Button onClick={() => setShowCreate(true)} className="mt-2">
+                <Plus size={14} className="mr-1" />
+                Create Flex Message
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {!loading && !error && templates.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {templates.map((fm) => {
+              const type = getContainerType(fm.content);
+              return (
+                <Card key={fm.id} className="group relative hover:shadow-md transition-shadow">
+                  <CardContent className="p-4 space-y-3">
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-sm truncate">{fm.name}</h3>
+                        {fm.description && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">{fm.description}</p>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="flex-shrink-0 text-xs capitalize">
+                        {type}
+                      </Badge>
+                    </div>
+
+                    {/* JSON preview */}
+                    <div className="bg-muted rounded-md p-2 text-xs font-mono text-muted-foreground overflow-hidden" style={{ maxHeight: "4.5rem" }}>
+                      <pre className="truncate whitespace-pre-wrap break-all line-clamp-3">
+                        {fm.content}
+                      </pre>
+                    </div>
+
+                    {/* Date */}
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(fm.created_at).toLocaleDateString()}
+                    </p>
+
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => { window.location.href = `/flex-messages/${fm.id}`; }}
+                      >
+                        <Edit size={12} className="mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(fm)}
+                        disabled={deletingId === fm.id}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
+}

@@ -1,0 +1,398 @@
+import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { autoPushMessageApi } from "@/api/autoPushMessage";
+import type { AutoPushMessage } from "@/api/autoPushMessage";
+import { webhookSettingApi } from "@/api/webhookSetting";
+import { segmentApi } from "@/api/segment";
+import { lineOAApi } from "@/api/lineOA";
+import type { Segment, LineOA } from "@/types";
+import { MessageTemplateEditor } from "./MessageTemplateEditor";
+
+interface WebhookSetting {
+  id: string;
+  name: string;
+  webhook_type: string;
+  webhook_event?: string;
+  variables?: Array<{ name: string; description: string; required?: boolean }>;
+}
+
+interface CreateAutoPushDialogProps {
+  open: boolean;
+  lineOAId: string;
+  onClose: () => void;
+  onCreated: (apm: AutoPushMessage) => void;
+}
+
+interface Form {
+  webhook_setting_id: string;
+  name: string;
+  description: string;
+  message_template: string;
+  target_type: "follower" | "segment" | "all_followers" | "line_group";
+  target_segment_id: string;
+  target_follower_ids: string[];
+}
+
+const initialForm: Form = {
+  webhook_setting_id: "",
+  name: "",
+  description: "",
+  message_template: "",
+  target_type: "all_followers",
+  target_segment_id: "",
+  target_follower_ids: [],
+};
+
+function Field({
+  label,
+  required,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="text-sm font-medium">
+        {label}
+        {required && <span className="text-destructive ml-1">*</span>}
+      </label>
+      {children}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function TextInput({
+  value,
+  onChange,
+  placeholder,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      type="text"
+      className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+    />
+  );
+}
+
+function TextArea({
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  rows = 3,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  rows?: number;
+}) {
+  return (
+    <textarea
+      className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed font-mono"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+      rows={rows}
+    />
+  );
+}
+
+export function CreateAutoPushDialog({
+  open,
+  lineOAId: propLineOAId,
+  onClose,
+  onCreated,
+}: CreateAutoPushDialogProps) {
+  const [form, setForm] = useState<Form>(initialForm);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [webhooks, setWebhooks] = useState<WebhookSetting[]>([]);
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
+  const [lineOAId, setLineOAId] = useState<string>(propLineOAId);
+  const [loadingData, setLoadingData] = useState(false);
+  const [loadingLineOAs, setLoadingLineOAs] = useState(false);
+
+  // Load LINE OAs on mount
+  useEffect(() => {
+    if (open) {
+      loadLineOAs();
+    }
+  }, [open]);
+
+  // Load webhooks and segments when dialog opens or lineOAId changes
+  useEffect(() => {
+    if (open && lineOAId) {
+      loadSelectOptions();
+    }
+  }, [open, lineOAId]);
+
+  const loadLineOAs = async () => {
+    setLoadingLineOAs(true);
+    try {
+      const res = await lineOAApi.list({ workspace_id: "00000000-0000-0000-0000-000000000001" });
+      setLineOAs(res.data ?? []);
+    } catch (err) {
+      console.error("Failed to load LINE OAs:", err);
+    } finally {
+      setLoadingLineOAs(false);
+    }
+  };
+
+  const loadSelectOptions = async () => {
+    setLoadingData(true);
+    try {
+      // Load webhook settings
+      const webhookRes = await webhookSettingApi.list({ workspace_id: "00000000-0000-0000-0000-000000000001" });
+      setWebhooks(webhookRes.data ?? []);
+
+      // Load segments
+      const segmentRes = await segmentApi.list({
+        line_oa_id: lineOAId,
+        page: 1,
+        page_size: 100,
+      });
+      setSegments(segmentRes.data ?? []);
+    } catch (err) {
+      console.error("Failed to load options:", err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const handleLineOAChange = (newLineOAId: string) => {
+    setLineOAId(newLineOAId);
+    // Reset webhook and segment selections when LINE OA changes
+    setForm((prev) => ({ ...prev, webhook_setting_id: "", target_segment_id: "" }));
+  };
+
+  const handleWebhookChange = (webhookId: string) => {
+    set("webhook_setting_id")(webhookId);
+  };
+
+  const set = (key: keyof Form) => (value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleClose = () => {
+    setForm(initialForm);
+    setError("");
+    setLineOAId(propLineOAId);
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!form.name.trim()) {
+      setError("Auto push message name is required.");
+      return;
+    }
+    if (!form.webhook_setting_id.trim()) {
+      setError("Please select a webhook setting.");
+      return;
+    }
+    if (!form.message_template.trim()) {
+      setError("Message template is required.");
+      return;
+    }
+    if (form.target_type === "segment" && !form.target_segment_id.trim()) {
+      setError("Please select a target segment.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const created = await autoPushMessageApi.create({
+        line_oa_id: lineOAId,
+        webhook_setting_id: form.webhook_setting_id,
+        name: form.name.trim(),
+        description: form.description || "",
+        message_template: form.message_template,
+        target_type: form.target_type,
+        target_segment_id: form.target_segment_id || undefined,
+        target_follower_ids: form.target_follower_ids,
+      });
+      onCreated(created.data!);
+      handleClose();
+      // Store created message in sessionStorage so detail page can use it immediately
+      if (created.data) {
+        sessionStorage.setItem(
+          `apm_${created.data.id}`,
+          JSON.stringify(created.data)
+        );
+      }
+      // Redirect to detail page after creation (with slight delay to ensure DB commit)
+      setTimeout(() => {
+        window.location.href = `/auto-push-messages/${created.data!.id}`;
+      }, 300);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to create auto push message"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      title="Create Auto Push Message"
+      description="Create a new message template triggered by webhook events"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Error */}
+        {error && (
+          <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+            {error}
+          </div>
+        )}
+
+        {/* LINE OA Selection */}
+        <Field label="LINE Official Account" required hint="Which LINE OA will send this message">
+          <select
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
+            value={lineOAId}
+            onChange={(e) => handleLineOAChange(e.target.value)}
+            disabled={saving || loadingLineOAs}
+          >
+            <option value="">
+              {loadingLineOAs ? "Loading..." : "Select LINE OA..."}
+            </option>
+            {lineOAs.map((oa) => (
+              <option key={oa.id} value={oa.id}>
+                {oa.name} {oa.basic_id && `(@${oa.basic_id})`}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {/* Name */}
+        <Field label="Message Name" required>
+          <TextInput
+            value={form.name}
+            onChange={set("name")}
+            placeholder="e.g., CRM Lead Alert, Order Confirmation"
+            disabled={saving}
+          />
+        </Field>
+
+        {/* Webhook Setting */}
+        <Field label="Webhook Setting" required hint="Which webhook configuration to use for field definitions">
+          <select
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
+            value={form.webhook_setting_id}
+            onChange={(e) => handleWebhookChange(e.target.value)}
+            disabled={saving || loadingData}
+          >
+            <option value="">
+              {loadingData ? "Loading..." : "Select webhook setting..."}
+            </option>
+            {webhooks.map((webhook) => (
+              <option key={webhook.id} value={webhook.id}>
+                {webhook.name} ({webhook.webhook_type})
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {/* Message Template */}
+        <Field label="Message Template" required hint="HTML with {field_name} placeholders that will be substituted from webhook payload">
+          <MessageTemplateEditor
+            value={form.message_template}
+            onChange={set("message_template")}
+            disabled={saving}
+            webhookVariables={
+              webhooks.find((w) => w.id === form.webhook_setting_id)?.variables || []
+            }
+          />
+        </Field>
+
+        {/* Description */}
+        <Field label="Description" hint="Internal notes about this auto push message">
+          <TextArea
+            value={form.description}
+            onChange={set("description")}
+            placeholder="What is this message for? Who manages it? Any special instructions?"
+            disabled={saving}
+            rows={2}
+          />
+        </Field>
+
+        {/* Target Type */}
+        <Field label="Send To" required hint="Who should receive this message">
+          <select
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
+            value={form.target_type}
+            onChange={(e) => set("target_type")(e.target.value as any)}
+            disabled={saving}
+          >
+            <option value="all_followers">All Followers</option>
+            <option value="segment">Specific Segment</option>
+            <option value="follower">Single Follower</option>
+            <option value="line_group" disabled>LINE Group Chat (Coming Soon)</option>
+          </select>
+        </Field>
+
+        {/* Target Segment */}
+        {form.target_type === "segment" && (
+          <Field label="Select Segment" required>
+            <select
+              className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
+              value={form.target_segment_id}
+              onChange={(e) => set("target_segment_id")(e.target.value)}
+              disabled={saving || loadingData}
+            >
+              <option value="">
+                {loadingData ? "Loading..." : "Choose segment..."}
+              </option>
+              {segments.map((segment) => (
+                <option key={segment.id} value={segment.id}>
+                  {segment.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        {/* Buttons */}
+        <div className="flex items-center gap-2 pt-4 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" disabled={saving} className="ml-auto gap-2">
+            {saving && <RefreshCw size={14} className="animate-spin" />}
+            {saving ? "Creating..." : "Create Auto Push Message"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
