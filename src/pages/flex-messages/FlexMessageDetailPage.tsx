@@ -6,15 +6,18 @@ import { CopyButton } from "@/components/CopyButton";
 import {
   AlertCircle, ArrowLeft, RefreshCw,
   Trash2, CheckCircle, XCircle, Eye,
+  MousePointerClick, Code,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
-import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
+import { flexMessageApi, type FlexMessage, type FlexMessageVariable } from "@/api/flexMessage";
+import { VariablesPanel } from "./builder/VariablesPanel";
 import { flexMessageSnippets, insertSnippetIntoContent } from "@/utils/flexMessageSnippets";
 import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { render as renderFlexMessage } from "flex-render";
 import "flex-render/css";
+import { FlexBuilder } from "./builder/FlexBuilder";
 
 
 function getContainerType(content: string): string {
@@ -83,6 +86,7 @@ export function FlexMessageDetailPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
+  const [variables, setVariables] = useState<FlexMessageVariable[]>([]);
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   // Action states
@@ -90,6 +94,9 @@ export function FlexMessageDetailPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Editor mode
+  const [mode, setMode] = useState<"visual" | "code">("visual");
 
   useEffect(() => {
     const load = async () => {
@@ -100,6 +107,7 @@ export function FlexMessageDetailPage() {
         setName(data.name);
         setDescription(data.description ?? "");
         setContent(data.content);
+        setVariables(data.variables ?? []);
       } catch (err) {
         setLoadError(err instanceof Error ? err.message : "Failed to load template");
       } finally {
@@ -139,6 +147,7 @@ export function FlexMessageDetailPage() {
         name: name.trim(),
         description: description.trim() || undefined,
         content,
+        variables,
       });
       setFm(res.data);
       setSaveSuccess(true);
@@ -174,6 +183,20 @@ export function FlexMessageDetailPage() {
     const updated = insertSnippetIntoContent(content, snippet.json);
     setContent(updated);
     if (jsonError) setJsonError(null);
+  };
+
+  const switchToVisual = () => {
+    try {
+      JSON.parse(content);
+      setMode("visual");
+      setJsonError(null);
+    } catch {
+      setJsonError("Cannot switch to Visual mode: content is not valid JSON. Fix the JSON first.");
+    }
+  };
+
+  const switchToCode = () => {
+    setMode("code");
   };
 
   if (loading) {
@@ -225,7 +248,7 @@ export function FlexMessageDetailPage() {
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header — full width */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -254,130 +277,153 @@ export function FlexMessageDetailPage() {
           </div>
         </div>
 
-        {/* Two-column layout: editor (left) + preview (right) */}
-        <div className="flex gap-6 items-start">
+        {/* Template Settings — compact inline */}
+        <Card>
+          <CardContent className="py-3 px-4">
+            <div className="flex gap-4 items-start">
+              <div className="flex-1 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Template Name <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="w-full border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., Welcome Bubble, Product Carousel"
+                  disabled={saving}
+                />
+              </div>
+              <div className="flex-1 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Description</label>
+                <input
+                  type="text"
+                  className="w-full border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="What is this template used for?"
+                  disabled={saving}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Left: editor pane */}
-          <div className="flex-1 min-w-0 space-y-6">
-            {/* Settings */}
-            <Card>
-              <CardHeader><CardTitle>Template Settings</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">
-                    Template Name <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g., Welcome Bubble, Product Carousel"
-                    disabled={saving}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Description</label>
-                  <textarea
-                    className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="What is this template used for?"
-                    rows={2}
-                    disabled={saving}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+        {/* Variables Panel */}
+        <VariablesPanel variables={variables} onChange={setVariables} disabled={saving} />
 
-            {/* JSON Editor */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <CardTitle>Flex Message JSON</CardTitle>
-                  <div className="flex items-center gap-2 flex-wrap">
+        {/* Mode Toggle + Save */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+            <button
+              onClick={switchToVisual}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                mode === "visual"
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <MousePointerClick size={13} />
+              Visual
+            </button>
+            <button
+              onClick={switchToCode}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                mode === "code"
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Code size={13} />
+              Code
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {mode === "code" && <CopyButton value={content} />}
+            <Button onClick={handleSave} disabled={saving || deleting}>
+              {saving && <RefreshCw size={14} className="mr-2 animate-spin" />}
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </div>
+
+        {jsonError && (
+          <div className="flex items-center gap-2 text-destructive text-sm">
+            <AlertCircle size={14} />
+            {jsonError}
+          </div>
+        )}
+
+        {/* Visual Mode */}
+        {mode === "visual" && (
+          <FlexBuilder content={content} onContentChange={handleContentChange} variables={variables} />
+        )}
+
+        {/* Code Mode — existing CodeMirror editor + preview */}
+        {mode === "code" && (
+          <div className="flex gap-6 items-start">
+            {/* Left: editor pane */}
+            <div className="flex-1 min-w-0 space-y-4">
+              <Card>
+                <CardHeader className="py-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="text-sm">Flex Message JSON</CardTitle>
                     <Button variant="outline" size="sm" onClick={handleFormatJson} disabled={saving}>
                       Format JSON
                     </Button>
-                    <CopyButton value={content} />
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Quick-Insert Toolbar */}
-                <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-md border">
-                  <span className="text-xs font-medium text-muted-foreground mr-1">Insert:</span>
-                  {Object.entries(flexMessageSnippets).map(([key, snippet]) => (
-                    <button
-                      key={key}
-                      onClick={() => handleInsertSnippet(key)}
-                      title={snippet.description}
-                      disabled={saving}
-                      className="px-2.5 py-1 text-xs rounded border border-border bg-background hover:bg-accent hover:border-primary transition-colors font-mono disabled:opacity-50"
-                    >
-                      + {snippet.label}
-                    </button>
-                  ))}
-                  <span className="ml-auto text-xs text-muted-foreground hidden sm:block">
-                    Adds to body.contents
-                  </span>
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  Valid LINE Flex Message container JSON (<code className="bg-muted px-1 rounded">type: "bubble"</code> or{" "}
-                  <code className="bg-muted px-1 rounded">type: "carousel"</code>).
-                  <span className="hidden lg:inline"> Preview updates live on the right →</span>
-                  <span className="lg:hidden"> Scroll down to see the live preview.</span>
-                </p>
-
-                {/* CodeMirror Editor */}
-                <div className="rounded-md overflow-hidden border">
-                  <CodeMirror
-                    value={content}
-                    height="480px"
-                    extensions={[json()]}
-                    theme={oneDark}
-                    onChange={handleContentChange}
-                    editable={!saving}
-                    basicSetup={{
-                      lineNumbers: true,
-                      foldGutter: true,
-                      bracketMatching: true,
-                      closeBrackets: true,
-                      autocompletion: true,
-                    }}
-                  />
-                </div>
-
-                {jsonError && (
-                  <div className="flex items-center gap-2 text-destructive text-sm">
-                    <AlertCircle size={14} />
-                    {jsonError}
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  {/* Quick-Insert Toolbar */}
+                  <div className="flex flex-wrap items-center gap-2 p-2 bg-muted/50 rounded-md border">
+                    <span className="text-xs font-medium text-muted-foreground mr-1">Insert:</span>
+                    {Object.entries(flexMessageSnippets).map(([key, snippet]) => (
+                      <button
+                        key={key}
+                        onClick={() => handleInsertSnippet(key)}
+                        title={snippet.description}
+                        disabled={saving}
+                        className="px-2 py-0.5 text-xs rounded border border-border bg-background hover:bg-accent hover:border-primary transition-colors font-mono disabled:opacity-50"
+                      >
+                        + {snippet.label}
+                      </button>
+                    ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
 
-            {/* Save */}
-            <div className="flex justify-end">
-              <Button onClick={handleSave} disabled={saving || deleting} size="lg">
-                {saving && <RefreshCw size={14} className="mr-2 animate-spin" />}
-                {saving ? "Saving..." : "Save Changes"}
-              </Button>
+                  {/* CodeMirror Editor */}
+                  <div className="rounded-md overflow-hidden border">
+                    <CodeMirror
+                      value={content}
+                      height="480px"
+                      extensions={[json()]}
+                      theme={oneDark}
+                      onChange={handleContentChange}
+                      editable={!saving}
+                      basicSetup={{
+                        lineNumbers: true,
+                        foldGutter: true,
+                        bracketMatching: true,
+                        closeBrackets: true,
+                        autocompletion: true,
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Mobile preview (shown below editor on small screens) */}
+              <div className="lg:hidden">
+                <LivePreviewPanel content={content} />
+              </div>
             </div>
 
-            {/* Mobile preview (shown below editor on small screens) */}
-            <div className="lg:hidden">
+            {/* Right: live preview (desktop only, sticky) */}
+            <div className="hidden lg:block w-80 shrink-0">
               <LivePreviewPanel content={content} />
             </div>
           </div>
-
-          {/* Right: live preview (desktop only, sticky) */}
-          <div className="hidden lg:block w-80 shrink-0">
-            <LivePreviewPanel content={content} />
-          </div>
-
-        </div>
+        )}
       </div>
     </AppLayout>
   );
