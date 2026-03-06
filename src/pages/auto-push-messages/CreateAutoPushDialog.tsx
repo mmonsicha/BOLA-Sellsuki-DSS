@@ -7,6 +7,8 @@ import type { AutoPushMessage } from "@/api/autoPushMessage";
 import { webhookSettingApi } from "@/api/webhookSetting";
 import { segmentApi } from "@/api/segment";
 import { lineOAApi } from "@/api/lineOA";
+import { flexMessageApi } from "@/api/flexMessage";
+import type { FlexMessage } from "@/api/flexMessage";
 import type { Segment, LineOA } from "@/types";
 import { MessageTemplateEditor } from "./MessageTemplateEditor";
 
@@ -29,7 +31,9 @@ interface Form {
   webhook_setting_id: string;
   name: string;
   description: string;
+  message_type: "text" | "flex";
   message_template: string;
+  flex_message_id: string;
   target_type: "follower" | "segment" | "all_followers" | "line_group";
   target_segment_id: string;
   target_follower_ids: string[];
@@ -39,7 +43,9 @@ const initialForm: Form = {
   webhook_setting_id: "",
   name: "",
   description: "",
+  message_type: "text",
   message_template: "",
+  flex_message_id: "",
   target_type: "all_followers",
   target_segment_id: "",
   target_follower_ids: [],
@@ -131,6 +137,7 @@ export function CreateAutoPushDialog({
   const [lineOAId, setLineOAId] = useState<string>(propLineOAId);
   const [loadingData, setLoadingData] = useState(false);
   const [loadingLineOAs, setLoadingLineOAs] = useState(false);
+  const [flexMessages, setFlexMessages] = useState<FlexMessage[]>([]);
 
   // Load LINE OAs on mount
   useEffect(() => {
@@ -172,6 +179,10 @@ export function CreateAutoPushDialog({
         page_size: 100,
       });
       setSegments(segmentRes.data ?? []);
+
+      // Load flex messages for picker
+      const flexRes = await flexMessageApi.list({ workspace_id: "00000000-0000-0000-0000-000000000001" });
+      setFlexMessages(flexRes.data ?? []);
     } catch (err) {
       console.error("Failed to load options:", err);
     } finally {
@@ -212,8 +223,12 @@ export function CreateAutoPushDialog({
       setError("Please select a webhook setting.");
       return;
     }
-    if (!form.message_template.trim()) {
+    if (form.message_type === "text" && !form.message_template.trim()) {
       setError("Message template is required.");
+      return;
+    }
+    if (form.message_type === "flex" && !form.flex_message_id) {
+      setError("Please select a Flex Message template.");
       return;
     }
     if (form.target_type === "segment" && !form.target_segment_id.trim()) {
@@ -228,7 +243,9 @@ export function CreateAutoPushDialog({
         webhook_setting_id: form.webhook_setting_id,
         name: form.name.trim(),
         description: form.description || "",
-        message_template: form.message_template,
+        message_type: form.message_type,
+        message_template: form.message_type === "text" ? form.message_template : "",
+        flex_message_id: form.message_type === "flex" ? form.flex_message_id : undefined,
         target_type: form.target_type,
         target_segment_id: form.target_segment_id || undefined,
         target_follower_ids: form.target_follower_ids,
@@ -318,17 +335,79 @@ export function CreateAutoPushDialog({
           </select>
         </Field>
 
-        {/* Message Template */}
-        <Field label="Message Template" required hint="HTML with {field_name} placeholders that will be substituted from webhook payload">
-          <MessageTemplateEditor
-            value={form.message_template}
-            onChange={set("message_template")}
-            disabled={saving}
-            webhookVariables={
-              webhooks.find((w) => w.id === form.webhook_setting_id)?.variables || []
-            }
-          />
+        {/* Message Type Toggle */}
+        <Field label="Message Type" required hint="Choose between a plain text/HTML template or a pre-designed Flex Message">
+          <div className="flex gap-2">
+            <label className={`flex-1 flex items-center gap-2 border rounded-md px-3 py-2 cursor-pointer text-sm transition-colors ${form.message_type === "text" ? "border-primary bg-primary/5 text-primary font-medium" : "border-input"}`}>
+              <input
+                type="radio"
+                name="message_type"
+                value="text"
+                checked={form.message_type === "text"}
+                onChange={() => setForm((prev) => ({ ...prev, message_type: "text", flex_message_id: "" }))}
+                className="accent-primary"
+                disabled={saving}
+              />
+              Text / HTML
+            </label>
+            <label className={`flex-1 flex items-center gap-2 border rounded-md px-3 py-2 cursor-pointer text-sm transition-colors ${form.message_type === "flex" ? "border-primary bg-primary/5 text-primary font-medium" : "border-input"}`}>
+              <input
+                type="radio"
+                name="message_type"
+                value="flex"
+                checked={form.message_type === "flex"}
+                onChange={() => setForm((prev) => ({ ...prev, message_type: "flex", message_template: "" }))}
+                className="accent-primary"
+                disabled={saving}
+              />
+              Flex Message Template
+            </label>
+          </div>
         </Field>
+
+        {/* Text Message Template */}
+        {form.message_type === "text" && (
+          <Field label="Message Template" required hint="HTML with {field_name} placeholders that will be substituted from webhook payload">
+            <MessageTemplateEditor
+              value={form.message_template}
+              onChange={set("message_template")}
+              disabled={saving}
+              webhookVariables={
+                webhooks.find((w) => w.id === form.webhook_setting_id)?.variables || []
+              }
+            />
+          </Field>
+        )}
+
+        {/* Flex Message Picker */}
+        {form.message_type === "flex" && (
+          <Field label="Flex Message Template" required hint="Select a pre-designed Flex Message template to use">
+            <select
+              className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
+              value={form.flex_message_id}
+              onChange={(e) => set("flex_message_id")(e.target.value)}
+              disabled={saving || loadingData}
+            >
+              <option value="">
+                {loadingData ? "Loading templates..." : "Select a Flex Message template..."}
+              </option>
+              {flexMessages.map((fm) => (
+                <option key={fm.id} value={fm.id}>
+                  {fm.name}{fm.description ? ` — ${fm.description}` : ""}
+                </option>
+              ))}
+            </select>
+            {flexMessages.length === 0 && !loadingData && (
+              <p className="text-xs text-muted-foreground mt-1">
+                No Flex Message templates found.{" "}
+                <a href="/flex-messages" className="underline text-primary" target="_blank" rel="noopener noreferrer">
+                  Create one first
+                </a>
+                .
+              </p>
+            )}
+          </Field>
+        )}
 
         {/* Description */}
         <Field label="Description" hint="Internal notes about this auto push message">

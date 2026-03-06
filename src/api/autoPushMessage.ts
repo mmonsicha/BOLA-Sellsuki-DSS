@@ -8,7 +8,9 @@ export interface AutoPushMessage {
   webhook_url: string;
   name: string;
   description?: string;
+  message_type: "text" | "flex";
   message_template: string;
+  flex_message_id?: string;
   target_type: "follower" | "segment" | "all_followers" | "line_group";
   target_segment_id?: string;
   target_follower_ids?: string[];
@@ -40,7 +42,9 @@ export interface CreateAutoPushMessageRequest {
   webhook_setting_id: string;
   name: string;
   description?: string;
-  message_template: string;
+  message_type?: "text" | "flex";
+  message_template?: string;
+  flex_message_id?: string;
   target_type: "follower" | "segment" | "all_followers" | "line_group";
   target_segment_id?: string;
   target_follower_ids?: string[];
@@ -49,7 +53,9 @@ export interface CreateAutoPushMessageRequest {
 export interface UpdateAutoPushMessageRequest {
   name?: string;
   description?: string;
+  message_type?: "text" | "flex";
   message_template?: string;
+  flex_message_id?: string;
   is_enabled?: boolean;
   target_type?: string;
   target_segment_id?: string;

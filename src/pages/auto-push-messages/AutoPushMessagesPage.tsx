@@ -210,7 +210,9 @@ export function AutoPushMessagesPage() {
 
                         {/* Template Preview */}
                         <div className="text-xs text-muted-foreground mt-2 bg-muted px-2 py-1 rounded line-clamp-1">
-                          Template: {apm.message_template}
+                          {apm.message_type === "flex"
+                            ? "📋 Flex Message Template"
+                            : `Template: ${apm.message_template}`}
                         </div>
                       </div>
 

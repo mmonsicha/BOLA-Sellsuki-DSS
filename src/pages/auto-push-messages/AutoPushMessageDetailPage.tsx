@@ -6,6 +6,8 @@ import { AlertCircle, ArrowLeft, Copy, Check, RefreshCw, Trash2, CheckCircle, XC
 import { CopyButton } from "@/components/CopyButton";
 import { useState, useEffect } from "react";
 import { autoPushMessageApi } from "@/api/autoPushMessage";
+import { flexMessageApi } from "@/api/flexMessage";
+import type { FlexMessage } from "@/api/flexMessage";
 import { segmentApi } from "@/api/segment";
 import { webhookSettingApi } from "@/api/webhookSetting";
 import { DeliveryLogsTable } from "./DeliveryLogsTable";
@@ -17,7 +19,9 @@ import type { DeliveryLog } from "@/api/autoPushMessage";
 interface FormState {
   name: string;
   description: string;
+  messageType: "text" | "flex";
   messageTemplate: string;
+  flexMessageId: string;
   targetType: "follower" | "segment" | "all_followers";
   targetSegmentId: string;
   isEnabled: boolean;
@@ -94,6 +98,7 @@ export function AutoPushMessageDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [webhook, setWebhook] = useState<WebhookSetting | null>(null);
+  const [flexMessages, setFlexMessages] = useState<FlexMessage[]>([]);
 
   // Delivery Logs
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
@@ -106,7 +111,9 @@ export function AutoPushMessageDetailPage() {
   const [form, setForm] = useState<FormState>({
     name: "",
     description: "",
+    messageType: "text",
     messageTemplate: "",
+    flexMessageId: "",
     targetType: "all_followers",
     targetSegmentId: "",
     isEnabled: true,
@@ -158,7 +165,9 @@ export function AutoPushMessageDetailPage() {
           setForm({
             name: apmData.name,
             description: apmData.description || "",
+            messageType: (apmData.message_type as any) || "text",
             messageTemplate: apmData.message_template,
+            flexMessageId: apmData.flex_message_id || "",
             targetType: apmData.target_type as any,
             targetSegmentId: apmData.target_segment_id || "",
             isEnabled: apmData.is_enabled,
@@ -184,6 +193,14 @@ export function AutoPushMessageDetailPage() {
             console.error("Failed to load segments:", err);
           }
 
+          // Load flex messages for picker
+          try {
+            const flexRes = await flexMessageApi.list({ workspace_id: "00000000-0000-0000-0000-000000000001" });
+            setFlexMessages(flexRes.data ?? []);
+          } catch (err) {
+            console.error("Failed to load flex messages:", err);
+          }
+
           // Load delivery logs
           await loadDeliveryLogs(1);
         }
@@ -205,8 +222,12 @@ export function AutoPushMessageDetailPage() {
       setSaveError("Auto push message name is required");
       return;
     }
-    if (!form.messageTemplate.trim()) {
+    if (form.messageType === "text" && !form.messageTemplate.trim()) {
       setSaveError("Message template is required");
+      return;
+    }
+    if (form.messageType === "flex" && !form.flexMessageId) {
+      setSaveError("Please select a Flex Message template");
       return;
     }
 
@@ -215,7 +236,9 @@ export function AutoPushMessageDetailPage() {
       const updated = await autoPushMessageApi.update(id, {
         name: form.name.trim(),
         description: form.description || undefined,
-        message_template: form.messageTemplate,
+        message_type: form.messageType,
+        message_template: form.messageType === "text" ? form.messageTemplate : "",
+        flex_message_id: form.messageType === "flex" ? form.flexMessageId : undefined,
         target_type: form.targetType,
         target_segment_id: form.targetSegmentId || undefined,
         is_enabled: form.isEnabled,
@@ -370,15 +393,75 @@ export function AutoPushMessageDetailPage() {
               />
             </Field>
 
-            {/* Message Template */}
-            <Field label="Message Template" required hint="HTML template with {field_name} placeholders">
-              <MessageTemplateEditor
-                value={form.messageTemplate}
-                onChange={(v) => setForm({ ...form, messageTemplate: v })}
-                disabled={saving}
-                webhookVariables={webhook?.variables ?? []}
-              />
+            {/* Message Type Toggle */}
+            <Field label="Message Type" required>
+              <div className="flex gap-2">
+                <label className={`flex-1 flex items-center gap-2 border rounded-md px-3 py-2 cursor-pointer text-sm transition-colors ${form.messageType === "text" ? "border-primary bg-primary/5 text-primary font-medium" : "border-input"}`}>
+                  <input
+                    type="radio"
+                    name="messageType"
+                    value="text"
+                    checked={form.messageType === "text"}
+                    onChange={() => setForm({ ...form, messageType: "text", flexMessageId: "" })}
+                    className="accent-primary"
+                    disabled={saving}
+                  />
+                  Text / HTML
+                </label>
+                <label className={`flex-1 flex items-center gap-2 border rounded-md px-3 py-2 cursor-pointer text-sm transition-colors ${form.messageType === "flex" ? "border-primary bg-primary/5 text-primary font-medium" : "border-input"}`}>
+                  <input
+                    type="radio"
+                    name="messageType"
+                    value="flex"
+                    checked={form.messageType === "flex"}
+                    onChange={() => setForm({ ...form, messageType: "flex", messageTemplate: "" })}
+                    className="accent-primary"
+                    disabled={saving}
+                  />
+                  Flex Message Template
+                </label>
+              </div>
             </Field>
+
+            {/* Text Message Template */}
+            {form.messageType === "text" && (
+              <Field label="Message Template" required hint="HTML template with {field_name} placeholders">
+                <MessageTemplateEditor
+                  value={form.messageTemplate}
+                  onChange={(v) => setForm({ ...form, messageTemplate: v })}
+                  disabled={saving}
+                  webhookVariables={webhook?.variables ?? []}
+                />
+              </Field>
+            )}
+
+            {/* Flex Message Picker */}
+            {form.messageType === "flex" && (
+              <Field label="Flex Message Template" required hint="Select a pre-designed Flex Message template">
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted"
+                  value={form.flexMessageId}
+                  onChange={(e) => setForm({ ...form, flexMessageId: e.target.value })}
+                  disabled={saving}
+                >
+                  <option value="">Select a Flex Message template...</option>
+                  {flexMessages.map((fm) => (
+                    <option key={fm.id} value={fm.id}>
+                      {fm.name}{fm.description ? ` — ${fm.description}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {flexMessages.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No Flex Message templates found.{" "}
+                    <a href="/flex-messages" className="underline text-primary" target="_blank" rel="noopener noreferrer">
+                      Create one first
+                    </a>
+                    .
+                  </p>
+                )}
+              </Field>
+            )}
 
             {/* Target Type */}
             <Field label="Send To" required>
@@ -443,7 +526,20 @@ export function AutoPushMessageDetailPage() {
 
         {/* Example Payload */}
         {(() => {
-          const fields = extractTemplateFields(form.messageTemplate);
+          let fields: Record<string, string> = {};
+          if (form.messageType === "flex") {
+            const selectedFlex = flexMessages.find((fm) => fm.id === form.flexMessageId);
+            if (selectedFlex) {
+              selectedFlex.variables.forEach((v) => {
+                fields[v.name] = `example_${v.name}`;
+              });
+              // Also extract {placeholders} from the flex JSON content
+              const extracted = extractTemplateFields(selectedFlex.content);
+              fields = { ...extracted, ...fields };
+            }
+          } else {
+            fields = extractTemplateFields(form.messageTemplate);
+          }
           const hasFields = Object.keys(fields).length > 0;
           const payloadJson = JSON.stringify(fields, null, 2);
           return (
@@ -453,7 +549,10 @@ export function AutoPushMessageDetailPage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  POST this JSON to the webhook URL to trigger the message. Fields are extracted live from your template above.
+                  POST this JSON to the webhook URL to trigger the message.{" "}
+                  {form.messageType === "flex"
+                    ? "Fields are extracted from the selected Flex Message template."
+                    : "Fields are extracted live from your template above."}
                 </p>
                 {hasFields ? (
                   <div className="relative">
@@ -466,7 +565,9 @@ export function AutoPushMessageDetailPage() {
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground italic">
-                    No {"{field}"} placeholders found in your template yet.
+                    {form.messageType === "flex"
+                      ? "Select a Flex Message template to see required fields."
+                      : "No {field} placeholders found in your template yet."}
                   </p>
                 )}
               </CardContent>
