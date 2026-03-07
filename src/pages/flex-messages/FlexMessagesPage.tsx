@@ -3,10 +3,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Layers, Trash2, Edit, AlertCircle, ArrowLeft } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { workspaceApi } from "@/api/workspace";
+import { lineOAApi } from "@/api/lineOA";
+import type { LineOA } from "@/types";
 import { flexMessageTemplates, type FlexTemplate } from "@/utils/flexMessageTemplates";
+import { render as renderFlexMessage } from "flex-render";
 
 function getContainerType(content: string): string {
   try {
@@ -15,6 +18,41 @@ function getContainerType(content: string): string {
   } catch {
     return "bubble";
   }
+}
+
+// ─── Flex Message Card Preview ─────────────────────────────────────────────
+
+function FlexCardPreview({ content }: { content: string }) {
+  const html = useMemo(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return renderFlexMessage(JSON.parse(content) as any);
+    } catch {
+      return null;
+    }
+  }, [content]);
+
+  if (!html) {
+    return (
+      <div className="bg-muted rounded-md flex items-center justify-center h-36 text-xs text-muted-foreground italic">
+        Preview unavailable
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-md bg-[#C6D0D9] p-2" style={{ height: "180px" }}>
+      <div
+        style={{ pointerEvents: "none" }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+      {/* Gradient fade at bottom — looks intentional, hides hard crop */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-10 pointer-events-none"
+        style={{ background: "linear-gradient(to bottom, transparent, #C6D0D9)" }}
+      />
+    </div>
+  );
 }
 
 // ─── Step 1: Template Picker ───────────────────────────────────────────────
@@ -174,6 +212,7 @@ type DialogStep = "picker" | "form";
 
 export function FlexMessagesPage() {
   const [templates, setTemplates] = useState<FlexMessage[]>([]);
+  const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string>("");
@@ -190,8 +229,12 @@ export function FlexMessagesPage() {
         const wsRes = await workspaceApi.list({ page: 1, page_size: 1 });
         const id = wsRes?.data?.[0]?.id ?? "00000000-0000-0000-0000-000000000001";
         setWorkspaceId(id);
-        const res = await flexMessageApi.list({ workspace_id: id });
-        setTemplates(res.data ?? []);
+        const [tplRes, oaRes] = await Promise.all([
+          flexMessageApi.list({ workspace_id: id }),
+          lineOAApi.list({ workspace_id: id }),
+        ]);
+        setTemplates(tplRes.data ?? []);
+        setLineOAs(oaRes.data ?? []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load templates");
       } finally {
@@ -290,19 +333,44 @@ export function FlexMessagesPage() {
                           <p className="text-xs text-muted-foreground truncate mt-0.5">{fm.description}</p>
                         )}
                       </div>
-                      <Badge variant="outline" className="flex-shrink-0 text-xs capitalize">
-                        {type}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {type}
+                        </Badge>
+                        {fm.variables.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {fm.variables.length} var{fm.variables.length > 1 ? 's' : ''}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="bg-muted rounded-md p-2 text-xs font-mono text-muted-foreground overflow-hidden" style={{ maxHeight: "4.5rem" }}>
-                      <pre className="truncate whitespace-pre-wrap break-all line-clamp-3">
-                        {fm.content}
-                      </pre>
-                    </div>
+                    <FlexCardPreview content={fm.content} />
 
-                    <p className="text-xs text-muted-foreground">
+                    {lineOAs.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {lineOAs.slice(0, 3).map((oa) => (
+                          <span
+                            key={oa.id}
+                            className="inline-flex items-center gap-1 text-xs bg-[#06C755]/10 text-[#06C755] border border-[#06C755]/30 rounded px-1.5 py-0.5 font-medium"
+                          >
+                            <span>{oa.basic_id}</span>
+                            <span className="opacity-60">·</span>
+                            <span className="truncate max-w-[80px] opacity-80">{oa.name}</span>
+                          </span>
+                        ))}
+                        {lineOAs.length > 3 && (
+                          <span className="text-xs text-muted-foreground self-center">
+                            +{lineOAs.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
                       {new Date(fm.created_at).toLocaleDateString()}
+                      <span>·</span>
+                      <span className="font-mono">#{fm.id.slice(-8)}</span>
                     </p>
 
                     <div className="flex gap-2">

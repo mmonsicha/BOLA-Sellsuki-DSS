@@ -1,6 +1,8 @@
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { RefreshCw, ChevronDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { autoPushMessageApi } from "@/api/autoPushMessage";
 import type { AutoPushMessage } from "@/api/autoPushMessage";
@@ -138,6 +140,8 @@ export function CreateAutoPushDialog({
   const [loadingData, setLoadingData] = useState(false);
   const [loadingLineOAs, setLoadingLineOAs] = useState(false);
   const [flexMessages, setFlexMessages] = useState<FlexMessage[]>([]);
+  const [flexSelectorOpen, setFlexSelectorOpen] = useState(false);
+  const [flexSearch, setFlexSearch] = useState("");
 
   // Load LINE OAs on mount
   useEffect(() => {
@@ -272,6 +276,21 @@ export function CreateAutoPushDialog({
     }
   };
 
+  // Derived: selected flex message template
+  const selectedFlex = flexMessages.find((fm) => fm.id === form.flex_message_id);
+
+  // Helper: parse bubble/carousel type from Flex Message JSON content
+  const getFlexType = (content: string) => {
+    try { return (JSON.parse(content) as { type?: string })?.type ?? "bubble"; } catch { return "bubble"; }
+  };
+
+  // Filtered list for the flex selector search
+  const filteredFlexMessages = flexMessages.filter(
+    (fm) =>
+      fm.name.toLowerCase().includes(flexSearch.toLowerCase()) ||
+      fm.description.toLowerCase().includes(flexSearch.toLowerCase())
+  );
+
   return (
     <Dialog
       open={open}
@@ -382,21 +401,95 @@ export function CreateAutoPushDialog({
         {/* Flex Message Picker */}
         {form.message_type === "flex" && (
           <Field label="Flex Message Template" required hint="Select a pre-designed Flex Message template to use">
-            <select
-              className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
-              value={form.flex_message_id}
-              onChange={(e) => set("flex_message_id")(e.target.value)}
-              disabled={saving || loadingData}
-            >
-              <option value="">
-                {loadingData ? "Loading templates..." : "Select a Flex Message template..."}
-              </option>
-              {flexMessages.map((fm) => (
-                <option key={fm.id} value={fm.id}>
-                  {fm.name}{fm.description ? ` — ${fm.description}` : ""}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              {/* Trigger button */}
+              <button
+                type="button"
+                className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-background text-left disabled:bg-muted disabled:cursor-not-allowed"
+                onClick={() => setFlexSelectorOpen((o) => !o)}
+                disabled={saving || loadingData}
+              >
+                {selectedFlex ? (
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="truncate font-medium">{selectedFlex.name}</span>
+                    <span className="font-mono text-muted-foreground text-xs flex-shrink-0">
+                      #{selectedFlex.id.slice(-8)}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {loadingData ? "Loading templates..." : "Select a Flex Message template..."}
+                  </span>
+                )}
+                <ChevronDown size={14} className="flex-shrink-0 text-muted-foreground ml-2" />
+              </button>
+
+              {/* Dropdown panel */}
+              {flexSelectorOpen && (
+                <>
+                  {/* Click-outside overlay */}
+                  <div className="fixed inset-0 z-10" onClick={() => setFlexSelectorOpen(false)} />
+                  <div className="absolute z-20 mt-1 w-full bg-background border rounded-md shadow-lg max-h-72 overflow-y-auto">
+                    {/* Search */}
+                    <div className="p-2 border-b sticky top-0 bg-background">
+                      <input
+                        className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="Search by name or description..."
+                        value={flexSearch}
+                        onChange={(e) => setFlexSearch(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+
+                    {/* Template items */}
+                    {filteredFlexMessages.map((fm) => (
+                      <button
+                        key={fm.id}
+                        type="button"
+                        className={cn(
+                          "w-full text-left px-3 py-2 hover:bg-muted text-sm flex items-start gap-2 border-b last:border-b-0",
+                          form.flex_message_id === fm.id && "bg-muted"
+                        )}
+                        onClick={() => {
+                          set("flex_message_id")(fm.id);
+                          setFlexSelectorOpen(false);
+                          setFlexSearch("");
+                        }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-medium">{fm.name}</span>
+                            <span className="font-mono text-muted-foreground text-xs">
+                              #{fm.id.slice(-8)}
+                            </span>
+                          </div>
+                          {fm.description && (
+                            <p className="text-xs text-muted-foreground truncate">{fm.description}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0 pt-0.5">
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {getFlexType(fm.content)}
+                          </Badge>
+                          {fm.variables.length > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              {fm.variables.length} var{fm.variables.length > 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+
+                    {filteredFlexMessages.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        {flexSearch ? "No templates match your search." : "No Flex Message templates found."}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
             {flexMessages.length === 0 && !loadingData && (
               <p className="text-xs text-muted-foreground mt-1">
                 No Flex Message templates found.{" "}
