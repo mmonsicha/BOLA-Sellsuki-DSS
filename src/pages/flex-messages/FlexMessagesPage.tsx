@@ -3,13 +3,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Layers, Trash2, Edit, AlertCircle, ArrowLeft } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { workspaceApi } from "@/api/workspace";
 import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
 import { flexMessageTemplates, type FlexTemplate } from "@/utils/flexMessageTemplates";
 import { render as renderFlexMessage } from "flex-render";
+import { patchFlexHtml, useBrokenImageFallback } from "@/utils/flexPreviewUtils";
 
 function getContainerType(content: string): string {
   try {
@@ -23,14 +24,19 @@ function getContainerType(content: string): string {
 // ─── Flex Message Card Preview ─────────────────────────────────────────────
 
 function FlexCardPreview({ content }: { content: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const html = useMemo(() => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return renderFlexMessage(JSON.parse(content) as any);
+      const raw = renderFlexMessage(JSON.parse(content) as any);
+      return patchFlexHtml(raw);
     } catch {
       return null;
     }
   }, [content]);
+
+  useBrokenImageFallback(containerRef, html);
 
   if (!html) {
     return (
@@ -41,14 +47,15 @@ function FlexCardPreview({ content }: { content: string }) {
   }
 
   return (
-    <div className="relative overflow-hidden rounded-md bg-[#C6D0D9] p-2" style={{ height: "180px" }}>
+    <div className="relative overflow-hidden rounded-md bg-[#C6D0D9] p-2" style={{ height: "320px" }}>
       <div
+        ref={containerRef}
         style={{ pointerEvents: "none" }}
         dangerouslySetInnerHTML={{ __html: html }}
       />
       {/* Gradient fade at bottom — looks intentional, hides hard crop */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-10 pointer-events-none"
+        className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
         style={{ background: "linear-gradient(to bottom, transparent, #C6D0D9)" }}
       />
     </div>

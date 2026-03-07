@@ -8,7 +8,7 @@ import {
   Trash2, CheckCircle, XCircle, Eye,
   MousePointerClick, Code,
 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { flexMessageApi, type FlexMessage, type FlexMessageVariable } from "@/api/flexMessage";
 import { VariablesPanel } from "./builder/VariablesPanel";
 import { flexMessageSnippets, insertSnippetIntoContent } from "@/utils/flexMessageSnippets";
@@ -16,6 +16,7 @@ import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { render as renderFlexMessage } from "flex-render";
+import { patchFlexHtml, useBrokenImageFallback } from "@/utils/flexPreviewUtils";
 import "flex-render/css";
 import { FlexBuilder } from "./builder/FlexBuilder";
 
@@ -30,14 +31,20 @@ function getContainerType(content: string): string {
 }
 
 function LivePreviewPanel({ content }: { content: string }) {
-  let html: string | null = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parsed: any = JSON.parse(content);
-    html = renderFlexMessage(parsed);
-  } catch {
-    // invalid JSON or unsupported format — show placeholder
-  }
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const html = useMemo(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = renderFlexMessage(JSON.parse(content) as any);
+      return patchFlexHtml(raw);
+    } catch {
+      // invalid JSON or unsupported format — show placeholder
+      return null;
+    }
+  }, [content]);
+
+  useBrokenImageFallback(containerRef, html);
 
   return (
     <div className="sticky top-4 space-y-2">
@@ -56,6 +63,7 @@ function LivePreviewPanel({ content }: { content: string }) {
           >
             {html ? (
               <div
+                ref={containerRef}
                 className="w-full max-w-xs"
                 // flex-render returns safe HTML (no user input, only LINE Flex JSON structure)
                 dangerouslySetInnerHTML={{ __html: html }}
