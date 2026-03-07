@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, ArrowLeft, Copy, Check, RefreshCw, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, Copy, Check, RefreshCw, Trash2, CheckCircle, XCircle, ChevronDown } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import { useState, useEffect } from "react";
 import { autoPushMessageApi } from "@/api/autoPushMessage";
@@ -15,6 +15,8 @@ import { MessageTemplateEditor } from "./MessageTemplateEditor";
 import type { AutoPushMessage, Segment } from "@/types";
 import type { WebhookSetting } from "@/api/webhookSetting";
 import type { DeliveryLog } from "@/api/autoPushMessage";
+import { cn } from "@/lib/utils";
+import { FlexCardPreview } from "@/components/FlexCardPreview";
 
 interface FormState {
   name: string;
@@ -34,6 +36,41 @@ function extractTemplateFields(template: string): Record<string, string> {
   while ((match = regex.exec(template)) !== null) {
     fields[match[1]] = `example_${match[1]}`;
   }
+  return fields;
+}
+
+function getFlexContainerType(content: string): string {
+  try { return (JSON.parse(content) as { type?: string })?.type ?? "bubble"; } catch { return "bubble"; }
+}
+
+function buildPayloadFields(
+  messageType: "text" | "flex",
+  messageTemplate: string,
+  selectedFlex: FlexMessage | null,
+  targetType: string
+): Record<string, string> {
+  const fields: Record<string, string> = {};
+
+  // When targeting a single follower, the caller must supply who receives the message
+  if (targetType === "follower") {
+    fields["follower_id"] = "follower_uuid_here";
+  }
+
+  if (messageType === "flex" && selectedFlex) {
+    if (selectedFlex.variables.length > 0) {
+      // Use variable description as the example value when available
+      selectedFlex.variables.forEach((v) => {
+        fields[v.name] = v.description || `example_${v.name}`;
+      });
+    } else {
+      // Fallback: extract {placeholders} from the raw flex JSON content
+      const extracted = extractTemplateFields(selectedFlex.content);
+      Object.assign(fields, extracted);
+    }
+  } else if (messageType === "text") {
+    Object.assign(fields, extractTemplateFields(messageTemplate));
+  }
+
   return fields;
 }
 
@@ -99,6 +136,10 @@ export function AutoPushMessageDetailPage() {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [webhook, setWebhook] = useState<WebhookSetting | null>(null);
   const [flexMessages, setFlexMessages] = useState<FlexMessage[]>([]);
+
+  // Flex combobox state
+  const [flexSelectorOpen, setFlexSelectorOpen] = useState(false);
+  const [flexSearch, setFlexSearch] = useState("");
 
   // Delivery Logs
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
@@ -281,6 +322,26 @@ export function AutoPushMessageDetailPage() {
     }
   };
 
+  // ─── Derived values ────────────────────────────────────────────────────────
+  const selectedFlex = flexMessages.find((fm) => fm.id === form.flexMessageId) ?? null;
+
+  const filteredFlexMessages = flexSearch
+    ? flexMessages.filter(
+        (fm) =>
+          fm.name.toLowerCase().includes(flexSearch.toLowerCase()) ||
+          fm.description.toLowerCase().includes(flexSearch.toLowerCase())
+      )
+    : flexMessages;
+
+  const payloadFields = buildPayloadFields(
+    form.messageType,
+    form.messageTemplate,
+    selectedFlex,
+    form.targetType
+  );
+  const payloadJson = JSON.stringify(payloadFields, null, 2);
+  const hasPayloadFields = Object.keys(payloadFields).length > 0;
+
   if (loading) {
     return (
       <AppLayout title="Auto Push Message Details">
@@ -438,19 +499,89 @@ export function AutoPushMessageDetailPage() {
             {/* Flex Message Picker */}
             {form.messageType === "flex" && (
               <Field label="Flex Message Template" required hint="Select a pre-designed Flex Message template">
-                <select
-                  className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted"
-                  value={form.flexMessageId}
-                  onChange={(e) => setForm({ ...form, flexMessageId: e.target.value })}
-                  disabled={saving}
-                >
-                  <option value="">Select a Flex Message template...</option>
-                  {flexMessages.map((fm) => (
-                    <option key={fm.id} value={fm.id}>
-                      {fm.name}{fm.description ? ` — ${fm.description}` : ""}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  {/* Trigger button */}
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-background text-left disabled:bg-muted disabled:cursor-not-allowed"
+                    onClick={() => setFlexSelectorOpen((o) => !o)}
+                    disabled={saving}
+                  >
+                    {selectedFlex ? (
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="truncate font-medium">{selectedFlex.name}</span>
+                        <span className="font-mono text-muted-foreground text-xs flex-shrink-0">
+                          #{selectedFlex.id.slice(-8)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Select a Flex Message template...</span>
+                    )}
+                    <ChevronDown size={14} className="flex-shrink-0 text-muted-foreground ml-2" />
+                  </button>
+
+                  {/* Dropdown panel */}
+                  {flexSelectorOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setFlexSelectorOpen(false)} />
+                      <div className="absolute z-20 mt-1 w-full bg-background border rounded-md shadow-lg max-h-72 overflow-y-auto">
+                        {/* Search */}
+                        <div className="p-2 border-b sticky top-0 bg-background">
+                          <input
+                            className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            placeholder="Search by name or description..."
+                            value={flexSearch}
+                            onChange={(e) => setFlexSearch(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                        {/* Template items */}
+                        {filteredFlexMessages.map((fm) => (
+                          <button
+                            key={fm.id}
+                            type="button"
+                            className={cn(
+                              "w-full text-left px-3 py-2 hover:bg-muted text-sm flex items-start gap-2 border-b last:border-b-0",
+                              form.flexMessageId === fm.id && "bg-muted"
+                            )}
+                            onClick={() => {
+                              setForm({ ...form, flexMessageId: fm.id });
+                              setFlexSelectorOpen(false);
+                              setFlexSearch("");
+                            }}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-medium">{fm.name}</span>
+                                <span className="font-mono text-muted-foreground text-xs">
+                                  #{fm.id.slice(-8)}
+                                </span>
+                              </div>
+                              {fm.description && (
+                                <p className="text-xs text-muted-foreground truncate">{fm.description}</p>
+                              )}
+                            </div>
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0 pt-0.5">
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {getFlexContainerType(fm.content)}
+                              </Badge>
+                              {fm.variables.length > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  {fm.variables.length} var{fm.variables.length > 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                        {filteredFlexMessages.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            {flexSearch ? "No templates match your search." : "No Flex Message templates found."}
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
                 {flexMessages.length === 0 && (
                   <p className="text-xs text-muted-foreground mt-1">
                     No Flex Message templates found.{" "}
@@ -461,6 +592,14 @@ export function AutoPushMessageDetailPage() {
                   </p>
                 )}
               </Field>
+            )}
+
+            {/* Flex Message Preview */}
+            {form.messageType === "flex" && selectedFlex && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground font-medium">Preview</p>
+                <FlexCardPreview content={selectedFlex.content} height={280} />
+              </div>
             )}
 
             {/* Target Type */}
@@ -525,55 +664,53 @@ export function AutoPushMessageDetailPage() {
         </Card>
 
         {/* Example Payload */}
-        {(() => {
-          let fields: Record<string, string> = {};
-          if (form.messageType === "flex") {
-            const selectedFlex = flexMessages.find((fm) => fm.id === form.flexMessageId);
-            if (selectedFlex) {
-              selectedFlex.variables.forEach((v) => {
-                fields[v.name] = `example_${v.name}`;
-              });
-              // Also extract {placeholders} from the flex JSON content
-              const extracted = extractTemplateFields(selectedFlex.content);
-              fields = { ...extracted, ...fields };
-            }
-          } else {
-            fields = extractTemplateFields(form.messageTemplate);
-          }
-          const hasFields = Object.keys(fields).length > 0;
-          const payloadJson = JSON.stringify(fields, null, 2);
-          return (
-            <Card>
-              <CardHeader>
-                <CardTitle>Example Payload</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  POST this JSON to the webhook URL to trigger the message.{" "}
-                  {form.messageType === "flex"
-                    ? "Fields are extracted from the selected Flex Message template."
-                    : "Fields are extracted live from your template above."}
-                </p>
-                {hasFields ? (
-                  <div className="relative">
-                    <pre className="bg-muted rounded-md p-3 text-xs font-mono overflow-x-auto pr-8">
-                      {payloadJson}
-                    </pre>
-                    <div className="absolute top-2 right-2">
-                      <CopyButton value={payloadJson} />
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic">
-                    {form.messageType === "flex"
-                      ? "Select a Flex Message template to see required fields."
-                      : "No {field} placeholders found in your template yet."}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })()}
+        <Card>
+          <CardHeader>
+            <CardTitle>Example Payload</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              POST this JSON to the webhook URL to trigger the message.{" "}
+              {form.targetType === "follower"
+                ? <>
+                    <code className="bg-muted px-1 rounded text-xs">follower_id</code> specifies who receives the message.{" "}
+                  </>
+                : null}
+              {form.messageType === "flex"
+                ? "Other fields are from the selected Flex Message template."
+                : "Fields are extracted live from your template above."}
+            </p>
+            {hasPayloadFields ? (
+              <div className="relative">
+                <pre className="bg-muted rounded-md p-3 text-xs font-mono overflow-x-auto pr-8">
+                  {payloadJson}
+                </pre>
+                <div className="absolute top-2 right-2">
+                  <CopyButton value={payloadJson} />
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                {form.messageType === "flex"
+                  ? "Select a Flex Message template to see required fields."
+                  : "No {field} placeholders found in your template yet."}
+              </p>
+            )}
+            {/* Required variables indicator */}
+            {selectedFlex && selectedFlex.variables.some((v) => v.required) && (
+              <div className="flex flex-wrap items-center gap-1 pt-1">
+                <span className="text-xs text-muted-foreground">Required:</span>
+                {selectedFlex.variables
+                  .filter((v) => v.required)
+                  .map((v) => (
+                    <Badge key={v.name} variant="destructive" className="text-xs font-mono">
+                      {v.name}
+                    </Badge>
+                  ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Webhook Configuration Section */}
         {webhook && (
