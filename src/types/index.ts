@@ -67,8 +67,11 @@ export interface Broadcast {
   workspace_id: string;
   line_oa_id: string;
   name: string;
+  campaign_id?: string;
   target_type: BroadcastTargetType;
   target_segment_id: string;
+  target_user_ids?: string[];
+  messages?: Array<{ type: string; payload: unknown }>;
   scheduled_at: string | null;
   sent_at: string | null;
   status: BroadcastStatus;
@@ -79,9 +82,21 @@ export interface Broadcast {
   updated_at: string;
 }
 
+export interface BroadcastDeliveryLog {
+  id: string;
+  broadcast_id: string;
+  campaign_id: string;
+  line_user_id: string;
+  follower_id: string;
+  status: "pending" | "success" | "failed";
+  error_message?: string;
+  sent_at: string | null;
+  created_at: string;
+}
+
 // ---- Auto Reply ----
-export type TriggerType = "follow" | "keyword" | "postback" | "message" | "image";
-export type MatchMode = "exact" | "contains" | "starts_with";
+export type TriggerType = "follow" | "unfollow" | "keyword" | "postback" | "default";
+export type MatchMode = "exact" | "contains" | "prefix" | "regex";
 
 export interface AutoReply {
   id: string;
@@ -188,6 +203,27 @@ export interface PaginatedResponse<T> {
   total: number;
   page: number;
   page_size: number;
+}
+
+// ---- Outbound Webhook ----
+
+export interface OutboundWebhookConfig {
+  workspace_id: string;
+  webhook_url: string;
+  has_secret: boolean;
+}
+
+export type OutboundDeliveryStatus = "success" | "failed" | "pending";
+
+export interface OutboundDeliveryLog {
+  id: string;
+  workspace_id: string;
+  event_type: string;
+  target_url: string;
+  status: OutboundDeliveryStatus;
+  http_status_code?: number;
+  error_message?: string;
+  triggered_at: string;
 }
 
 // ---- API Error ----

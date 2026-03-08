@@ -2,28 +2,29 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Bot, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Plus, RefreshCw, Bot, Trash2, ToggleLeft, ToggleRight, GripVertical } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { autoReplyApi } from "@/api/autoReply";
 import { lineOAApi } from "@/api/lineOA";
 import type { AutoReply, LineOA, TriggerType } from "@/types";
+import { AutoReplyDialog } from "./AutoReplyDialog";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 const triggerLabel: Record<TriggerType, string> = {
   follow:   "Follow",
+  unfollow: "Unfollow",
   keyword:  "Keyword",
   postback: "Postback",
-  message:  "Any Message",
-  image:    "Image",
+  default:  "Default",
 };
 
-const triggerVariant: Record<TriggerType, "default" | "secondary" | "success" | "warning" | "outline"> = {
+const triggerVariant: Record<TriggerType, "default" | "secondary" | "success" | "warning" | "outline" | "destructive"> = {
   follow:   "success",
+  unfollow: "destructive",
   keyword:  "default",
   postback: "warning",
-  message:  "secondary",
-  image:    "outline",
+  default:  "secondary",
 };
 
 export function AutoReplyPage() {
@@ -33,6 +34,14 @@ export function AutoReplyPage() {
   const [loading, setLoading] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<AutoReply | null>(null);
+
+  // Drag-to-reorder state
+  const dragIndex = useRef<number | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   // Load LINE OAs for filter
   useEffect(() => {
@@ -51,7 +60,10 @@ export function AutoReplyPage() {
     setLoading(true);
     autoReplyApi
       .list({ line_oa_id: selectedOA })
-      .then((res) => setAutoReplies(res.data ?? []))
+      .then((res) => {
+        const sorted = (res.data ?? []).slice().sort((a, b) => a.priority - b.priority);
+        setAutoReplies(sorted);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [selectedOA]);
@@ -81,6 +93,67 @@ export function AutoReplyPage() {
     }
   };
 
+  const openCreate = () => {
+    setEditingItem(null);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (ar: AutoReply) => {
+    setEditingItem(ar);
+    setDialogOpen(true);
+  };
+
+  const handleSaved = (saved: AutoReply) => {
+    setAutoReplies((prev) => {
+      const exists = prev.find((r) => r.id === saved.id);
+      const updated = exists
+        ? prev.map((r) => (r.id === saved.id ? saved : r))
+        : [...prev, saved];
+      return updated.slice().sort((a, b) => a.priority - b.priority);
+    });
+    setDialogOpen(false);
+  };
+
+  // ---- drag-to-reorder handlers ----
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    dragIndex.current = index;
+    setDraggingId(autoReplies[index].id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const from = dragIndex.current;
+    if (from === null || from === index) return;
+
+    setAutoReplies((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(index, 0, item);
+      dragIndex.current = index;
+      return next;
+    });
+  };
+
+  const handleDragEnd = async () => {
+    setDraggingId(null);
+    // Persist new priorities: each item gets priority = index * 10 + 10
+    const updates = autoReplies.map((ar, i) => ({
+      id: ar.id,
+      priority: (i + 1) * 10,
+    }));
+    try {
+      await Promise.all(updates.map(({ id, priority }) => autoReplyApi.update(id, { priority })));
+      setAutoReplies((prev) =>
+        prev.map((ar, i) => ({ ...ar, priority: (i + 1) * 10 }))
+      );
+    } catch {
+      // Non-critical — UI already reflects the order
+    }
+  };
+
   return (
     <AppLayout title="Auto Reply">
       <div className="space-y-4">
@@ -102,7 +175,7 @@ export function AutoReplyPage() {
               </select>
             )}
           </div>
-          <Button className="gap-2" onClick={() => alert("Create auto reply — coming soon")}>
+          <Button className="gap-2" onClick={openCreate} disabled={!selectedOA}>
             <Plus size={16} />
             New Auto Reply
           </Button>
@@ -134,7 +207,7 @@ export function AutoReplyPage() {
               <p className="text-sm text-muted-foreground mt-1">
                 Set up automated replies for follows, keywords, and more.
               </p>
-              <Button className="mt-4 gap-2" onClick={() => alert("Create auto reply — coming soon")}>
+              <Button className="mt-4 gap-2" onClick={openCreate}>
                 <Plus size={16} />
                 New Auto Reply
               </Button>
@@ -142,21 +215,50 @@ export function AutoReplyPage() {
           </Card>
         )}
 
+        {/* Drag-hint */}
+        {!loading && autoReplies.length > 1 && (
+          <p className="text-xs text-muted-foreground">
+            Drag <GripVertical size={12} className="inline -mt-0.5" /> to reorder priority.
+            Lower position = evaluated first.
+          </p>
+        )}
+
         {/* List */}
         {!loading && autoReplies.length > 0 && (
-          <div className="grid gap-3">
-            {autoReplies.map((ar) => (
-              <Card key={ar.id} className={!ar.is_enabled ? "opacity-60" : ""}>
-                <CardContent className="flex items-center gap-4 p-4">
+          <div className="grid gap-2">
+            {autoReplies.map((ar, index) => (
+              <Card
+                key={ar.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+                className={[
+                  "cursor-default select-none transition-opacity",
+                  !ar.is_enabled ? "opacity-60" : "",
+                  draggingId === ar.id ? "opacity-40 ring-2 ring-blue-400" : "",
+                ].join(" ")}
+              >
+                <CardContent className="flex items-center gap-3 p-4">
+                  {/* Drag handle */}
+                  <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0">
+                    <GripVertical size={16} />
+                  </div>
+
+                  {/* Priority badge */}
+                  <span className="text-xs text-muted-foreground w-5 text-center flex-shrink-0">
+                    #{index + 1}
+                  </span>
+
                   {/* Icon */}
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <Bot size={18} className="text-blue-600" />
+                  <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <Bot size={16} className="text-blue-600" />
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{ar.name}</span>
+                      <span className="font-medium text-sm truncate">{ar.name}</span>
                       <Badge variant={triggerVariant[ar.trigger]}>
                         {triggerLabel[ar.trigger] ?? ar.trigger}
                       </Badge>
@@ -164,17 +266,21 @@ export function AutoReplyPage() {
                         <Badge variant="secondary">Disabled</Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       {ar.keywords?.length > 0 && (
                         <span className="text-xs text-muted-foreground">
                           Keywords: {ar.keywords.slice(0, 3).join(", ")}
                           {ar.keywords.length > 3 && ` +${ar.keywords.length - 3}`}
                         </span>
                       )}
+                      {ar.postback_data && (
+                        <span className="text-xs text-muted-foreground font-mono truncate max-w-[160px]">
+                          {ar.postback_data}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">
                         {ar.messages?.length ?? 0} message{ar.messages?.length !== 1 ? "s" : ""}
                       </span>
-                      <span className="text-xs text-muted-foreground">Priority: {ar.priority}</span>
                     </div>
                   </div>
 
@@ -190,7 +296,7 @@ export function AutoReplyPage() {
                         ? <ToggleRight size={22} className="text-line" />
                         : <ToggleLeft size={22} />}
                     </button>
-                    <Button variant="outline" size="sm" onClick={() => alert("Edit — coming soon")}>
+                    <Button variant="outline" size="sm" onClick={() => openEdit(ar)}>
                       Edit
                     </Button>
                     <Button
@@ -209,6 +315,15 @@ export function AutoReplyPage() {
           </div>
         )}
       </div>
+
+      {/* Create / Edit dialog */}
+      <AutoReplyDialog
+        open={dialogOpen}
+        lineOAId={selectedOA}
+        existing={editingItem}
+        onClose={() => setDialogOpen(false)}
+        onSaved={handleSaved}
+      />
     </AppLayout>
   );
 }

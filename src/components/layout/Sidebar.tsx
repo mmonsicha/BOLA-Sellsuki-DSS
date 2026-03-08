@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Menu,
   Layers,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -33,6 +34,7 @@ const navItems: NavItem[] = [
   { label: "Media", href: "/media", icon: Image },
   { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
   { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Integration Guide", href: "/integration", icon: BookOpen },
 ];
 
 interface SidebarProps {
