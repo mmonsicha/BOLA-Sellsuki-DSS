@@ -44,9 +44,9 @@ export function SegmentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Group your customers into segments for targeted broadcasts.
+            Group your followers into segments for targeted broadcasts.
           </p>
-          <Button className="gap-2" onClick={() => alert("Create segment — coming soon")}>
+          <Button className="gap-2" onClick={() => { window.location.href = "/segments/new"; }}>
             <Plus size={16} />
             New Segment
           </Button>
@@ -67,9 +67,9 @@ export function SegmentsPage() {
               <div className="text-4xl mb-3">🏷️</div>
               <p className="font-medium">No segments yet</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Create a segment to group customers by behaviour or attributes.
+                Create a segment to group followers by behaviour or attributes.
               </p>
-              <Button className="mt-4 gap-2" onClick={() => alert("Create segment — coming soon")}>
+              <Button className="mt-4 gap-2" onClick={() => { window.location.href = "/segments/new"; }}>
                 <Plus size={16} />
                 New Segment
               </Button>
@@ -81,7 +81,11 @@ export function SegmentsPage() {
         {!loading && segments.length > 0 && (
           <div className="grid gap-3">
             {segments.map((seg) => (
-              <Card key={seg.id}>
+              <Card
+                key={seg.id}
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => { window.location.href = `/segments/${seg.id}/edit`; }}
+              >
                 <CardContent className="flex items-center gap-4 p-4">
                   {/* Icon */}
                   <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
@@ -104,7 +108,7 @@ export function SegmentsPage() {
                     )}
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-xs text-muted-foreground">
-                        {seg.customer_count ?? 0} customers
+                        {seg.customer_count ?? 0} followers
                       </span>
                       {seg.rule?.conditions?.length > 0 && (
                         <span className="text-xs text-muted-foreground">
@@ -121,7 +125,14 @@ export function SegmentsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => alert("Edit — coming soon")}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.location.href = `/segments/${seg.id}/edit`;
+                      }}
+                    >
                       Edit
                     </Button>
                     <Button
@@ -129,7 +140,7 @@ export function SegmentsPage() {
                       size="icon"
                       className="text-destructive hover:text-destructive h-8 w-8"
                       disabled={deletingId === seg.id}
-                      onClick={() => handleDelete(seg.id)}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(seg.id); }}
                     >
                       <Trash2 size={14} />
                     </Button>

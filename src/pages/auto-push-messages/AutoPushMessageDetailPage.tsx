@@ -51,9 +51,10 @@ function buildPayloadFields(
 ): Record<string, string> {
   const fields: Record<string, string> = {};
 
-  // When targeting a single follower, the caller must supply who receives the message
+  // When targeting a single follower, the caller must supply who receives the message.
+  // target_line_user_id overrides the pre-configured target for this webhook trigger.
   if (targetType === "follower") {
-    fields["follower_id"] = "follower_uuid_here";
+    fields["target_line_user_id"] = "Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
   }
 
   if (messageType === "flex" && selectedFlex) {
@@ -673,7 +674,9 @@ export function AutoPushMessageDetailPage() {
               POST this JSON to the webhook URL to trigger the message.{" "}
               {form.targetType === "follower"
                 ? <>
-                    <code className="bg-muted px-1 rounded text-xs">follower_id</code> specifies who receives the message.{" "}
+                    <code className="bg-muted px-1 rounded text-xs">target_line_user_id</code> specifies the LINE User ID who receives the message.
+                    Alternatively, use <code className="bg-muted px-1 rounded text-xs">target_by</code> to target by a custom field, e.g.{" "}
+                    <code className="bg-muted px-1 rounded text-xs">{"{"}"field": "oc2plus_id", "value": "MEM-123"{"}"}</code>.{" "}
                   </>
                 : null}
               {form.messageType === "flex"

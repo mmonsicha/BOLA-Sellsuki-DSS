@@ -2,8 +2,12 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { Follower } from "@/types";
+import { RefreshCw } from "lucide-react";
+import type { Follower, LineOA } from "@/types";
 import { followerApi } from "@/api/follower";
+import { lineOAApi } from "@/api/lineOA";
+
+const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 const followStatusVariant = {
   following: "success" as const,
@@ -13,63 +17,83 @@ const followStatusVariant = {
 
 export function FollowersPage() {
   const [followers, setFollowers] = useState<Follower[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
+  const [selectedLineOAId, setSelectedLineOAId] = useState<string>("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
+  // Load LINE OAs once on mount
   useEffect(() => {
-    const loadFollowers = async () => {
-      try {
-        setLoading(true);
-        const response = await followerApi.list({ workspace_id: WORKSPACE_ID });
-        setFollowers(response.data || []);
+    lineOAApi
+      .list({ workspace_id: WORKSPACE_ID })
+      .then((res) => {
+        const oas = res.data ?? [];
+        setLineOAs(oas);
+        if (oas.length > 0) setSelectedLineOAId(oas[0].id);
+      })
+      .catch(console.error);
+  }, []);
+
+  // Reload followers whenever the selected OA changes
+  useEffect(() => {
+    if (!selectedLineOAId) return;
+    setLoading(true);
+    followerApi
+      .list({ workspace_id: WORKSPACE_ID, line_oa_id: selectedLineOAId })
+      .then((res) => {
+        setFollowers(res.data ?? []);
         setError(null);
-      } catch (err) {
+      })
+      .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to load followers");
         setFollowers([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadFollowers();
-  }, []);
+      })
+      .finally(() => setLoading(false));
+  }, [selectedLineOAId]);
 
   return (
     <AppLayout title="Followers">
       <div className="space-y-4">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             Manage your LINE followers. They are automatically added when they follow your LINE OA.
           </p>
           <div className="flex items-center gap-2">
-            {/* Filter by LINE OA */}
-            <select className="border rounded-md px-3 py-1.5 text-sm bg-background">
-              <option value="">All LINE OAs</option>
+            <select
+              className="border rounded-md px-3 py-1.5 text-sm bg-background"
+              value={selectedLineOAId}
+              onChange={(e) => setSelectedLineOAId(e.target.value)}
+            >
+              {lineOAs.map((oa) => (
+                <option key={oa.id} value={oa.id}>
+                  {oa.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
+        {/* Error */}
         {error && (
           <Card className="border-destructive">
             <CardContent className="text-center py-8">
-              <div className="text-4xl mb-3">⚠️</div>
               <p className="font-medium text-destructive">Error loading followers</p>
               <p className="text-sm text-muted-foreground mt-1">{error}</p>
             </CardContent>
           </Card>
         )}
 
+        {/* Loading */}
         {loading && (
-          <Card>
-            <CardContent className="text-center py-12">
-              <div className="text-4xl mb-3">⏳</div>
-              <p className="font-medium">Loading followers...</p>
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+            <RefreshCw size={16} className="animate-spin" />
+            Loading...
+          </div>
         )}
 
-        {!loading && !error && followers.length === 0 ? (
+        {/* Empty */}
+        {!loading && !error && selectedLineOAId && followers.length === 0 && (
           <Card>
             <CardContent className="text-center py-12">
               <div className="text-4xl mb-3">👥</div>
@@ -79,11 +103,19 @@ export function FollowersPage() {
               </p>
             </CardContent>
           </Card>
-        ) : !loading && !error && (
+        )}
+
+        {/* List */}
+        {!loading && !error && followers.length > 0 && (
           <div className="grid gap-3">
             {followers.map((follower) => (
-              <Card key={follower.id}>
+              <Card
+                key={follower.id}
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => { window.location.href = `/followers/${follower.id}`; }}
+              >
                 <CardContent className="flex items-center gap-4 p-4">
+                  {/* Avatar */}
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex-shrink-0 overflow-hidden">
                     {follower.picture_url ? (
                       <img src={follower.picture_url} alt={follower.display_name} className="w-full h-full object-cover" />
@@ -93,6 +125,8 @@ export function FollowersPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{follower.display_name || follower.line_user_id}</span>
@@ -119,7 +153,19 @@ export function FollowersPage() {
                         ))}
                       </div>
                     )}
+                    {/* Identity bridge keys */}
+                    {follower.custom_fields && Object.keys(follower.custom_fields).length > 0 && (
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {Object.entries(follower.custom_fields).map(([k, v]) => (
+                          <span key={k} className="text-xs text-muted-foreground bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-mono">
+                            {k}: {v}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Date */}
                   <div className="text-xs text-muted-foreground flex-shrink-0">
                     {follower.followed_at
                       ? new Date(follower.followed_at).toLocaleDateString()
