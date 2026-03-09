@@ -209,12 +209,13 @@ interface AreaOverlayProps {
   lineH: number;
   selected: boolean;
   previewMode: boolean;
+  drawMode: boolean;
   onSelect: (id: string) => void;
   onResize: (id: string, patch: Partial<DraftArea>) => void;
 }
 
 function AreaOverlay({
-  area, index, canvasW, canvasH, lineW, lineH, selected, previewMode, onSelect, onResize,
+  area, index, canvasW, canvasH, lineW, lineH, selected, previewMode, drawMode, onSelect, onResize,
 }: AreaOverlayProps) {
   const scaleX = canvasW / lineW;
   const scaleY = canvasH / lineH;
@@ -312,7 +313,7 @@ function AreaOverlay({
           onSelect(area.id);
         }
       }}
-      onMouseDown={previewMode ? undefined : startDrag}
+      onMouseDown={previewMode || drawMode ? undefined : startDrag}
     >
       {/* Area label */}
       <div
@@ -548,6 +549,8 @@ export function RichMenuBuilderPage() {
   const [isSettingDefault, setIsSettingDefault] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const toast = useToast();
+  // drawStart/drawCurrent stored in CSS PIXELS relative to canvas content area
+  // (not LINE coords) so the preview rect tracks the cursor with zero error.
 
   const { menu, pages, currentPageIndex, areas, selectedAreaId, drawMode, previewMode, loading, saving, error } = state;
 
@@ -749,44 +752,65 @@ export function RichMenuBuilderPage() {
   };
 
   // Draw mode mouse events
-  const getLineCoords = useCallback(
-    (e: React.MouseEvent) => {
-      if (!canvasRef.current) return { x: 0, y: 0 };
-      const rect = canvasRef.current.getBoundingClientRect();
-      const px = ((e.clientX - rect.left) / rect.width) * lineW;
-      const py = ((e.clientY - rect.top) / canvasSize.h) * lineH;
-      return { x: Math.round(Math.max(0, Math.min(px, lineW))), y: Math.round(Math.max(0, Math.min(py, lineH))) };
-    },
-    [canvasSize.h, lineH, lineW]
-  );
+  // Coords are stored as CSS PIXELS relative to the canvas content box.
+  // This eliminates all scale-mismatch between input (mouse) and output (preview rect).
+  const getCanvasPx = useCallback((e: React.MouseEvent): { x: number; y: number } => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
+    const rect = canvasRef.current.getBoundingClientRect();
+    // Clamp to the canvas content area (subtract 1px border on each side)
+    const borderW = 1;
+    const contentW = rect.width - borderW * 2;
+    const contentH = rect.height - borderW * 2;
+    const x = Math.round(Math.max(0, Math.min(e.clientX - rect.left - borderW, contentW)));
+    const y = Math.round(Math.max(0, Math.min(e.clientY - rect.top - borderW, contentH)));
+    return { x, y };
+  }, []);
+
+  // Convert CSS px (content-box relative) → LINE pixel coordinates
+  const pxToLine = useCallback((px: number, py: number): { x: number; y: number } => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
+    const rect = canvasRef.current.getBoundingClientRect();
+    const borderW = 1;
+    const contentW = rect.width - borderW * 2;
+    const contentH = rect.height - borderW * 2;
+    return {
+      x: Math.round((px / contentW) * lineW),
+      y: Math.round((py / contentH) * lineH),
+    };
+  }, [lineH, lineW]);
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
     if (!drawMode) {
       dispatch({ type: "SELECT_AREA", id: null });
       return;
     }
-    const coords = getLineCoords(e);
+    e.preventDefault();
+    const coords = getCanvasPx(e);
     setDrawStart(coords);
     setDrawCurrent(coords);
   };
 
   const onCanvasMouseMove = (e: React.MouseEvent) => {
     if (!drawMode || !drawStart) return;
-    setDrawCurrent(getLineCoords(e));
+    setDrawCurrent(getCanvasPx(e));
   };
 
   const onCanvasMouseUp = (e: React.MouseEvent) => {
     if (!drawMode || !drawStart) return;
-    const end = getLineCoords(e);
-    const x = Math.min(drawStart.x, end.x);
-    const y = Math.min(drawStart.y, end.y);
-    const w = Math.abs(end.x - drawStart.x);
-    const h = Math.abs(end.y - drawStart.y);
-    if (w > 30 && h > 30 && currentPage) {
+    const end = getCanvasPx(e);
+    const wPx = Math.abs(end.x - drawStart.x);
+    const hPx = Math.abs(end.y - drawStart.y);
+    // Require at least 20×20 CSS pixels so accidental clicks don't create tiny areas
+    if (wPx > 20 && hPx > 20 && currentPage) {
+      const topLeft = pxToLine(Math.min(drawStart.x, end.x), Math.min(drawStart.y, end.y));
+      const bottomRight = pxToLine(Math.max(drawStart.x, end.x), Math.max(drawStart.y, end.y));
       const newArea: DraftArea = {
         id: `new-${Date.now()}`,
         pageId: currentPage.id,
-        x, y, width: w, height: h,
+        x: topLeft.x,
+        y: topLeft.y,
+        width: Math.max(1, bottomRight.x - topLeft.x),
+        height: Math.max(1, bottomRight.y - topLeft.y),
         action_type: "uri",
         action_label: "",
         action_uri: "",
@@ -825,18 +849,19 @@ export function RichMenuBuilderPage() {
     );
   }
 
-  // Draw preview rect
+  // Draw preview rect — stored in CSS pixels so it tracks the cursor with zero error.
   const drawPreviewStyle: React.CSSProperties | null =
     drawMode && drawStart && drawCurrent
       ? {
           position: "absolute",
-          left: (Math.min(drawStart.x, drawCurrent.x) / lineW) * canvasSize.w,
-          top: (Math.min(drawStart.y, drawCurrent.y) / lineH) * canvasSize.h,
-          width: (Math.abs(drawCurrent.x - drawStart.x) / lineW) * canvasSize.w,
-          height: (Math.abs(drawCurrent.y - drawStart.y) / lineH) * canvasSize.h,
+          left: Math.min(drawStart.x, drawCurrent.x),
+          top: Math.min(drawStart.y, drawCurrent.y),
+          width: Math.abs(drawCurrent.x - drawStart.x),
+          height: Math.abs(drawCurrent.y - drawStart.y),
           border: "2px dashed #3b82f6",
-          backgroundColor: "rgba(59,130,246,0.12)",
+          backgroundColor: "rgba(59,130,246,0.15)",
           pointerEvents: "none",
+          boxSizing: "border-box",
         }
       : null;
 
@@ -1096,6 +1121,7 @@ export function RichMenuBuilderPage() {
               onMouseDown={onCanvasMouseDown}
               onMouseMove={onCanvasMouseMove}
               onMouseUp={onCanvasMouseUp}
+              onMouseLeave={() => { if (drawStart) { setDrawStart(null); setDrawCurrent(null); } }}
             >
               {/* Placeholder when no image */}
               {!currentPage?.image_url && (
@@ -1120,6 +1146,7 @@ export function RichMenuBuilderPage() {
                   lineH={lineH}
                   selected={area.id === selectedAreaId}
                   previewMode={previewMode}
+                  drawMode={drawMode}
                   onSelect={(id) => dispatch({ type: "SELECT_AREA", id })}
                   onResize={(id, patch) => dispatch({ type: "UPDATE_AREA", id, patch })}
                 />
