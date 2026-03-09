@@ -28,6 +28,9 @@ import { RichMenusPage } from "@/pages/rich-menus/RichMenusPage";
 import { RichMenuBuilderPage } from "@/pages/rich-menus/RichMenuBuilderPage";
 import { RichMenuAssignmentsPage } from "@/pages/rich-menus/RichMenuAssignmentsPage";
 import { QuickRepliesPage } from "@/pages/quick-replies/QuickRepliesPage";
+import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
+import { LONDeliveryLogsPage } from "@/pages/lon-delivery-logs/LONDeliveryLogsPage";
+import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscribePage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { ToastProvider } from "@/components/ui/toast";
@@ -103,6 +106,13 @@ function Router() {
 
   // Quick Replies
   if (path.startsWith("/quick-replies")) return <QuickRepliesPage />;
+
+  // LON — public subscribe page (unauthenticated, accessed via QR code)
+  if (path.startsWith("/lon/subscribe/")) return <LONPublicSubscribePage />;
+
+  // LON — authenticated pages
+  if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
+  if (path.startsWith("/lon-delivery-logs")) return <LONDeliveryLogsPage />;
 
   // 404
   return (
