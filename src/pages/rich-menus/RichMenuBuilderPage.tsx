@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { RefreshCw, Plus, Trash2, Eye, Edit3, Upload, Check } from "lucide-react";
+import { RefreshCw, Plus, Trash2, Eye, Edit3, Upload, Check, Star } from "lucide-react";
 import type { RichMenu, RichMenuPage, RichMenuPageArea } from "@/types";
 import { richMenuApi, richMenuPageApi, richMenuAreaApi } from "@/api/richMenu";
 import { useToast } from "@/components/ui/toast";
@@ -539,6 +539,8 @@ export function RichMenuBuilderPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishSuccess, setPublishSuccess] = useState(false);
+  const [showSetDefaultPrompt, setShowSetDefaultPrompt] = useState(false);
+  const [isSettingDefault, setIsSettingDefault] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const toast = useToast();
 
@@ -659,12 +661,32 @@ export function RichMenuBuilderPage() {
       dispatch({ type: "LOAD_MENU", menu: updated });
       setPublishSuccess(true);
       setTimeout(() => setPublishSuccess(false), 4000);
-      toast.success("Published to LINE ✓", "The rich menu is now live on LINE.");
+      // Prompt to set as default only if it isn't already
+      if (!updated.is_default) {
+        setShowSetDefaultPrompt(true);
+      } else {
+        toast.success("Published & set as default ✓", "The rich menu is now showing to all followers.");
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Publish failed";
       toast.error("Publish failed", msg);
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const handleSetDefault = async () => {
+    if (!menu) return;
+    setIsSettingDefault(true);
+    try {
+      await richMenuApi.setDefault(menu.id);
+      dispatch({ type: "UPDATE_MENU_FIELD", field: "is_default", value: true });
+      setShowSetDefaultPrompt(false);
+      toast.success("Set as default ✓", "This rich menu will now show to all your LINE followers.");
+    } catch (e: unknown) {
+      toast.error("Failed to set as default", e instanceof Error ? e.message : "An unexpected error occurred.");
+    } finally {
+      setIsSettingDefault(false);
     }
   };
 
@@ -861,11 +883,44 @@ export function RichMenuBuilderPage() {
             <Button size="sm" onClick={handlePublish} disabled={isPublishing}>
               {isPublishing
                 ? <><RefreshCw className="h-4 w-4 mr-1 animate-spin" /> Publishing...</>
-                : <><Upload className="h-4 w-4 mr-1" /> Publish</>
+                : <><Upload className="h-4 w-4 mr-1" /> Publish to LINE</>
               }
             </Button>
+            {menu.is_default ? null : menu.published_at ? (
+              <Button size="sm" variant="outline" onClick={handleSetDefault} disabled={isSettingDefault}
+                className="border-amber-400 text-amber-700 hover:bg-amber-50"
+              >
+                {isSettingDefault
+                  ? <RefreshCw className="h-4 w-4 animate-spin" />
+                  : <><Star className="h-4 w-4 mr-1" /> Set as Default</>
+                }
+              </Button>
+            ) : null}
           </div>
         </div>
+
+        {/* Set as Default prompt — shown once right after publish */}
+        {showSetDefaultPrompt && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm">
+            <div className="flex items-center gap-2 text-amber-800">
+              <Star className="h-4 w-4 text-amber-500 flex-shrink-0" />
+              <span>
+                <strong>Published to LINE!</strong> Set this menu as default so it appears to all your followers.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button size="sm" variant="outline" onClick={() => setShowSetDefaultPrompt(false)} className="h-7 text-xs">
+                Later
+              </Button>
+              <Button size="sm" onClick={handleSetDefault} disabled={isSettingDefault} className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white border-0">
+                {isSettingDefault
+                  ? <RefreshCw className="h-3 w-3 animate-spin" />
+                  : <><Star className="h-3 w-3 mr-1" /> Set as Default</>
+                }
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* 3-panel layout */}
         <div className="flex gap-4 flex-1 min-h-0" style={{ height: "calc(100vh - 200px)" }}>

@@ -320,7 +320,14 @@ export function RichMenusPage() {
     try {
       const updated = await richMenuApi.publish(menu.id);
       setMenus((prev) => prev.map((m) => (m.id === menu.id ? updated : m)));
-      toast.success("Published to LINE ✓", `"${menu.name}" is now live.`);
+      if (!updated.is_default) {
+        toast.warning(
+          "Published — but not visible yet!",
+          `"${menu.name}" was uploaded to LINE. Click ★ Set as Default so followers can see it.`
+        );
+      } else {
+        toast.success("Published & visible to followers ✓", `"${menu.name}" is now showing.`);
+      }
     } catch (e: unknown) {
       toast.error("Publish failed", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {
