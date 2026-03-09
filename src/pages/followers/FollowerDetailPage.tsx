@@ -90,6 +90,20 @@ function CustomFieldsEditor({
     onChange({ ...fields, [key]: val });
   };
 
+  const handleKeyBlur = () => {
+    // Auto-add when clicking away from key field if both key and value are filled
+    if (newKey.trim() && newVal.trim()) {
+      add();
+    }
+  };
+
+  const handleValueBlur = () => {
+    // Auto-add when clicking away from value field if key is filled
+    if (newKey.trim()) {
+      add();
+    }
+  };
+
   return (
     <div className="space-y-2">
       {/* Existing entries */}
@@ -123,6 +137,7 @@ function CustomFieldsEditor({
           className="w-40 border rounded-md px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-mono"
           onChange={(e) => setNewKey(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          onBlur={handleKeyBlur}
         />
         <span className="text-muted-foreground">→</span>
         <input
@@ -132,6 +147,7 @@ function CustomFieldsEditor({
           className="flex-1 border rounded-md px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-mono"
           onChange={(e) => setNewVal(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          onBlur={handleValueBlur}
         />
         <Button type="button" variant="outline" size="sm" onClick={add}>
           <Plus size={14} />
