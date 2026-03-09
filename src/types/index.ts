@@ -232,3 +232,188 @@ export interface ApiError {
   error_code: string;
   issue_id: string;
 }
+
+// ---- AI Chatbot ----
+export type LLMProvider = "openai" | "anthropic" | "google" | "custom";
+export type ChatMode = "ai" | "human";
+export type ChatType = "one_on_one" | "group" | "room";
+export type MessageRole = "user" | "assistant" | "system" | "human_agent";
+export type KBSourceType = "manual" | "imported" | "learned_from_reply";
+export type QuestionStatus = "pending" | "resolved" | "dismissed";
+export type EscalationReason = "low_confidence" | "manual" | "keyword";
+
+export interface AIChatbotConfig {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  is_enabled: boolean;
+  enable_group_chat: boolean;
+  group_chat_trigger_prefix: string;
+  llm_provider: LLMProvider;
+  llm_model: string;
+  llm_api_base_url: string;
+  llm_temperature: number;
+  system_prompt: string;
+  confidence_threshold: number;
+  max_context_turns: number;
+  fallback_message: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatSession {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  chat_type: ChatType;
+  line_chat_id: string;
+  follower_id: string;
+  mode: ChatMode;
+  assigned_admin_id: string;
+  escalation_reason?: string;
+  escalated_at?: string | null;
+  first_human_reply_at?: string | null;
+  last_message_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  workspace_id: string;
+  role: MessageRole;
+  content: string;
+  message_type: string;
+  line_message_id: string;
+  metadata: string;
+  is_escalation_trigger: boolean;
+  created_at: string;
+}
+
+export interface KnowledgeBase {
+  id: string;
+  workspace_id: string;
+  title: string;
+  content: string;
+  source_type: KBSourceType;
+  tags: string[];
+  embedding_model: string;
+  is_active: boolean;
+  created_by_admin_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UnansweredQuestion {
+  id: string;
+  workspace_id: string;
+  session_id: string;
+  follower_id: string;
+  original_message: string;
+  context_messages: ChatMessage[];
+  status: QuestionStatus;
+  resolved_knowledge_id: string;
+  triggered_at: string;
+  resolved_at: string | null;
+  resolved_by_admin_id: string;
+}
+
+// Generic API response wrapper
+export interface ApiResponse<T> {
+  data: T;
+  message?: string;
+  error?: string;
+}
+
+// ---- Rich Menu ----
+export interface RichMenuSize { width: number; height: number; }
+
+export interface RichMenuPageArea {
+  id: string;
+  rich_menu_page_id: string;
+  area_order: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  action_type: string;
+  action_label: string;
+  action_uri: string;
+  action_text: string;
+  action_data: string;
+  action_display_text: string;
+  target_page_number: number;
+}
+
+export interface RichMenuPage {
+  id: string;
+  rich_menu_id: string;
+  page_number: number;
+  tab_label: string;
+  image_url: string;
+  image_media_id: string;
+  line_rich_menu_id: string;
+  line_rich_menu_alias_id: string;
+  areas: RichMenuPageArea[];
+}
+
+export interface RichMenu {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  line_rich_menu_id: string;
+  name: string;
+  description: string;
+  size_type: "large" | "compact";
+  menu_type: "static" | "dynamic";
+  chat_bar_text: string;
+  selected: boolean;
+  size: RichMenuSize;
+  areas: any[];
+  image_url: string;
+  image_media_id: string;
+  is_default: boolean;
+  linked_segment_id: string;
+  published_at: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  pages: RichMenuPage[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssignmentRule {
+  field: string;
+  operator: string;
+  value: string;
+}
+
+export interface RichMenuAssignment {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  rich_menu_id: string;
+  name: string;
+  priority: number;
+  rules: AssignmentRule[];
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuickReplyItem {
+  label: string;
+  action_type: string;
+  action_value: string;
+  image_url: string;
+}
+
+export interface QuickReply {
+  id: string;
+  workspace_id: string;
+  name: string;
+  items: QuickReplyItem[];
+  created_at: string;
+  updated_at: string;
+}

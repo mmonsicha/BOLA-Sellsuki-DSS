@@ -67,7 +67,7 @@ export function FollowersPage() {
             >
               {lineOAs.map((oa) => (
                 <option key={oa.id} value={oa.id}>
-                  {oa.name}
+                  {oa.name || oa.basic_id || oa.id.slice(0, 12)}
                 </option>
               ))}
             </select>

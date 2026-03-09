@@ -18,6 +18,16 @@ import { WebhookPage } from "@/pages/webhook-settings/WebhookPage";
 import { WebhookDetailPage } from "@/pages/webhook-settings/WebhookDetailPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
 import { IntegrationGuidePage } from "@/pages/integration/IntegrationGuidePage";
+import { ChatbotSettingsPage } from "@/pages/ai-chatbot/ChatbotSettingsPage";
+import { ChatSessionsPage } from "@/pages/ai-chatbot/ChatSessionsPage";
+import { ChatSessionDetailPage } from "@/pages/ai-chatbot/ChatSessionDetailPage";
+import { KnowledgeBasePage } from "@/pages/knowledge-base/KnowledgeBasePage";
+import { UnansweredQuestionsPage } from "@/pages/unanswered-questions/UnansweredQuestionsPage";
+import { ChatInboxPage } from "@/pages/chat-inbox/ChatInboxPage";
+import { RichMenusPage } from "@/pages/rich-menus/RichMenusPage";
+import { RichMenuBuilderPage } from "@/pages/rich-menus/RichMenuBuilderPage";
+import { RichMenuAssignmentsPage } from "@/pages/rich-menus/RichMenuAssignmentsPage";
+import { QuickRepliesPage } from "@/pages/quick-replies/QuickRepliesPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -72,6 +82,26 @@ function Router() {
 
   if (path.startsWith("/settings")) return <SettingsPage />;
   if (path.startsWith("/integration")) return <IntegrationGuidePage />;
+
+  // AI Chatbot routes
+  if (path.startsWith("/chatbot-settings")) return <ChatbotSettingsPage />;
+  if (segments[0] === "chat-sessions") {
+    if (segments[1]) return <ChatSessionDetailPage />;
+    return <ChatSessionsPage />;
+  }
+  if (path.startsWith("/knowledge-base")) return <KnowledgeBasePage />;
+  if (path.startsWith("/unanswered-questions")) return <UnansweredQuestionsPage />;
+  if (path.startsWith("/chat-inbox")) return <ChatInboxPage />;
+
+  // Rich Menus
+  if (segments[0] === "rich-menus") {
+    if (segments[1] === "assignments") return <RichMenuAssignmentsPage />;
+    if (segments[1]) return <RichMenuBuilderPage />;
+    return <RichMenusPage />;
+  }
+
+  // Quick Replies
+  if (path.startsWith("/quick-replies")) return <QuickRepliesPage />;
 
   // 404
   return (

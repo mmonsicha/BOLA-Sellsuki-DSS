@@ -12,6 +12,13 @@ import {
   Menu,
   Layers,
   BookOpen,
+  Bot,
+  MessagesSquare,
+  Database,
+  HelpCircle,
+  Inbox,
+  LayoutTemplate,
+  MessageCircleDashed,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -22,19 +29,44 @@ interface NavItem {
   badge?: string;
 }
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
-  { label: "LINE OA", href: "/line-oa", icon: MessageCircle },
-  { label: "Followers", href: "/followers", icon: Users },
-  { label: "Segments", href: "/segments", icon: Tag },
-  { label: "Broadcasts", href: "/broadcasts", icon: Radio },
-  { label: "Auto Reply", href: "/auto-reply", icon: ChevronRight },
-  { label: "Auto Push Messages", href: "/auto-push-messages", icon: Radio },
-  { label: "Flex Messages", href: "/flex-messages", icon: Layers },
-  { label: "Media", href: "/media", icon: Image },
-  { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
-  { label: "Settings", href: "/settings", icon: Settings },
-  { label: "Integration Guide", href: "/integration", icon: BookOpen },
+interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    items: [
+      { label: "Dashboard", href: "/", icon: LayoutDashboard },
+      { label: "LINE OA", href: "/line-oa", icon: MessageCircle },
+      { label: "Followers", href: "/followers", icon: Users },
+      { label: "Segments", href: "/segments", icon: Tag },
+      { label: "Broadcasts", href: "/broadcasts", icon: Radio },
+      { label: "Auto Reply", href: "/auto-reply", icon: ChevronRight },
+      { label: "Auto Push Messages", href: "/auto-push-messages", icon: Radio },
+      { label: "Flex Messages", href: "/flex-messages", icon: Layers },
+      { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
+      { label: "Quick Replies", href: "/quick-replies", icon: MessageCircleDashed },
+      { label: "Media", href: "/media", icon: Image },
+      { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
+    ],
+  },
+  {
+    title: "AI Chatbot",
+    items: [
+      { label: "Chatbot Settings", href: "/chatbot-settings", icon: Bot },
+      { label: "Chat Inbox", href: "/chat-inbox", icon: Inbox },
+      { label: "Chat Sessions", href: "/chat-sessions", icon: MessagesSquare },
+      { label: "Knowledge Base", href: "/knowledge-base", icon: Database },
+      { label: "Unanswered Questions", href: "/unanswered-questions", icon: HelpCircle },
+    ],
+  },
+  {
+    items: [
+      { label: "Settings", href: "/settings", icon: Settings },
+      { label: "Integration Guide", href: "/integration", icon: BookOpen },
+    ],
+  },
 ];
 
 interface SidebarProps {
@@ -74,35 +106,46 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto">
-        <ul className="space-y-1 px-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentPath === item.href ||
-              (item.href !== "/" && currentPath.startsWith(item.href));
+        <div className="space-y-4 px-2">
+          {navSections.map((section, sIdx) => (
+            <div key={sIdx}>
+              {!collapsed && section.title && (
+                <div className="px-3 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  {section.title}
+                </div>
+              )}
+              <ul className="space-y-1">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = currentPath === item.href ||
+                    (item.href !== "/" && currentPath.startsWith(item.href));
 
-            return (
-              <li key={item.href}>
-                <a
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                    isActive
-                      ? "bg-line text-white"
-                      : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                  )}
-                >
-                  <Icon size={18} className="flex-shrink-0" />
-                  {!collapsed && <span>{item.label}</span>}
-                  {!collapsed && item.badge && (
-                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
-                      {item.badge}
-                    </span>
-                  )}
-                </a>
-              </li>
-            );
-          })}
-        </ul>
+                  return (
+                    <li key={item.href}>
+                      <a
+                        href={item.href}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                          isActive
+                            ? "bg-line text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        )}
+                      >
+                        <Icon size={18} className="flex-shrink-0" />
+                        {!collapsed && <span>{item.label}</span>}
+                        {!collapsed && item.badge && (
+                          <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                            {item.badge}
+                          </span>
+                        )}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
       </nav>
 
       {/* Footer */}
