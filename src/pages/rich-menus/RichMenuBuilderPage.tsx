@@ -1018,7 +1018,10 @@ export function RichMenuBuilderPage() {
               {currentPage && (
                 <div className="pt-2 border-t space-y-2">
                   <Label htmlFor="page-image" className="text-xs font-medium">
-                    Page Image
+                    Page Image{" "}
+                    {!currentPage.image_url && (
+                      <span className="text-destructive font-normal">(required to publish)</span>
+                    )}
                   </Label>
                   <div className="flex gap-2">
                     <input
