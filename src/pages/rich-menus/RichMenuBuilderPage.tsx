@@ -434,11 +434,16 @@ function AreaEditor({ area, pageCount, onChange, onDelete }: AreaEditorProps) {
         <div className="space-y-1">
           <Label className="text-xs">URL</Label>
           <Input
-            className="h-7 text-xs"
+            className={`h-7 text-xs ${area.action_uri && !area.action_uri.includes("://") ? "border-amber-400 focus:border-amber-400" : ""}`}
             value={area.action_uri}
             onChange={(e) => onChange({ action_uri: e.target.value })}
-            placeholder="https://..."
+            placeholder="https://example.com"
           />
+          {area.action_uri && !area.action_uri.includes("://") && (
+            <p className="text-xs text-amber-600">
+              Missing scheme — will be saved as <strong>https://{area.action_uri}</strong>
+            </p>
+          )}
         </div>
       )}
 
