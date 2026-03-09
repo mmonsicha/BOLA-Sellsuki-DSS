@@ -12,6 +12,7 @@ import { Plus, Trash2, RefreshCw, ChevronLeft, TestTube } from "lucide-react";
 import type { RichMenu, RichMenuAssignment, AssignmentRule, LineOA } from "@/types";
 import { richMenuAssignmentApi, richMenuApi } from "@/api/richMenu";
 import { lineOAApi } from "@/api/lineOA";
+import { useToast } from "@/components/ui/toast";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -94,6 +95,7 @@ interface AssignmentDialogProps {
 }
 
 function AssignmentDialog({ open, lineOAId, menus, editing, onClose, onSaved }: AssignmentDialogProps) {
+  const toast = useToast();
   const [name, setName] = useState("");
   const [priority, setPriority] = useState(10);
   const [isDefault, setIsDefault] = useState(false);
@@ -139,8 +141,9 @@ function AssignmentDialog({ open, lineOAId, menus, editing, onClose, onSaved }: 
         : await richMenuAssignmentApi.create(data);
       onSaved(result);
       onClose();
+      toast.success(editing ? "Rule updated" : "Rule created");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Save failed");
+      toast.error("Save failed", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {
       setSaving(false);
     }
@@ -333,6 +336,7 @@ function TestPanel({ assignment, lineOAId, menus }: TestPanelProps) {
 }
 
 export function RichMenuAssignmentsPage() {
+  const toast = useToast();
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [selectedOA, setSelectedOA] = useState<string>("");
   const [assignments, setAssignments] = useState<RichMenuAssignment[]>([]);
@@ -373,8 +377,9 @@ export function RichMenuAssignmentsPage() {
     try {
       await richMenuAssignmentApi.delete(id);
       setAssignments((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Rule deleted");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      toast.error("Delete failed", e instanceof Error ? e.message : "An unexpected error occurred.");
     }
   };
 

@@ -12,6 +12,7 @@ import { LayoutTemplate, Copy, Trash2, Plus, List, LayoutGrid, RefreshCw, Send, 
 import type { RichMenu, LineOA } from "@/types";
 import { richMenuApi } from "@/api/richMenu";
 import { lineOAApi } from "@/api/lineOA";
+import { useToast } from "@/components/ui/toast";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -223,6 +224,7 @@ function MenuCard({ menu, onDuplicate, onDelete, onPublish, onSetDefault, duplic
 }
 
 export function RichMenusPage() {
+  const toast = useToast();
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [selectedOA, setSelectedOA] = useState<string>("");
   const [menus, setMenus] = useState<RichMenu[]>([]);
@@ -284,7 +286,7 @@ export function RichMenusPage() {
       setNewLineOAId("");
       window.location.href = `/rich-menus/${rm.id}`;
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to create menu");
+      toast.error("Failed to create menu", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {
       setCreating(false);
     }
@@ -296,7 +298,7 @@ export function RichMenusPage() {
       const copy = await richMenuApi.duplicate(menu.id, menu.line_oa_id);
       window.location.href = `/rich-menus/${copy.id}`;
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to duplicate menu");
+      toast.error("Failed to duplicate menu", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {
       setDuplicatingId(null);
     }
@@ -307,8 +309,9 @@ export function RichMenusPage() {
     try {
       await richMenuApi.delete(id);
       setMenus((prev) => prev.filter((m) => m.id !== id));
+      toast.success("Menu deleted");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to delete menu");
+      toast.error("Failed to delete menu", e instanceof Error ? e.message : "An unexpected error occurred.");
     }
   };
 
@@ -317,8 +320,9 @@ export function RichMenusPage() {
     try {
       const updated = await richMenuApi.publish(menu.id);
       setMenus((prev) => prev.map((m) => (m.id === menu.id ? updated : m)));
+      toast.success("Published to LINE ✓", `"${menu.name}" is now live.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to publish menu");
+      toast.error("Publish failed", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {
       setPublishingId(null);
     }
@@ -330,8 +334,9 @@ export function RichMenusPage() {
       const updated = await richMenuApi.setDefault(menu.id);
       // Mark all others as non-default, update the one that changed
       setMenus((prev) => prev.map((m) => (m.id === menu.id ? updated : { ...m, is_default: false })));
+      toast.success("Set as default", `"${menu.name}" is now the default rich menu.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to set default menu");
+      toast.error("Failed to set default", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {
       setSettingDefaultId(null);
     }

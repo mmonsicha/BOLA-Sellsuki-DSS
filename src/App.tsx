@@ -30,6 +30,7 @@ import { RichMenuAssignmentsPage } from "@/pages/rich-menus/RichMenuAssignmentsP
 import { QuickRepliesPage } from "@/pages/quick-replies/QuickRepliesPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
+import { ToastProvider } from "@/components/ui/toast";
 
 // Simple path-based routing (no react-router dependency needed for v1)
 function Router() {
@@ -112,7 +113,11 @@ function Router() {
 }
 
 function App() {
-  return <Router />;
+  return (
+    <ToastProvider>
+      <Router />
+    </ToastProvider>
+  );
 }
 
 export default App;

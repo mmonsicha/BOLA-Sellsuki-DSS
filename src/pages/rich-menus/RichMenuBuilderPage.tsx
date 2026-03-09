@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { RefreshCw, Plus, Trash2, Eye, Edit3, Upload, Check } from "lucide-react";
 import type { RichMenu, RichMenuPage, RichMenuPageArea } from "@/types";
 import { richMenuApi, richMenuPageApi, richMenuAreaApi } from "@/api/richMenu";
+import { useToast } from "@/components/ui/toast";
 
 // ---- Constants ----
 const LINE_LARGE_WIDTH = 2500;
@@ -538,9 +539,8 @@ export function RichMenuBuilderPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishSuccess, setPublishSuccess] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const toast = useToast();
 
   const { menu, pages, currentPageIndex, areas, selectedAreaId, drawMode, previewMode, loading, saving, error } = state;
 
@@ -642,8 +642,9 @@ export function RichMenuBuilderPage() {
       dispatch({ type: "MARK_CLEAN" });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
+      toast.success("Saved", "Menu settings and areas have been saved.");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Save failed");
+      toast.error("Save failed", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {
       dispatch({ type: "SET_SAVING", value: false });
     }
@@ -652,16 +653,16 @@ export function RichMenuBuilderPage() {
   const handlePublish = async () => {
     if (!menu) return;
     setIsPublishing(true);
-    setPublishError(null);
     setPublishSuccess(false);
     try {
       const updated = await richMenuApi.publish(menu.id);
       dispatch({ type: "LOAD_MENU", menu: updated });
       setPublishSuccess(true);
       setTimeout(() => setPublishSuccess(false), 4000);
+      toast.success("Published to LINE ✓", "The rich menu is now live on LINE.");
     } catch (e: unknown) {
-      setPublishError(e instanceof Error ? e.message : "Publish failed");
-      setTimeout(() => setPublishError(null), 6000);
+      const msg = e instanceof Error ? e.message : "Publish failed";
+      toast.error("Publish failed", msg);
     } finally {
       setIsPublishing(false);
     }
@@ -677,7 +678,7 @@ export function RichMenuBuilderPage() {
       dispatch({ type: "ADD_PAGE", page });
       dispatch({ type: "SET_PAGE", index: pages.length });
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to add page");
+      toast.error("Failed to add page", e instanceof Error ? e.message : "An unexpected error occurred.");
     }
   };
 
@@ -687,8 +688,9 @@ export function RichMenuBuilderPage() {
     try {
       await richMenuPageApi.delete(menu.id, pageId);
       dispatch({ type: "DELETE_PAGE", pageId });
+      toast.success("Page deleted");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Failed to delete page");
+      toast.error("Failed to delete page", e instanceof Error ? e.message : "An unexpected error occurred.");
     }
   };
 
@@ -699,19 +701,19 @@ export function RichMenuBuilderPage() {
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      setUploadError("Please select an image file");
+      toast.warning("Invalid file", "Please select an image file (PNG, JPG, etc.).");
       return;
     }
 
     setIsUploadingImage(true);
-    setUploadError(null);
 
     try {
       const result = await richMenuPageApi.uploadImage(menu.id, currentPage.id, file);
       // Update only the current page's image_url — keeps everything else intact
       dispatch({ type: "UPDATE_PAGE", pageId: currentPage.id, patch: { image_url: result.image_url } });
+      toast.success("Image uploaded");
     } catch (e: unknown) {
-      setUploadError(e instanceof Error ? e.message : "Upload failed");
+      toast.error("Upload failed", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {
       setIsUploadingImage(false);
       // Reset the input so the same file can be re-uploaded if needed
@@ -832,11 +834,6 @@ export function RichMenuBuilderPage() {
             {publishSuccess && (
               <span className="flex items-center gap-1 text-xs text-green-600">
                 <Check className="h-3 w-3" /> Published to LINE ✓
-              </span>
-            )}
-            {publishError && (
-              <span className="text-xs text-destructive max-w-xs truncate" title={publishError}>
-                ✕ {publishError}
               </span>
             )}
           </div>
@@ -1000,9 +997,6 @@ export function RichMenuBuilderPage() {
                       </Button>
                     )}
                   </div>
-                  {uploadError && (
-                    <p className="text-xs text-destructive">{uploadError}</p>
-                  )}
                   {currentPage.image_url && (
                     <p className="text-xs text-muted-foreground">Image uploaded ✓</p>
                   )}
