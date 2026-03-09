@@ -16,6 +16,7 @@ const targetTypeMeta = {
   "segment": { label: "Segment", cls: "bg-purple-100 text-purple-700 border-0" },
   "all_followers": { label: "All Followers", cls: "bg-green-100 text-green-700 border-0" },
   "line_group": { label: "LINE Group (Soon)", cls: "bg-gray-100 text-gray-700 border-0" },
+  "lon_subscribers": { label: "LON Subscribers", cls: "bg-orange-100 text-orange-700 border-0" },
 } as const;
 
 function CopyButton({ text }: { text: string }) {

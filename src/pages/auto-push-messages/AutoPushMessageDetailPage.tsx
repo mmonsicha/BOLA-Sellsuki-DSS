@@ -24,7 +24,7 @@ interface FormState {
   messageType: "text" | "flex";
   messageTemplate: string;
   flexMessageId: string;
-  targetType: "follower" | "segment" | "all_followers";
+  targetType: "follower" | "segment" | "all_followers" | "lon_subscribers";
   targetSegmentId: string;
   isEnabled: boolean;
 }
@@ -618,6 +618,7 @@ export function AutoPushMessageDetailPage() {
                 disabled={saving}
               >
                 <option value="all_followers">All Followers</option>
+                <option value="lon_subscribers">LON Subscribers (LINE Notification)</option>
                 <option value="segment">Specific Segment</option>
                 <option value="follower">Single Follower</option>
               </select>

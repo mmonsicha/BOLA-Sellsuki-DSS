@@ -11,7 +11,7 @@ export interface AutoPushMessage {
   message_type: "text" | "flex";
   message_template: string;
   flex_message_id?: string;
-  target_type: "follower" | "segment" | "all_followers" | "line_group";
+  target_type: "follower" | "segment" | "all_followers" | "line_group" | "lon_subscribers";
   target_segment_id?: string;
   target_follower_ids?: string[];
   group_chat_id?: string;
@@ -45,7 +45,7 @@ export interface CreateAutoPushMessageRequest {
   message_type?: "text" | "flex";
   message_template?: string;
   flex_message_id?: string;
-  target_type: "follower" | "segment" | "all_followers" | "line_group";
+  target_type: "follower" | "segment" | "all_followers" | "line_group" | "lon_subscribers";
   target_segment_id?: string;
   target_follower_ids?: string[];
 }
