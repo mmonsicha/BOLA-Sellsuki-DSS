@@ -885,12 +885,12 @@ export function RichMenuBuilderPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Chat Bar Text</Label>
+                <Label className="text-xs">Chat Bar Text <span className="text-muted-foreground">(defaults to menu name)</span></Label>
                 <Input
                   className="h-7 text-xs"
                   value={menu.chat_bar_text || ""}
                   onChange={(e) => dispatch({ type: "UPDATE_MENU_FIELD", field: "chat_bar_text", value: e.target.value })}
-                  placeholder="Tap to open menu"
+                  placeholder={menu.name || "e.g. Tap to open menu"}
                 />
               </div>
               <div className="space-y-1">
