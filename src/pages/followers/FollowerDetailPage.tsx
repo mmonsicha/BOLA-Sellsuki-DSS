@@ -108,12 +108,12 @@ function CustomFieldsEditor({
     <div className="space-y-2">
       {/* Existing entries */}
       {Object.entries(fields).map(([k, v]) => (
-        <div key={k} className="flex items-center gap-2">
+        <div key={k} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
           <input
             type="text"
             readOnly
             value={k}
-            className="w-40 border rounded-md px-2 py-1.5 text-sm bg-muted font-mono text-muted-foreground"
+            className="w-full sm:w-40 border rounded-md px-2 py-1.5 text-sm bg-muted font-mono text-muted-foreground"
           />
           <span className="text-muted-foreground">→</span>
           <input
@@ -129,12 +129,12 @@ function CustomFieldsEditor({
       ))}
 
       {/* Add new row */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
         <input
           type="text"
           value={newKey}
           placeholder="key"
-          className="w-40 border rounded-md px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+          className="w-full sm:w-40 border rounded-md px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring font-mono"
           onChange={(e) => setNewKey(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
           onBlur={handleKeyBlur}
@@ -297,7 +297,7 @@ export function FollowerDetailPage() {
         <Card>
           <CardHeader><CardTitle>LINE Identity</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
               <span className="text-muted-foreground">LINE User ID</span>
               <span className="font-mono text-xs break-all">{follower.line_user_id}</span>
 

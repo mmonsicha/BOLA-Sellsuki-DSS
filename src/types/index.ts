@@ -289,6 +289,8 @@ export interface ChatSession {
   chat_type: ChatType;
   line_chat_id: string;
   follower_id: string;
+  follower_display_name: string;
+  follower_picture_url: string;
   mode: ChatMode;
   assigned_admin_id: string;
   escalation_reason?: string;
@@ -476,6 +478,21 @@ export interface LONDeliveryLog {
   http_status_code?: number;
   triggered_by: string;
   sent_at: string;
+}
+
+// ---- LON by Phone (PNP) ----
+export interface PNPDeliveryLog {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  phone_hash: string;
+  template_key: string;
+  status: "success" | "failed";
+  error_message?: string;
+  http_status_code?: number;
+  triggered_by: string;
+  sent_at: string;
+  created_at: string;
 }
 
 // ---- Registration Form ----

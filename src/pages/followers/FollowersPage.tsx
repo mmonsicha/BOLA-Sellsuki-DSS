@@ -6,6 +6,7 @@ import { RefreshCw } from "lucide-react";
 import type { Follower, LineOA } from "@/types";
 import { followerApi } from "@/api/follower";
 import { lineOAApi } from "@/api/lineOA";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -29,17 +30,16 @@ export function FollowersPage() {
       .then((res) => {
         const oas = res.data ?? [];
         setLineOAs(oas);
-        if (oas.length > 0) setSelectedLineOAId(oas[0].id);
+        // Start with "All" — no auto-select
       })
       .catch(console.error);
   }, []);
 
   // Reload followers whenever the selected OA changes
   useEffect(() => {
-    if (!selectedLineOAId) return;
     setLoading(true);
     followerApi
-      .list({ workspace_id: WORKSPACE_ID, line_oa_id: selectedLineOAId })
+      .list({ workspace_id: WORKSPACE_ID, line_oa_id: selectedLineOAId || undefined })
       .then((res) => {
         setFollowers(res.data ?? []);
         setError(null);
@@ -55,24 +55,19 @@ export function FollowersPage() {
     <AppLayout title="Followers">
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Manage your LINE followers. They are automatically added when they follow your LINE OA.
           </p>
-          <div className="flex items-center gap-2">
-            <select
-              className="border rounded-md px-3 py-1.5 text-sm bg-background"
-              value={selectedLineOAId}
-              onChange={(e) => setSelectedLineOAId(e.target.value)}
-            >
-              {lineOAs.map((oa) => (
-                <option key={oa.id} value={oa.id}>
-                  {oa.name || oa.basic_id || oa.id.slice(0, 12)}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
+
+        {/* LINE OA Filter */}
+        <LineOAFilter
+          lineOAs={lineOAs}
+          selectedId={selectedLineOAId}
+          onChange={setSelectedLineOAId}
+          showAll={true}
+        />
 
         {/* Error */}
         {error && (
@@ -166,7 +161,7 @@ export function FollowersPage() {
                   </div>
 
                   {/* Date */}
-                  <div className="text-xs text-muted-foreground flex-shrink-0">
+                  <div className="hidden sm:block text-xs text-muted-foreground flex-shrink-0">
                     {follower.followed_at
                       ? new Date(follower.followed_at).toLocaleDateString()
                       : "—"}

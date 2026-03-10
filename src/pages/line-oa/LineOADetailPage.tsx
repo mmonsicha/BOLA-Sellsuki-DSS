@@ -381,7 +381,7 @@ export function LineOADetailPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4 pt-2 border-t text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t text-sm">
               <div>
                 <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide mb-1">
                   Channel ID

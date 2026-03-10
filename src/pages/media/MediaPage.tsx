@@ -13,6 +13,8 @@ import type { Media } from "@/types";
 import { UploadMediaDialog } from "./UploadMediaDialog";
 import { EditMediaDialog } from "./EditMediaDialog";
 
+import { toDisplayUrl } from "@/lib/mediaUtils";
+
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 const typeIcon: Record<string, React.ElementType> = {
@@ -70,17 +72,17 @@ function Lightbox({ media, onClose }: { media: Media; onClose: () => void }) {
 
         {media.type === "image" || media.type === "rich_menu" ? (
           <img
-            src={media.url}
+            src={toDisplayUrl(media.url)}
             alt={media.alt_text || media.name}
             className="max-w-full max-h-[80vh] rounded-lg object-contain shadow-2xl"
           />
         ) : media.type === "video" ? (
-          <video src={media.url} controls className="max-w-full max-h-[80vh] rounded-lg shadow-2xl" />
+          <video src={toDisplayUrl(media.url)} controls className="max-w-full max-h-[80vh] rounded-lg shadow-2xl" />
         ) : media.type === "audio" ? (
           <div className="bg-white rounded-xl p-8 shadow-2xl flex flex-col items-center gap-4">
             <Music size={48} className="text-muted-foreground" />
             <p className="font-medium">{media.name}</p>
-            <audio src={media.url} controls />
+            <audio src={toDisplayUrl(media.url)} controls />
           </div>
         ) : (
           <div className="bg-white rounded-xl p-8 shadow-2xl flex flex-col items-center gap-4">
@@ -151,7 +153,7 @@ function MediaCard({ m, onDelete, onEdit, onPreview, deletingId }: MediaCardProp
         >
           {m.thumbnail_url || (m.type === "image" && m.url) ? (
             <img
-              src={m.thumbnail_url || m.url}
+              src={toDisplayUrl(m.thumbnail_url || m.url)}
               alt={m.alt_text || m.name}
               className="w-full h-full object-cover"
             />
@@ -423,7 +425,7 @@ export function MediaPage() {
                       <CardContent className="flex items-center gap-3 p-3">
                         <div className="w-12 h-12 rounded-md bg-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
                           {m.thumbnail_url || (m.type === "image" && m.url) ? (
-                            <img src={m.thumbnail_url || m.url} alt={m.name} className="w-full h-full object-cover" />
+                            <img src={toDisplayUrl(m.thumbnail_url || m.url)} alt={m.name} className="w-full h-full object-cover" />
                           ) : (
                             <TypeIcon size={18} className="text-gray-400" />
                           )}

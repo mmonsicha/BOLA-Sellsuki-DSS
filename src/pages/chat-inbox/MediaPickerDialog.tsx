@@ -3,6 +3,7 @@ import { mediaApi } from "@/api/media";
 import type { Media } from "@/types";
 import { X, RefreshCw, FileImage, Film, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toDisplayUrl } from "@/lib/mediaUtils";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -145,7 +146,7 @@ function MediaThumb({
     >
       {thumbUrl ? (
         <img
-          src={thumbUrl}
+          src={toDisplayUrl(thumbUrl)}
           alt={media.alt_text || media.name}
           className="w-full h-full object-cover"
         />

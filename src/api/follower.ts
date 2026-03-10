@@ -19,8 +19,8 @@ export const followerApi = {
   list: (params: ListFollowersParams) =>
     api.get<PaginatedResponse<Follower>>("/v1/followers", params),
 
-  get: (id: string) =>
-    api.get<Follower>(`/v1/followers/${id}`),
+  get: (id: string, params?: { line_oa_id?: string }) =>
+    api.get<Follower>(`/v1/followers/${id}`, params),
 
   update: (id: string, body: UpdateFollowerBody) =>
     api.put<Follower>(`/v1/followers/${id}`, body),

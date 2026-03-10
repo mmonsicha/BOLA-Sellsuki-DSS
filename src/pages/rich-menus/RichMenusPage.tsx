@@ -13,14 +13,10 @@ import type { RichMenu, LineOA } from "@/types";
 import { richMenuApi } from "@/api/richMenu";
 import { lineOAApi } from "@/api/lineOA";
 import { useToast } from "@/components/ui/toast";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
+import { oaLabel } from "@/lib/lineOAUtils";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
-
-/** Display name for a LINE OA: prefer name, fall back to basic_id (@handle), then short ID */
-function oaLabel(oa: LineOA): string {
-  if (oa.name) return oa.basic_id ? `${oa.name} (${oa.basic_id})` : oa.name;
-  return oa.basic_id || oa.id.slice(0, 12);
-}
 
 /**
  * Status rules:
@@ -360,51 +356,42 @@ export function RichMenusPage() {
     <AppLayout title="Rich Menus">
       <div className="space-y-4">
         {/* Controls bar */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Label className="whitespace-nowrap text-sm font-medium">LINE OA:</Label>
-            <Select value={selectedOA} onValueChange={setSelectedOA}>
-              <SelectTrigger className="w-64">
-                <SelectValue>
-                  {selectedOA
-                    ? (lineOAs.find((o) => o.id === selectedOA) ? oaLabel(lineOAs.find((o) => o.id === selectedOA)!) : selectedOA.slice(0, 12))
-                    : "Select LINE OA..."}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {lineOAs.map((oa) => (
-                  <SelectItem key={oa.id} value={oa.id}>
-                    {oaLabel(oa)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "timeline" | "grid")}>
               <TabsList>
                 <TabsTrigger value="timeline">
                   <List className="h-4 w-4 mr-1" />
-                  Timeline
+                  <span className="hidden sm:inline">Timeline</span>
                 </TabsTrigger>
                 <TabsTrigger value="grid">
                   <LayoutGrid className="h-4 w-4 mr-1" />
-                  Grid
+                  <span className="hidden sm:inline">Grid</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => { window.location.href = "/rich-menus/assignments"; }}
             >
-              Assignment Rules
-            </Button>
-            <Button onClick={() => setShowNewDialog(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              New Menu
+              <span className="hidden sm:inline">Assignment Rules</span>
+              <span className="sm:hidden">Assignments</span>
             </Button>
           </div>
+          <Button className="self-start sm:self-auto" onClick={() => setShowNewDialog(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            New Menu
+          </Button>
         </div>
+
+        {/* LINE OA Filter */}
+        <LineOAFilter
+          lineOAs={lineOAs}
+          selectedId={selectedOA}
+          onChange={setSelectedOA}
+          showAll={false}
+        />
 
         {/* Body */}
         {!selectedOA ? (
@@ -507,7 +494,7 @@ export function RichMenusPage() {
 
       {/* New Menu Dialog */}
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
-        <DialogContent className="w-full max-w-2xl p-8">
+        <DialogContent className="w-full sm:max-w-2xl p-4 sm:p-8">
           <DialogHeader className="pb-4">
             <DialogTitle className="text-2xl">Create New Rich Menu</DialogTitle>
             <p className="text-sm text-muted-foreground mt-2">Design interactive menu experiences for your LINE OA</p>
@@ -562,7 +549,7 @@ export function RichMenusPage() {
             </div>
 
             {/* Size Type & Menu Type */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="dialog-size" className="text-sm font-semibold">Size</Label>
                 <Select value={newSizeType} onValueChange={(v) => setNewSizeType(v as "large" | "compact")}>

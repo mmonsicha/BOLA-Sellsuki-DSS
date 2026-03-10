@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { chatSessionApi } from "@/api/aiChatbot";
-import { followerApi } from "@/api/follower";
-import type { ChatSession, ChatMessage, Follower, Media } from "@/types";
+import { lineOAApi } from "@/api/lineOA";
+import type { ChatSession, ChatMessage, Media, LineOA } from "@/types";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { ImageIcon, X } from "lucide-react";
+import { ChevronLeft, ImageIcon, X } from "lucide-react";
 import { MediaPickerDialog } from "./MediaPickerDialog";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
+import { toDisplayUrl } from "@/lib/mediaUtils";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -35,7 +37,9 @@ function relativeTime(dateStr: string): string {
 
 function msgPreview(msg: ChatMessage): string {
   if (msg.message_type === "image") return "📷 Image";
-  const trimmed = msg.content.trim();
+  if (msg.message_type === "flex") return "🃏 Flex Card";
+  const trimmed = msg.content?.trim() ?? "";
+  if (!trimmed) return "(no text)";
   return trimmed.length > 60 ? trimmed.slice(0, 57) + "…" : trimmed;
 }
 
@@ -57,8 +61,9 @@ export function ChatInboxPage() {
   const [saveAsKB, setSaveAsKB] = useState(false);
   const [kbTitle, setKbTitle] = useState("");
 
-  // Follower profiles
-  const [followerMap, setFollowerMap] = useState<Record<string, Follower>>({});
+  // LINE OA filter
+  const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
+  const [selectedOAId, setSelectedOAId] = useState<string>("");
 
   // Last message preview per session
   const [lastMsgMap, setLastMsgMap] = useState<Record<string, ChatMessage>>({});
@@ -73,7 +78,17 @@ export function ChatInboxPage() {
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Mobile responsive: show chat panel instead of list on small screens
+  const [mobileShowChat, setMobileShowChat] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // ── Load LINE OAs ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    lineOAApi.list({ workspace_id: WORKSPACE_ID })
+      .then((res) => setLineOAs(res.data ?? []))
+      .catch(console.error);
+  }, []);
 
   // ── Sessions polling ──────────────────────────────────────────────────────
   const fetchSessions = useCallback(() => {
@@ -88,19 +103,6 @@ export function ChatInboxPage() {
     const t = setInterval(fetchSessions, 5000);
     return () => clearInterval(t);
   }, [fetchSessions]);
-
-  // ── Batch-fetch follower profiles for sessions ────────────────────────────
-  useEffect(() => {
-    const unknownIds = sessions
-      .map((s) => s.follower_id)
-      .filter((id): id is string => !!id && !followerMap[id]);
-    const unique = [...new Set(unknownIds)];
-    unique.forEach((id) => {
-      followerApi.get(id)
-        .then((f) => setFollowerMap((prev) => ({ ...prev, [f.id]: f })))
-        .catch(() => {});
-    });
-  }, [sessions]);
 
   // ── Messages polling ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -137,15 +139,18 @@ export function ChatInboxPage() {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const filteredSessions = sessions.filter((s) => {
+    if (selectedOAId && s.line_oa_id !== selectedOAId) return false;
     if (activeTab === "ai") return s.mode === "ai";
     if (activeTab === "human") return s.mode === "human";
     return true;
   });
 
-  const isUnread = (s: ChatSession): boolean =>
-    s.id !== selectedSession?.id &&
-    !!s.last_message_at &&
-    (!lastViewedMap[s.id] || new Date(s.last_message_at) > new Date(lastViewedMap[s.id]));
+  const isUnread = (s: ChatSession): boolean => {
+    if (s.id === selectedSession?.id) return false;
+    const activityAt = s.last_message_at || s.updated_at;
+    if (!activityAt) return false;
+    return !lastViewedMap[s.id] || new Date(activityAt) > new Date(lastViewedMap[s.id]);
+  };
 
   const markRead = (session: ChatSession) => {
     const now = new Date().toISOString();
@@ -218,22 +223,37 @@ export function ChatInboxPage() {
     setSaveAsKB(false);
     setKbTitle("");
     markRead(session);
+    setMobileShowChat(true);
   };
 
-  const selectedFollower = selectedSession?.follower_id ? followerMap[selectedSession.follower_id] : undefined;
-  const selectedName = selectedFollower?.display_name || selectedSession?.line_chat_id || "";
+  // Derive display name and picture URL directly from denormalized session fields
+  const selectedName = selectedSession?.follower_display_name || selectedSession?.line_chat_id || "";
+  const selectedPicUrl = selectedSession?.follower_picture_url || "";
 
   return (
     <AppLayout title="Chat Inbox" fullHeight>
     <div className="flex h-full overflow-hidden bg-gray-100">
 
       {/* ── Left Panel: Session List ─────────────────────────────────────── */}
-      <div className="w-80 flex-shrink-0 border-r flex flex-col bg-white shadow-sm">
+      <div className={`${mobileShowChat ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 border-r flex-col bg-white shadow-sm`}>
         {/* Header */}
         <div className="px-4 py-4 border-b">
           <h1 className="font-bold text-lg text-gray-900">Chat Inbox</h1>
           <p className="text-xs text-gray-500 mt-0.5">Human-in-the-loop conversations</p>
         </div>
+
+        {/* LINE OA Filter */}
+        {lineOAs.length > 0 && (
+          <div className="px-4 py-2.5 border-b bg-gray-50">
+            <LineOAFilter
+              lineOAs={lineOAs}
+              selectedId={selectedOAId}
+              onChange={setSelectedOAId}
+              showAll={true}
+              className="text-xs"
+            />
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="flex border-b bg-gray-50">
@@ -270,7 +290,6 @@ export function ChatInboxPage() {
               <SessionListItem
                 key={s.id}
                 session={s}
-                follower={followerMap[s.follower_id ?? ""] ?? undefined}
                 lastMessage={lastMsgMap[s.id]}
                 isSelected={selectedSession?.id === s.id}
                 unread={isUnread(s)}
@@ -283,17 +302,23 @@ export function ChatInboxPage() {
 
       {/* ── Right Panel: Conversation ────────────────────────────────────── */}
       {selectedSession ? (
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className={`${mobileShowChat ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0`}>
           {/* Conversation Header */}
           <div className="px-5 py-3.5 border-b flex items-center justify-between bg-white shadow-sm flex-shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <Avatar follower={selectedFollower} name={selectedName} size={9} />
+              {/* Back button — mobile only */}
+              <button
+                onClick={() => setMobileShowChat(false)}
+                className="md:hidden flex-shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 -ml-1"
+                aria-label="Back to session list"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <Avatar pictureUrl={selectedPicUrl} name={selectedName} size={9} />
               <div className="min-w-0">
                 <div className="font-semibold text-sm text-gray-900 truncate">{selectedName}</div>
-                <div className="text-xs text-gray-400 flex items-center gap-1.5">
-                  {selectedFollower
-                    ? selectedSession.line_chat_id
-                    : (selectedSession.follower_id ? `Follower: ${selectedSession.follower_id.slice(0, 8)}…` : "Anonymous")}
+                <div className="hidden md:flex text-xs text-gray-400 items-center gap-1.5">
+                  <span>{selectedSession.line_chat_id}</span>
                   <span className="text-gray-300">·</span>
                   <span>{messages.length} messages</span>
                 </div>
@@ -344,7 +369,12 @@ export function ChatInboxPage() {
               <div className="text-center text-gray-400 text-sm py-8">No messages yet</div>
             )}
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} follower={selectedFollower} />
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                followerName={selectedSession.follower_display_name}
+                followerPicUrl={selectedSession.follower_picture_url}
+              />
             ))}
             <div ref={messagesEndRef} />
           </div>
@@ -358,7 +388,7 @@ export function ChatInboxPage() {
                   <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden bg-gray-200">
                     {selectedMedia.type === "image" ? (
                       <img
-                        src={selectedMedia.thumbnail_url || selectedMedia.url}
+                        src={toDisplayUrl(selectedMedia.thumbnail_url || selectedMedia.url)}
                         alt={selectedMedia.name}
                         className="w-full h-full object-cover"
                       />
@@ -455,7 +485,7 @@ export function ChatInboxPage() {
           )}
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+        <div className="hidden md:flex flex-1 flex-col items-center justify-center text-gray-400">
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
             <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -481,22 +511,23 @@ export function ChatInboxPage() {
   );
 }
 
-// ── Avatar ──────────────────────────────────────────────────────────────────
+// ── Avatar ───────────────────────────────────────────────────────────────────
+// pictureUrl: LINE profile picture (stored in chat_sessions.follower_picture_url)
+// name: display name — used for the alt text and initial fallback
 
-function Avatar({ follower, name, size = 8 }: { follower?: Follower; name: string; size?: number }) {
+function Avatar({ pictureUrl, name, size = 8 }: { pictureUrl?: string; name: string; size?: number }) {
   const initial = name.charAt(0).toUpperCase() || "?";
   const sizeClass = `w-${size} h-${size}`;
 
-  if (follower?.picture_url) {
+  if (pictureUrl) {
     return (
       <img
-        src={follower.picture_url}
-        alt={follower.display_name || name}
+        src={pictureUrl}
+        alt={name}
         className={`${sizeClass} rounded-full object-cover flex-shrink-0 border border-gray-200`}
         onError={(e) => {
           // Fallback to initials on broken image
           (e.currentTarget as HTMLImageElement).style.display = "none";
-          e.currentTarget.parentElement?.querySelector(".avatar-fallback")?.classList.remove("hidden");
         }}
       />
     );
@@ -513,20 +544,19 @@ function Avatar({ follower, name, size = 8 }: { follower?: Follower; name: strin
 
 function SessionListItem({
   session,
-  follower,
   lastMessage,
   isSelected,
   unread,
   onClick,
 }: {
   session: ChatSession;
-  follower?: Follower;
   lastMessage?: ChatMessage;
   isSelected: boolean;
   unread: boolean;
   onClick: () => void;
 }) {
-  const name = follower?.display_name || session.line_chat_id;
+  // Use denormalized display name stored on the session; fall back to LINE chat ID
+  const name = session.follower_display_name || session.line_chat_id;
   const lastTime = session.last_message_at ? relativeTime(session.last_message_at) : null;
   const chatTypeLabel = CHAT_TYPE_LABELS[session.chat_type] ?? session.chat_type;
 
@@ -542,9 +572,9 @@ function SessionListItem({
       <div className="flex items-start gap-2.5">
         {/* Avatar */}
         <div className="relative flex-shrink-0 mt-0.5">
-          <Avatar follower={follower} name={name} size={9} />
+          <Avatar pictureUrl={session.follower_picture_url} name={name} size={9} />
           {unread && (
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
           )}
         </div>
 
@@ -586,11 +616,20 @@ function SessionListItem({
 
 // ── MessageBubble ────────────────────────────────────────────────────────────
 
-function MessageBubble({ message, follower }: { message: ChatMessage; follower?: Follower }) {
+function MessageBubble({
+  message,
+  followerName,
+  followerPicUrl,
+}: {
+  message: ChatMessage;
+  followerName?: string;
+  followerPicUrl?: string;
+}) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
   const isAgent = message.role === "human_agent";
   const isImage = message.message_type === "image";
+  const isFlex = message.message_type === "flex";
 
   if (isSystem) {
     return (
@@ -601,21 +640,27 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
   }
 
   const timeStr = new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const senderLabel = isAgent ? "You" : "Auto-Reply";
 
   return (
     <div className={`flex items-end gap-2 ${isUser ? "justify-start" : "justify-end"}`}>
       {/* User avatar (left side) */}
       {isUser && (
         <div className="flex-shrink-0 mb-1">
-          <Avatar follower={follower} name={follower?.display_name || "User"} size={7} />
+          <Avatar pictureUrl={followerPicUrl} name={followerName || "User"} size={7} />
         </div>
       )}
 
       {isImage ? (
-        /* Image bubble */
+        /* ── Image bubble ── */
         <div className={`max-w-xs lg:max-w-sm rounded-2xl overflow-hidden shadow-sm ${isUser ? "rounded-tl-sm" : "rounded-tr-sm"}`}>
+          {!isUser && (
+            <div className={`text-xs px-3 pt-1.5 pb-0.5 font-medium opacity-80 ${isAgent ? "bg-orange-500 text-white" : "bg-green-500 text-white"}`}>
+              {senderLabel}
+            </div>
+          )}
           <img
-            src={message.content}
+            src={toDisplayUrl(message.content)}
             alt="Image"
             className="w-full object-cover block"
             style={{ maxHeight: "240px" }}
@@ -624,8 +669,27 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
             {timeStr}
           </div>
         </div>
+      ) : isFlex ? (
+        /* ── Flex message card ── */
+        <div className={`max-w-xs lg:max-w-sm rounded-2xl shadow-sm border overflow-hidden ${isUser ? "rounded-tl-sm border-gray-200" : "rounded-tr-sm border-green-300"}`}>
+          {/* header bar */}
+          <div className={`px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold ${isUser ? "bg-gray-100 text-gray-600" : isAgent ? "bg-orange-500 text-white" : "bg-green-500 text-white"}`}>
+            <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 flex-shrink-0">
+              <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v2a1 1 0 01-1 1H3a1 1 0 01-1-1V3zm0 6a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H3a1 1 0 01-1-1V9zm8-1a1 1 0 00-1 1v4a1 1 0 001 1h2a1 1 0 001-1V9a1 1 0 00-1-1h-2z" />
+            </svg>
+            {isUser ? "Flex Card" : senderLabel + " · Flex"}
+          </div>
+          {/* alt text body */}
+          <div className={`px-3 py-2.5 text-sm ${isUser ? "bg-white text-gray-800" : isAgent ? "bg-orange-50 text-gray-800" : "bg-green-50 text-gray-800"}`}>
+            <p className="font-medium text-gray-700">{message.content}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Rich card sent via LINE</p>
+          </div>
+          <div className="text-xs px-3 py-1 flex justify-end border-t text-gray-400 border-gray-100">
+            {timeStr}
+          </div>
+        </div>
       ) : (
-        /* Text bubble */
+        /* ── Text bubble ── */
         <div className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-2.5 rounded-2xl text-sm shadow-sm ${
           isUser
             ? "bg-white text-gray-800 border border-gray-200 rounded-tl-sm"
@@ -634,9 +698,7 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
             : "bg-green-500 text-white rounded-tr-sm"
         }`}>
           {!isUser && (
-            <div className="text-xs opacity-75 mb-1 font-medium">
-              {isAgent ? "Agent" : "Bot"}
-            </div>
+            <div className="text-xs opacity-75 mb-1 font-medium">{senderLabel}</div>
           )}
           <div className="whitespace-pre-wrap break-words">{message.content}</div>
           <div className={`text-xs mt-1.5 ${isUser ? "text-gray-400" : "opacity-60"}`}>

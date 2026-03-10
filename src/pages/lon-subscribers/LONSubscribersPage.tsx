@@ -11,6 +11,7 @@ import {
 import type { LONSubscriber, LONSubscriberStats, LineOA } from "@/types";
 import { lonApi, type BulkSubscribeByPhoneResult, type SendConsentRequestResult } from "@/api/lon";
 import { lineOAApi } from "@/api/lineOA";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
@@ -651,7 +652,7 @@ export function LONSubscribersPage() {
     <AppLayout title="LON Subscribers">
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
             LINE Notification Messaging subscribers who have granted consent for push notifications.
           </p>
@@ -711,21 +712,13 @@ export function LONSubscribersPage() {
           </div>
         </div>
 
-        {/* LINE OA Selector */}
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium">LINE OA:</label>
-          <select
-            className="border rounded px-2 py-1 text-sm"
-            value={selectedLineOAId}
-            onChange={(e) => setSelectedLineOAId(e.target.value)}
-          >
-            {lineOAs.map((oa) => (
-              <option key={oa.id} value={oa.id}>
-                {oa.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* LINE OA Filter */}
+        <LineOAFilter
+          lineOAs={lineOAs}
+          selectedId={selectedLineOAId}
+          onChange={setSelectedLineOAId}
+          showAll={false}
+        />
 
         {/* Subscribe by Phone form */}
         {showPhoneForm && (

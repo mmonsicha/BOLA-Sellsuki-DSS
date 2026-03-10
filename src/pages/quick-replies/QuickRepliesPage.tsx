@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Trash2, RefreshCw, Edit, MessageSquare } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Edit3, MessageSquare } from "lucide-react";
 import type { QuickReply, QuickReplyItem, LineOA } from "@/types";
 import { quickReplyApi } from "@/api/richMenu";
 import { lineOAApi } from "@/api/lineOA";
@@ -425,12 +425,12 @@ export function QuickRepliesPage() {
                         {qr.items?.length || 0} item{(qr.items?.length || 0) !== 1 ? "s" : ""}
                       </Badge>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-7 w-7 p-0"
                         onClick={() => { setEditingQR(qr); setDialogOpen(true); }}
                       >
-                        <Edit className="h-3 w-3" />
+                        <Edit3 className="h-3.5 w-3.5 mr-1" />
+                        Edit
                       </Button>
                       <Button
                         variant="ghost"
