@@ -53,11 +53,11 @@ export function LineOAPage() {
       <div className="space-y-4">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Connect your LINE Official Accounts to manage customers and send messages.
           </p>
-          <Button className="gap-2" onClick={() => setConnectOpen(true)}>
+          <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={() => setConnectOpen(true)}>
             <Plus size={16} />
             Connect LINE OA
           </Button>
@@ -105,7 +105,7 @@ export function LineOAPage() {
                   </div>
 
                   {/* Info */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold truncate">{oa.name}</span>
 
@@ -135,13 +135,13 @@ export function LineOAPage() {
                       </div>
                     )}
 
-                    <div className="text-xs text-muted-foreground mt-0.5">
+                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
                       Channel ID: <code className="font-mono">{oa.channel_id}</code>
                     </div>
 
                     {oa.webhook_url && (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-xs text-muted-foreground truncate max-w-xs">
+                      <div className="flex items-center gap-1.5 mt-1 min-w-0">
+                        <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
                           {oa.webhook_url}
                         </span>
                         <button

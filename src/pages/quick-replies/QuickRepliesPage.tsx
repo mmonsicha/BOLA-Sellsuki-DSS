@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Trash2, RefreshCw, Edit, MessageSquare } from "lucide-react";
-import type { QuickReply, QuickReplyItem } from "@/types";
+import type { QuickReply, QuickReplyItem, LineOA } from "@/types";
 import { quickReplyApi } from "@/api/richMenu";
-import { LineOASelector } from "@/pages/auto-push-messages/LineOASelector";
+import { lineOAApi } from "@/api/lineOA";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -98,7 +99,7 @@ function ItemRow({ item, index, onChange, onRemove }: ItemRowProps) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="space-y-1">
           <Label className="text-xs">
             Label{" "}
@@ -229,9 +230,9 @@ function EditDialog({ open, editing, lineOAID, onClose, onSaved }: EditDialogPro
           <DialogTitle>{editing ? "Edit Quick Reply Set" : "New Quick Reply Set"}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex gap-4 flex-1 min-h-0 overflow-hidden px-6 py-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-1 sm:min-h-0 sm:overflow-hidden px-6 py-4">
           {/* Items editor */}
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+          <div className="space-y-3 sm:flex-1 sm:overflow-y-auto pr-2">
             <div className="space-y-1">
               <Label>Set Name</Label>
               <Input
@@ -272,7 +273,7 @@ function EditDialog({ open, editing, lineOAID, onClose, onSaved }: EditDialogPro
           </div>
 
           {/* Preview panel */}
-          <div className="w-52 flex-shrink-0 space-y-2">
+          <div className="w-full sm:w-52 sm:flex-shrink-0 space-y-2">
             <Label className="text-sm">Preview</Label>
             <QuickReplyPreview items={items} />
             <div className="text-xs text-muted-foreground space-y-1">
@@ -297,12 +298,25 @@ function EditDialog({ open, editing, lineOAID, onClose, onSaved }: EditDialogPro
 // ---- Main Page ----
 export function QuickRepliesPage() {
   const [selectedLineOAId, setSelectedLineOAId] = useState<string>("");
+  const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingQR, setEditingQR] = useState<QuickReply | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Load LINE OAs on mount
+  useEffect(() => {
+    lineOAApi
+      .list({ workspace_id: WORKSPACE_ID })
+      .then((res) => {
+        const oas = res.data ?? [];
+        setLineOAs(oas);
+        if (oas.length > 0) setSelectedLineOAId(oas[0].id);
+      })
+      .catch(console.error);
+  }, []);
 
   const load = (lineOAID: string) => {
     if (!lineOAID) return;
@@ -348,27 +362,29 @@ export function QuickRepliesPage() {
   return (
     <AppLayout title="Quick Replies">
       <div className="space-y-4">
-        {/* LINE OA Selector */}
-        <LineOASelector
-          workspaceId={WORKSPACE_ID}
-          selectedId={selectedLineOAId}
-          onSelect={setSelectedLineOAId}
-        />
-
         {/* Header */}
-        {selectedLineOAId && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Create sets of quick reply chips that appear above the keyboard in LINE chats.
           </p>
-          <Button
-            onClick={() => { setEditingQR(null); setDialogOpen(true); }}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            New Quick Reply Set
-          </Button>
+          {selectedLineOAId && (
+            <Button
+              className="self-start sm:self-auto flex-shrink-0"
+              onClick={() => { setEditingQR(null); setDialogOpen(true); }}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Quick Reply Set
+            </Button>
+          )}
         </div>
-        )}
+
+        {/* LINE OA Filter */}
+        <LineOAFilter
+          lineOAs={lineOAs}
+          selectedId={selectedLineOAId}
+          onChange={setSelectedLineOAId}
+          showAll={false}
+        />
 
         {/* Body */}
         {!selectedLineOAId ? null : loading ? (

@@ -555,6 +555,8 @@ export function RichMenuBuilderPage() {
   const menuId = window.location.pathname.split("/")[2];
   const [state, dispatch] = useReducer(builderReducer, initialState);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [canvasDisplayW, setCanvasDisplayW] = useState(CANVAS_DISPLAY_W);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [drawCurrent, setDrawCurrent] = useState<{ x: number; y: number } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -572,12 +574,12 @@ export function RichMenuBuilderPage() {
   const lineH = menu?.size_type === "compact" ? LINE_COMPACT_HEIGHT : LINE_LARGE_HEIGHT;
   const lineW = LINE_LARGE_WIDTH;
 
-  // Canvas is a fixed CANVAS_DISPLAY_W × proportional-height — never responsive.
-  // Keeping this as a derived value (not state) means it's always in sync with
-  // the menu's size_type and never lags behind a ResizeObserver callback.
+  // Canvas width tracks the container width on mobile (capped at CANVAS_DISPLAY_W).
+  // canvasDisplayW is updated by a ResizeObserver on the center panel so the
+  // coordinate math always uses the actual rendered canvas width.
   const canvasSize = {
-    w: CANVAS_DISPLAY_W,
-    h: Math.round(CANVAS_DISPLAY_W * lineH / lineW),
+    w: canvasDisplayW,
+    h: Math.round(canvasDisplayW * lineH / lineW),
   };
 
   // Load menu
@@ -588,6 +590,18 @@ export function RichMenuBuilderPage() {
       .then((rm) => dispatch({ type: "LOAD_MENU", menu: rm }))
       .catch((e: Error) => dispatch({ type: "SET_ERROR", value: e.message }));
   }, [menuId]);
+
+  // Responsive canvas: observe the center panel container and cap at CANVAS_DISPLAY_W
+  useEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0].contentRect.width;
+      setCanvasDisplayW(Math.min(Math.floor(w), CANVAS_DISPLAY_W));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Keyboard: delete selected area
   useEffect(() => {
@@ -952,10 +966,10 @@ export function RichMenuBuilderPage() {
           </div>
         )}
 
-        {/* 3-panel layout */}
-        <div className="flex gap-4 flex-1 min-h-0" style={{ height: "calc(100vh - 200px)" }}>
+        {/* 3-panel layout — stacks vertically on mobile, side-by-side on lg+ */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:flex-1 lg:min-h-0 lg:h-[calc(100vh-200px)]">
           {/* LEFT PANEL: Properties */}
-          <div className="w-56 flex-shrink-0 space-y-4 overflow-y-auto">
+          <div className="w-full lg:w-56 lg:flex-shrink-0 space-y-4 lg:overflow-y-auto">
             <div className="space-y-3">
               <h3 className="text-sm font-semibold">Menu Settings</h3>
               <div className="space-y-1">
@@ -1093,10 +1107,10 @@ export function RichMenuBuilderPage() {
             </div>
           </div>
 
-          {/* CENTER PANEL: overflow-only container — canvas is a fixed-size block inside */}
-          <div className="flex-1 min-w-0 overflow-x-auto overflow-y-auto">
-            {/* Fixed-width inner block — canvas never resizes with the window */}
-            <div style={{ width: CANVAS_DISPLAY_W }}>
+          {/* CENTER PANEL: canvas container — width drives canvasDisplayW via ResizeObserver */}
+          <div ref={canvasContainerRef} className="flex-1 min-w-0 overflow-y-auto">
+            {/* Inner block matches canvas width so it doesn't force horizontal scroll */}
+            <div style={{ width: canvasDisplayW }}>
               {previewMode && (
                 <div className="text-xs text-green-600 bg-green-50 rounded px-2 py-1 border border-green-200 mb-2">
                   Preview mode: click on areas to see what action would be triggered.
@@ -1105,7 +1119,7 @@ export function RichMenuBuilderPage() {
               <div
                 ref={canvasRef}
                 style={{
-                  width: CANVAS_DISPLAY_W,
+                  width: canvasDisplayW,
                   height: canvasSize.h,
                   position: "relative",
                   background: currentPage?.image_url ? `url(${currentPage.image_url}) center/cover no-repeat` : "#e5e7eb",
@@ -1177,7 +1191,7 @@ export function RichMenuBuilderPage() {
           </div>
 
           {/* RIGHT PANEL: Area Editor */}
-          <div className="w-56 flex-shrink-0 overflow-y-auto">
+          <div className="w-full lg:w-56 lg:flex-shrink-0 lg:overflow-y-auto">
             {selectedArea ? (
               <AreaEditor
                 area={selectedArea}

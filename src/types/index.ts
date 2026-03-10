@@ -130,8 +130,27 @@ export interface Media {
   url: string;
   thumbnail_url: string;
   storage_path: string;
+  thumbnail_s3_key: string;
   uploaded_by: string;
+  alt_text: string;
+  action_url: string;
+  width: number;
+  height: number;
+  tags: string[];
+  upload_status: string;
+  usage_count: number;
   created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface PresignedUploadResponse {
+  media_id: string;
+  upload_url: string;
+  thumbnail_upload_url: string;
+  public_url: string;
+  thumbnail_public_url: string;
+  expires_at: string;
 }
 
 // ---- Webhook Setting ----
@@ -457,4 +476,47 @@ export interface LONDeliveryLog {
   http_status_code?: number;
   triggered_by: string;
   sent_at: string;
+}
+
+// ---- Registration Form ----
+export type FieldType = "text" | "phone" | "email" | "date" | "select" | "checkbox" | "number";
+
+export interface FormField {
+  key: string;
+  label: string;
+  type: FieldType;
+  required: boolean;
+  options?: string[];
+}
+
+export interface RegistrationForm {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  name: string;
+  title: string;
+  description: string;
+  logo_url: string;
+  primary_color: string;
+  liff_id: string;
+  liff_url: string;
+  success_message: string;
+  redirect_url: string;
+  fields: FormField[];
+  terms_text: string;
+  is_active: boolean;
+  submission_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormSubmission {
+  id: string;
+  form_id: string;
+  workspace_id: string;
+  follower_id: string;
+  line_user_id: string;
+  submission_data: Record<string, string>;
+  ip_address: string;
+  submitted_at: string;
 }
