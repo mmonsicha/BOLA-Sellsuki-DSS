@@ -112,23 +112,29 @@ export function ChatInboxPage() {
     return () => clearInterval(t);
   }, [fetchSessions]);
 
-  // ── Batch-fetch follower profiles for sessions ────────────────────────────
+  // ── Lazy-load follower profiles — only when a row enters the viewport ───────
   // follower_id in chat_sessions is the LINE user ID (e.g. U5432...), not a BOLA UUID.
-  // Use ?line_oa_id= to look up by LINE user ID via GetFollowerByLineUserID.
-  useEffect(() => {
-    const unknownIds = sessions
-      .map((s) => s.follower_id)
-      .filter((id): id is string => !!id && !followerMap[id]);
-    const unique = [...new Set(unknownIds)];
-    unique.forEach((lineUserId) => {
-      const session = sessions.find((s) => s.follower_id === lineUserId);
-      const lineOAID = session?.line_oa_id;
-      followerApi.get(lineUserId, lineOAID ? { line_oa_id: lineOAID } : undefined)
-        // Key by lineUserId so followerMap[session.follower_id] always resolves
-        .then((f) => setFollowerMap((prev) => ({ ...prev, [lineUserId]: f })))
-        .catch(() => {});
-    });
-  }, [sessions]);
+  //
+  // Why lazy?  Firing N parallel followerApi.get() calls on every sessions poll
+  // hammers the backend (which may call the LINE API), risking rate-limits.
+  // Instead we request the profile only when the row is actually visible,
+  // and guard against duplicate in-flight requests with pendingFetchRef.
+  const followerMapRef = useRef<Record<string, Follower>>({});
+  const pendingFetchRef = useRef(new Set<string>());
+
+  // Keep ref in sync with state so requestFollowerFetch can read it without
+  // being listed as a dependency (avoids unnecessary callback re-creations).
+  useEffect(() => { followerMapRef.current = followerMap; }, [followerMap]);
+
+  const requestFollowerFetch = useCallback((lineUserId: string, lineOAID?: string) => {
+    // Skip if already loaded or an identical request is already in-flight
+    if (followerMapRef.current[lineUserId] || pendingFetchRef.current.has(lineUserId)) return;
+    pendingFetchRef.current.add(lineUserId);
+    followerApi.get(lineUserId, lineOAID ? { line_oa_id: lineOAID } : undefined)
+      .then((f) => setFollowerMap((m) => ({ ...m, [lineUserId]: f })))
+      .catch(() => {})
+      .finally(() => pendingFetchRef.current.delete(lineUserId));
+  }, []);
 
   // ── Messages polling ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -252,6 +258,8 @@ export function ChatInboxPage() {
     setKbTitle("");
     markRead(session);
     setMobileShowChat(true); // on mobile: switch to conversation view
+    // Eagerly fetch profile so the conversation header shows the name right away
+    if (session.follower_id) requestFollowerFetch(session.follower_id, session.line_oa_id);
   };
 
   const selectedFollower = selectedSession?.follower_id ? followerMap[selectedSession.follower_id] : undefined;
@@ -323,6 +331,11 @@ export function ChatInboxPage() {
                 isSelected={selectedSession?.id === s.id}
                 unread={isUnread(s)}
                 onClick={() => handleSelectSession(s)}
+                onVisible={(sess) =>
+                  sess.follower_id
+                    ? requestFollowerFetch(sess.follower_id, sess.line_oa_id)
+                    : undefined
+                }
               />
             ))
           )}
@@ -574,6 +587,7 @@ function SessionListItem({
   isSelected,
   unread,
   onClick,
+  onVisible,
 }: {
   session: ChatSession;
   follower?: Follower;
@@ -581,13 +595,38 @@ function SessionListItem({
   isSelected: boolean;
   unread: boolean;
   onClick: () => void;
+  onVisible?: (session: ChatSession) => void;
 }) {
   const name = follower?.display_name || session.line_chat_id;
   const lastTime = session.last_message_at ? relativeTime(session.last_message_at) : null;
   const chatTypeLabel = CHAT_TYPE_LABELS[session.chat_type] ?? session.chat_type;
 
+  // ── Lazy-load follower profile via IntersectionObserver ─────────────────
+  // Fire onVisible only once per mount (or until follower is loaded).
+  // rootMargin: "100px" pre-fetches rows slightly before they scroll into view.
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (follower || !onVisible || !session.follower_id) return;
+    const el = rowRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          onVisible(session);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1, rootMargin: "100px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  // Re-run only if follower loads (so we stop observing) or session changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [follower, session.follower_id, session.line_oa_id]);
+
   return (
     <div
+      ref={rowRef}
       onClick={onClick}
       className={`px-4 py-3.5 border-b cursor-pointer transition-colors ${
         isSelected
