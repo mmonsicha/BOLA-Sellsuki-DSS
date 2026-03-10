@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { chatSessionApi } from "@/api/aiChatbot";
 import { followerApi } from "@/api/follower";
-import type { ChatSession, ChatMessage, Follower, Media } from "@/types";
+import { lineOAApi } from "@/api/lineOA";
+import type { ChatSession, ChatMessage, Follower, Media, LineOA } from "@/types";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ImageIcon, X } from "lucide-react";
 import { MediaPickerDialog } from "./MediaPickerDialog";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -58,6 +60,10 @@ export function ChatInboxPage() {
   const [saveAsKB, setSaveAsKB] = useState(false);
   const [kbTitle, setKbTitle] = useState("");
 
+  // LINE OA filter
+  const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
+  const [selectedOAId, setSelectedOAId] = useState<string>("");
+
   // Follower profiles
   const [followerMap, setFollowerMap] = useState<Record<string, Follower>>({});
 
@@ -75,6 +81,17 @@ export function ChatInboxPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // ── Load LINE OAs ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    lineOAApi.list({ workspace_id: WORKSPACE_ID })
+      .then((res) => {
+        const oas = res.data ?? [];
+        setLineOAs(oas);
+        // No auto-select — start with "All"
+      })
+      .catch(console.error);
+  }, []);
 
   // ── Sessions polling ──────────────────────────────────────────────────────
   const fetchSessions = useCallback(() => {
@@ -143,6 +160,7 @@ export function ChatInboxPage() {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const filteredSessions = sessions.filter((s) => {
+    if (selectedOAId && s.line_oa_id !== selectedOAId) return false;
     if (activeTab === "ai") return s.mode === "ai";
     if (activeTab === "human") return s.mode === "human";
     return true;
@@ -240,6 +258,19 @@ export function ChatInboxPage() {
           <h1 className="font-bold text-lg text-gray-900">Chat Inbox</h1>
           <p className="text-xs text-gray-500 mt-0.5">Human-in-the-loop conversations</p>
         </div>
+
+        {/* LINE OA Filter */}
+        {lineOAs.length > 0 && (
+          <div className="px-4 py-2.5 border-b bg-gray-50">
+            <LineOAFilter
+              lineOAs={lineOAs}
+              selectedId={selectedOAId}
+              onChange={setSelectedOAId}
+              showAll={true}
+              className="text-xs"
+            />
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="flex border-b bg-gray-50">
