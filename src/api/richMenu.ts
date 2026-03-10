@@ -86,6 +86,14 @@ export const richMenuPageApi = {
 
 // Areas
 export const richMenuAreaApi = {
+  // Replace ALL areas for a page atomically. Returns saved areas with real IDs.
+  replaceAll: (menuId: string, pageId: string, areas: Partial<RichMenuPageArea>[]) =>
+    fetchJSON<RichMenuPageArea[]>(`${BASE}/rich-menus/${menuId}/pages/${pageId}/areas`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(areas),
+    }),
+
   create: (menuId: string, pageId: string, data: Partial<RichMenuPageArea>) =>
     fetchJSON<RichMenuPageArea>(`${BASE}/rich-menus/${menuId}/pages/${pageId}/areas`, {
       method: "POST",
@@ -138,12 +146,25 @@ export const richMenuAssignmentApi = {
         body: JSON.stringify({ line_oa_id: lineOAID, follower_id: followerID }),
       }
     ),
+
+  apply: (lineOAID: string, followerID: string) =>
+    fetchJSON<{ ok: boolean }>(
+      `${BASE}/rich-menu-assignments/apply`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ line_oa_id: lineOAID, follower_id: followerID }),
+      }
+    ),
 };
 
 // Quick Replies
 export const quickReplyApi = {
-  list: (workspaceID: string) =>
-    fetchJSON<{ data: QuickReply[] }>(`${BASE}/quick-replies?workspace_id=${workspaceID}`),
+  list: (workspaceID: string, lineOAID?: string) => {
+    const params = new URLSearchParams({ workspace_id: workspaceID });
+    if (lineOAID) params.set("line_oa_id", lineOAID);
+    return fetchJSON<{ data: QuickReply[] }>(`${BASE}/quick-replies?${params.toString()}`);
+  },
 
   get: (id: string) =>
     fetchJSON<QuickReply>(`${BASE}/quick-replies/${id}`),
@@ -162,6 +183,11 @@ export const quickReplyApi = {
       body: JSON.stringify(data),
     }),
 
-  delete: (id: string) =>
-    fetch(`${BASE}/quick-replies/${id}`, { method: "DELETE" }),
+  delete: async (id: string) => {
+    const res = await fetch(`${BASE}/quick-replies/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.error || json.message || `Delete failed: ${res.status}`);
+    }
+  },
 };
