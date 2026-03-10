@@ -42,11 +42,11 @@ export function SegmentsPage() {
     <AppLayout title="Segments">
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Group your followers into segments for targeted broadcasts.
           </p>
-          <Button className="gap-2" onClick={() => { window.location.href = "/segments/new"; }}>
+          <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={() => { window.location.href = "/segments/new"; }}>
             <Plus size={16} />
             New Segment
           </Button>
@@ -119,22 +119,12 @@ export function SegmentsPage() {
                   </div>
 
                   {/* Date */}
-                  <div className="text-xs text-muted-foreground flex-shrink-0">
+                  <div className="hidden sm:block text-xs text-muted-foreground flex-shrink-0">
                     {new Date(seg.created_at).toLocaleDateString()}
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.location.href = `/segments/${seg.id}/edit`;
-                      }}
-                    >
-                      Edit
-                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

@@ -7,6 +7,7 @@ import { RefreshCw, ScrollText } from "lucide-react";
 import type { LONDeliveryLog, LineOA } from "@/types";
 import { lonApi } from "@/api/lon";
 import { lineOAApi } from "@/api/lineOA";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -80,31 +81,23 @@ export function LONDeliveryLogsPage() {
     <AppLayout title="LON Delivery Logs">
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             History of LINE Notification Messaging delivery attempts.
           </p>
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
+          <Button variant="outline" size="sm" onClick={handleRefresh} className="self-start sm:self-auto flex-shrink-0">
             <RefreshCw size={14} className="mr-1" />
             Refresh
           </Button>
         </div>
 
-        {/* LINE OA Selector */}
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium">LINE OA:</label>
-          <select
-            className="border rounded px-2 py-1 text-sm"
-            value={selectedLineOAId}
-            onChange={(e) => handleOAChange(e.target.value)}
-          >
-            {lineOAs.map((oa) => (
-              <option key={oa.id} value={oa.id}>
-                {oa.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* LINE OA Filter */}
+        <LineOAFilter
+          lineOAs={lineOAs}
+          selectedId={selectedLineOAId}
+          onChange={handleOAChange}
+          showAll={false}
+        />
 
         {error && (
           <div className="rounded border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">

@@ -478,6 +478,21 @@ export interface LONDeliveryLog {
   sent_at: string;
 }
 
+// ---- LON by Phone (PNP) ----
+export interface PNPDeliveryLog {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  phone_hash: string;
+  template_key: string;
+  status: "success" | "failed";
+  error_message?: string;
+  http_status_code?: number;
+  triggered_by: string;
+  sent_at: string;
+  created_at: string;
+}
+
 // ---- Registration Form ----
 export type FieldType = "text" | "phone" | "email" | "date" | "select" | "checkbox" | "number";
 

@@ -8,6 +8,7 @@ import { workspaceApi } from "@/api/workspace";
 import { lineOAApi } from "@/api/lineOA";
 import { broadcastApi } from "@/api/broadcast";
 import type { Broadcast, BroadcastStatus, LineOA } from "@/types";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
 
 // ─── Status config ──────────────────────────────────────────────────────────
 
@@ -85,17 +86,6 @@ function BroadcastRow({ broadcast }: BroadcastRowProps) {
             )}
           </div>
         )}
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            window.location.href = `/broadcasts/${broadcast.id}`;
-          }}
-        >
-          View
-        </Button>
       </CardContent>
     </Card>
   );
@@ -211,34 +201,26 @@ export function BroadcastsPage() {
     <AppLayout title="Broadcasts">
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Send messages to all followers or specific segments.
           </p>
-          <div className="flex items-center gap-2">
-            {/* LINE OA filter */}
-            <select
-              className="border rounded-md px-3 py-1.5 text-sm bg-background"
-              value={selectedLineOAId}
-              onChange={(e) => setSelectedLineOAId(e.target.value)}
-            >
-              <option value="">All LINE OAs</option>
-              {lineOAs.map((oa) => (
-                <option key={oa.id} value={oa.id}>
-                  {oa.name || oa.basic_id || oa.id.slice(0, 12)}
-                </option>
-              ))}
-            </select>
-
-            <Button
-              className="gap-2"
-              onClick={() => { window.location.href = "/broadcasts/new"; }}
-            >
-              <Plus size={16} />
-              New Broadcast
-            </Button>
-          </div>
+          <Button
+            className="gap-2 self-start sm:self-auto flex-shrink-0"
+            onClick={() => { window.location.href = "/broadcasts/new"; }}
+          >
+            <Plus size={16} />
+            New Broadcast
+          </Button>
         </div>
+
+        {/* LINE OA Filter */}
+        <LineOAFilter
+          lineOAs={lineOAs}
+          selectedId={selectedLineOAId}
+          onChange={setSelectedLineOAId}
+          showAll={true}
+        />
 
         {/* Error */}
         {error && (

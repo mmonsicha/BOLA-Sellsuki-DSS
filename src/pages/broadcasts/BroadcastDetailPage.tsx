@@ -499,7 +499,7 @@ export function BroadcastDetailPage() {
             <CardTitle className="text-sm">Info</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <div className="grid grid-cols-2 gap-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2">
               <span className="text-muted-foreground">LINE OA</span>
               <span className="flex items-center gap-1.5 flex-wrap">
                 <span>{lineOA?.name ?? broadcast.line_oa_id}</span>

@@ -7,7 +7,9 @@ import { useState, useEffect } from "react";
 import { autoPushMessageApi } from "@/api/autoPushMessage";
 import type { AutoPushMessage } from "@/api/autoPushMessage";
 import { CreateAutoPushDialog } from "./CreateAutoPushDialog";
-import { LineOASelector } from "./LineOASelector";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
+import { lineOAApi } from "@/api/lineOA";
+import type { LineOA } from "@/types";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -72,11 +74,24 @@ function DeliveryStats({ apm }: { apm: AutoPushMessage }) {
 
 export function AutoPushMessagesPage() {
   const [apms, setApms] = useState<AutoPushMessage[]>([]);
+  const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedLineOAId, setSelectedLineOAId] = useState<string>("");
+
+  // Load LINE OAs on mount
+  useEffect(() => {
+    lineOAApi
+      .list({ workspace_id: WORKSPACE_ID })
+      .then((res) => {
+        const oas = res.data ?? [];
+        setLineOAs(oas);
+        if (oas.length > 0) setSelectedLineOAId(oas[0].id);
+      })
+      .catch(console.error);
+  }, []);
 
   const loadAutoPushMessages = () => {
     if (!selectedLineOAId) return;
@@ -126,21 +141,22 @@ export function AutoPushMessagesPage() {
     <AppLayout title="Auto Push Messages">
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Create reusable message templates triggered by webhook events. Each APM gets a unique webhook endpoint that external systems can POST to.
           </p>
-          <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+          <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={() => setCreateOpen(true)}>
             <Plus size={16} />
             Create Auto Push
           </Button>
         </div>
 
-        {/* LINE OA Selection */}
-        <LineOASelector
-          workspaceId={WORKSPACE_ID}
+        {/* LINE OA Filter */}
+        <LineOAFilter
+          lineOAs={lineOAs}
           selectedId={selectedLineOAId}
-          onSelect={setSelectedLineOAId}
+          onChange={setSelectedLineOAId}
+          showAll={false}
         />
 
         {/* Loading */}
@@ -175,7 +191,11 @@ export function AutoPushMessagesPage() {
               const typeMeta = targetTypeMeta[apm.target_type as keyof typeof targetTypeMeta] ?? targetTypeMeta["all_followers"];
               const isActive = apm.is_enabled;
               return (
-                <Card key={apm.id} className={!isActive ? "opacity-60" : ""}>
+                <Card
+                  key={apm.id}
+                  className={`cursor-pointer hover:shadow-md transition-shadow${!isActive ? " opacity-60" : ""}`}
+                  onClick={() => { window.location.href = `/auto-push-messages/${apm.id}`; }}
+                >
                   <CardContent className="flex flex-col gap-4 p-4">
                     {/* Header */}
                     <div className="flex items-start gap-4">
@@ -202,7 +222,7 @@ export function AutoPushMessagesPage() {
                         )}
 
                         {/* Webhook URL */}
-                        <div className="flex items-center gap-1 mt-2">
+                        <div className="flex items-center gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
                           <span className="text-xs text-muted-foreground font-mono truncate max-w-sm bg-muted px-2 py-1 rounded">
                             {apm.webhook_url}
                           </span>
@@ -218,7 +238,7 @@ export function AutoPushMessagesPage() {
                       </div>
 
                       {/* Date */}
-                      <div className="text-xs text-muted-foreground flex-shrink-0">
+                      <div className="hidden sm:block text-xs text-muted-foreground flex-shrink-0">
                         {new Date(apm.created_at).toLocaleDateString()}
                       </div>
                     </div>
@@ -231,7 +251,7 @@ export function AutoPushMessagesPage() {
                     )}
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleToggle(apm)}
                         disabled={togglingId === apm.id}
@@ -242,9 +262,6 @@ export function AutoPushMessagesPage() {
                           ? <ToggleRight size={22} className="text-green-600" />
                           : <ToggleLeft size={22} />}
                       </button>
-                      <Button variant="outline" size="sm" onClick={() => { window.location.href = `/auto-push-messages/${apm.id}`; }}>
-                        View / Edit
-                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

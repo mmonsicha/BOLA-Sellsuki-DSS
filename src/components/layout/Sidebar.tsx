@@ -23,6 +23,7 @@ import {
   ScrollText,
   ClipboardList,
   BarChart2,
+  PhoneCall,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -51,6 +52,7 @@ const navSections: NavSection[] = [
       { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
       { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
       { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
+      { label: "LON by Phone", href: "/lon-by-phone", icon: PhoneCall },
       { label: "Registration Forms", href: "/registration-forms", icon: ClipboardList },
     ],
   },

@@ -2,12 +2,13 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Bot, Trash2, ToggleLeft, ToggleRight, GripVertical } from "lucide-react";
+import { Plus, RefreshCw, Bot, Trash2, ToggleLeft, ToggleRight, GripVertical, Edit3 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { autoReplyApi } from "@/api/autoReply";
 import { lineOAApi } from "@/api/lineOA";
 import type { AutoReply, LineOA, TriggerType } from "@/types";
 import { AutoReplyDialog } from "./AutoReplyDialog";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -158,28 +159,23 @@ export function AutoReplyPage() {
     <AppLayout title="Auto Reply">
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-muted-foreground">
-              Automatically reply to messages based on triggers.
-            </p>
-            {lineOAs.length > 0 && (
-              <select
-                className="border rounded-md px-3 py-1.5 text-sm bg-background"
-                value={selectedOA}
-                onChange={(e) => setSelectedOA(e.target.value)}
-              >
-                {lineOAs.map((oa) => (
-                  <option key={oa.id} value={oa.id}>{oa.name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-          <Button className="gap-2" onClick={openCreate} disabled={!selectedOA}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Automatically reply to messages based on triggers.
+          </p>
+          <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={openCreate} disabled={!selectedOA}>
             <Plus size={16} />
             New Auto Reply
           </Button>
         </div>
+
+        {/* LINE OA Filter */}
+        <LineOAFilter
+          lineOAs={lineOAs}
+          selectedId={selectedOA}
+          onChange={setSelectedOA}
+          showAll={false}
+        />
 
         {/* No OA state */}
         {lineOAs.length === 0 && !loading && (
@@ -297,6 +293,7 @@ export function AutoReplyPage() {
                         : <ToggleLeft size={22} />}
                     </button>
                     <Button variant="outline" size="sm" onClick={() => openEdit(ar)}>
+                      <Edit3 size={14} className="mr-1" />
                       Edit
                     </Button>
                     <Button

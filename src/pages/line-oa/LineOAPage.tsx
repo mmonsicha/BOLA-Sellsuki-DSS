@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Copy, Settings2 } from "lucide-react";
+import { Plus, RefreshCw, Copy } from "lucide-react";
 import { useState, useEffect } from "react";
 import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
@@ -92,7 +92,11 @@ export function LineOAPage() {
         {!loading && lineOAs.length > 0 && (
           <div className="grid gap-3">
             {lineOAs.map((oa) => (
-              <Card key={oa.id} className="hover:border-border/80 transition-colors">
+              <Card
+                key={oa.id}
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => goToDetail(oa.id)}
+              >
                 <CardContent className="flex items-center gap-4 p-4">
 
                   {/* Avatar */}
@@ -115,6 +119,7 @@ export function LineOAPage() {
                           href={`https://line.me/R/ti/p/${oa.basic_id}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center px-2.5 py-1 bg-line/10 text-line rounded text-xs font-mono font-semibold hover:bg-line/20 transition-colors"
                           title="Open in LINE"
                         >
@@ -145,7 +150,7 @@ export function LineOAPage() {
                           {oa.webhook_url}
                         </span>
                         <button
-                          onClick={() => copyWebhookURL(oa)}
+                          onClick={(e) => { e.stopPropagation(); copyWebhookURL(oa); }}
                           className="text-muted-foreground hover:text-foreground flex-shrink-0 transition-colors"
                           title="Copy webhook URL"
                         >
@@ -161,19 +166,6 @@ export function LineOAPage() {
                   {/* Date */}
                   <div className="text-xs text-muted-foreground flex-shrink-0 hidden sm:block">
                     {new Date(oa.created_at).toLocaleDateString()}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => goToDetail(oa.id)}
-                    >
-                      <Settings2 size={14} />
-                      Settings
-                    </Button>
                   </div>
                 </CardContent>
               </Card>

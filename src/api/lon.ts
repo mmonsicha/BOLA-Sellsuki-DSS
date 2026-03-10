@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { LONSubscriber, LONSubscriberStats, LONDeliveryLog } from "@/types";
+import type { LONSubscriber, LONSubscriberStats, LONDeliveryLog, PNPDeliveryLog } from "@/types";
 
 export interface ListLONSubscribersParams {
   line_oa_id: string;
@@ -72,6 +72,24 @@ export interface SendConsentRequestResult {
   failed: number;
 }
 
+export interface SendLONByPhoneParams {
+  line_oa_id: string;
+  phone_number: string;
+  template_key: string;
+  body: Record<string, unknown>;
+  triggered_by?: string;
+}
+
+export interface ListPNPLogsParams {
+  line_oa_id: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface ListPNPLogsResponse {
+  data: PNPDeliveryLog[];
+}
+
 export const lonApi = {
   listSubscribers: (params: ListLONSubscribersParams) =>
     api.get<ListLONSubscribersResponse>("/v1/lon-subscribers", params),
@@ -102,4 +120,10 @@ export const lonApi = {
 
   sendConsentRequest: (params: SendConsentRequestParams) =>
     api.post<SendConsentRequestResult>("/v1/lon/send-consent-request", params),
+
+  sendLONByPhone: (params: SendLONByPhoneParams) =>
+    api.post<PNPDeliveryLog>("/v1/pnp/send", params),
+
+  listLONByPhoneLogs: (params: ListPNPLogsParams) =>
+    api.get<ListPNPLogsResponse>("/v1/pnp/logs", params),
 };

@@ -50,7 +50,7 @@ export function Dialog({ open, onClose, onOpenChange, title, description, childr
     if (!open) return null;
     return (
       <DialogContext.Provider value={{ open, onOpenChange }}>
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => onOpenChange?.(false)}
@@ -65,16 +65,17 @@ export function Dialog({ open, onClose, onOpenChange, title, description, childr
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={handleClose}
       />
-      {/* Panel */}
+      {/* Panel — bottom sheet on mobile, centered modal on sm+ */}
       <div
         className={cn(
-          "relative bg-background rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto",
+          "relative bg-background shadow-xl w-full max-h-[90vh] overflow-y-auto",
+          "rounded-t-2xl sm:rounded-lg sm:max-w-lg sm:mx-4",
           className
         )}
       >
@@ -105,7 +106,8 @@ export function DialogContent({ className, children }: React.HTMLAttributes<HTML
   return (
     <div
       className={cn(
-        "relative z-10 bg-background rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto",
+        "relative z-10 bg-background shadow-xl w-full max-h-[90vh] overflow-y-auto",
+        "rounded-t-2xl sm:rounded-lg sm:max-w-lg sm:mx-4",
         className
       )}
     >

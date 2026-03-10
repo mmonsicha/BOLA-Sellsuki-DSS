@@ -31,6 +31,7 @@ import { RichMenuAssignmentsPage } from "@/pages/rich-menus/RichMenuAssignmentsP
 import { QuickRepliesPage } from "@/pages/quick-replies/QuickRepliesPage";
 import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
 import { LONDeliveryLogsPage } from "@/pages/lon-delivery-logs/LONDeliveryLogsPage";
+import { LONByPhonePage } from "@/pages/lon-by-phone/LONByPhonePage";
 import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscribePage";
 import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFormsPage";
 import { RegistrationFormBuilderPage } from "@/pages/registration-forms/RegistrationFormBuilderPage";
@@ -118,6 +119,7 @@ function Router() {
   // LON — authenticated pages
   if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
   if (path.startsWith("/lon-delivery-logs")) return <LONDeliveryLogsPage />;
+  if (path.startsWith("/lon-by-phone")) return <LONByPhonePage />;
 
   // Registration Forms
   if (segments[0] === "registration-forms") {

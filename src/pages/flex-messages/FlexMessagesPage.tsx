@@ -29,9 +29,9 @@ interface TemplatePickerProps {
 
 function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-background rounded-lg shadow-xl w-full max-w-2xl flex flex-col"
+        className="bg-background rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-2xl flex flex-col"
         style={{ maxHeight: "90vh" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -44,7 +44,7 @@ function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
         </div>
 
         {/* Grid */}
-        <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-3 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-4 gap-3 overflow-y-auto flex-1">
           {flexMessageTemplates.map((t) => (
             <button
               key={t.id}
@@ -107,9 +107,9 @@ function CreateForm({ template, workspaceId, onBack, onClose }: CreateFormProps)
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-background rounded-lg shadow-xl w-full max-w-md p-6 space-y-4"
+        className="bg-background rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-md p-6 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -249,11 +249,11 @@ export function FlexMessagesPage() {
 
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <p className="text-sm text-muted-foreground max-w-lg">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <p className="text-sm text-muted-foreground sm:max-w-lg">
             Create reusable LINE Flex Message templates. These JSON-based rich layouts can be attached to Broadcasts and Auto Push Messages.
           </p>
-          <Button onClick={openCreate}>
+          <Button className="self-start sm:self-auto flex-shrink-0" onClick={openCreate}>
             <Plus size={16} className="mr-2" />
             Create Flex Message
           </Button>

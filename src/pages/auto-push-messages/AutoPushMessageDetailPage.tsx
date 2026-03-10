@@ -392,17 +392,17 @@ export function AutoPushMessageDetailPage() {
 
       <div className="space-y-6 max-w-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => { window.location.href = "/auto-push-messages"; }} className="text-muted-foreground hover:text-foreground">
+            <button onClick={() => { window.location.href = "/auto-push-messages"; }} className="text-muted-foreground hover:text-foreground flex-shrink-0">
               <ArrowLeft size={20} />
             </button>
-            <div>
-              <h1 className="text-2xl font-bold">{apm.name}</h1>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold truncate">{apm.name}</h1>
               <p className="text-sm text-muted-foreground">Created {new Date(apm.created_at).toLocaleDateString()}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Badge variant={apm.is_enabled ? "default" : "secondary"}>
               {apm.is_enabled ? "Enabled" : "Disabled"}
             </Badge>
