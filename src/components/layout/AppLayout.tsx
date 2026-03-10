@@ -3,9 +3,10 @@ import { Sidebar } from "./Sidebar";
 interface AppLayoutProps {
   children: React.ReactNode;
   title?: string;
+  fullHeight?: boolean; // for pages that need full-height, no-padding content area (e.g. Chat Inbox)
 }
 
-export function AppLayout({ children, title }: AppLayoutProps) {
+export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
@@ -26,7 +27,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         </header>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className={fullHeight ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto p-6"}>
           {children}
         </main>
       </div>
