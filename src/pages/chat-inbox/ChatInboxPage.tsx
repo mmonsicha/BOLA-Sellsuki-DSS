@@ -35,7 +35,8 @@ function relativeTime(dateStr: string): string {
 
 function msgPreview(msg: ChatMessage): string {
   if (msg.message_type === "image") return "📷 Image";
-  const trimmed = msg.content.trim();
+  const trimmed = msg.content?.trim() ?? "";
+  if (!trimmed) return "(no text)";
   return trimmed.length > 60 ? trimmed.slice(0, 57) + "…" : trimmed;
 }
 
@@ -90,14 +91,19 @@ export function ChatInboxPage() {
   }, [fetchSessions]);
 
   // ── Batch-fetch follower profiles for sessions ────────────────────────────
+  // follower_id in chat_sessions is the LINE user ID (e.g. U5432...), not a BOLA UUID.
+  // Use ?line_oa_id= to look up by LINE user ID via GetFollowerByLineUserID.
   useEffect(() => {
     const unknownIds = sessions
       .map((s) => s.follower_id)
       .filter((id): id is string => !!id && !followerMap[id]);
     const unique = [...new Set(unknownIds)];
-    unique.forEach((id) => {
-      followerApi.get(id)
-        .then((f) => setFollowerMap((prev) => ({ ...prev, [f.id]: f })))
+    unique.forEach((lineUserId) => {
+      const session = sessions.find((s) => s.follower_id === lineUserId);
+      const lineOAID = session?.line_oa_id;
+      followerApi.get(lineUserId, lineOAID ? { line_oa_id: lineOAID } : undefined)
+        // Key by lineUserId so followerMap[session.follower_id] always resolves
+        .then((f) => setFollowerMap((prev) => ({ ...prev, [lineUserId]: f })))
         .catch(() => {});
     });
   }, [sessions]);
@@ -635,7 +641,7 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
         }`}>
           {!isUser && (
             <div className="text-xs opacity-75 mb-1 font-medium">
-              {isAgent ? "Agent" : "Bot"}
+              {isAgent ? "You" : "Bot"}
             </div>
           )}
           <div className="whitespace-pre-wrap break-words">{message.content}</div>
