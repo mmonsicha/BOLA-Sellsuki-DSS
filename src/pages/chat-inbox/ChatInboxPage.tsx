@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { chatSessionApi } from "@/api/aiChatbot";
-import { followerApi } from "@/api/follower";
 import { lineOAApi } from "@/api/lineOA";
-import type { ChatSession, ChatMessage, Follower, Media, LineOA } from "@/types";
+import type { ChatSession, ChatMessage, Media, LineOA } from "@/types";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ChevronLeft, ImageIcon, X } from "lucide-react";
 import { MediaPickerDialog } from "./MediaPickerDialog";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
-
 import { toDisplayUrl } from "@/lib/mediaUtils";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
@@ -39,6 +37,7 @@ function relativeTime(dateStr: string): string {
 
 function msgPreview(msg: ChatMessage): string {
   if (msg.message_type === "image") return "📷 Image";
+  if (msg.message_type === "flex") return "🃏 Flex Card";
   const trimmed = msg.content?.trim() ?? "";
   if (!trimmed) return "(no text)";
   return trimmed.length > 60 ? trimmed.slice(0, 57) + "…" : trimmed;
@@ -66,9 +65,6 @@ export function ChatInboxPage() {
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [selectedOAId, setSelectedOAId] = useState<string>("");
 
-  // Follower profiles
-  const [followerMap, setFollowerMap] = useState<Record<string, Follower>>({});
-
   // Last message preview per session
   const [lastMsgMap, setLastMsgMap] = useState<Record<string, ChatMessage>>({});
 
@@ -90,11 +86,7 @@ export function ChatInboxPage() {
   // ── Load LINE OAs ─────────────────────────────────────────────────────────
   useEffect(() => {
     lineOAApi.list({ workspace_id: WORKSPACE_ID })
-      .then((res) => {
-        const oas = res.data ?? [];
-        setLineOAs(oas);
-        // No auto-select — start with "All"
-      })
+      .then((res) => setLineOAs(res.data ?? []))
       .catch(console.error);
   }, []);
 
@@ -111,30 +103,6 @@ export function ChatInboxPage() {
     const t = setInterval(fetchSessions, 5000);
     return () => clearInterval(t);
   }, [fetchSessions]);
-
-  // ── Lazy-load follower profiles — only when a row enters the viewport ───────
-  // follower_id in chat_sessions is the LINE user ID (e.g. U5432...), not a BOLA UUID.
-  //
-  // Why lazy?  Firing N parallel followerApi.get() calls on every sessions poll
-  // hammers the backend (which may call the LINE API), risking rate-limits.
-  // Instead we request the profile only when the row is actually visible,
-  // and guard against duplicate in-flight requests with pendingFetchRef.
-  const followerMapRef = useRef<Record<string, Follower>>({});
-  const pendingFetchRef = useRef(new Set<string>());
-
-  // Keep ref in sync with state so requestFollowerFetch can read it without
-  // being listed as a dependency (avoids unnecessary callback re-creations).
-  useEffect(() => { followerMapRef.current = followerMap; }, [followerMap]);
-
-  const requestFollowerFetch = useCallback((lineUserId: string, lineOAID?: string) => {
-    // Skip if already loaded or an identical request is already in-flight
-    if (followerMapRef.current[lineUserId] || pendingFetchRef.current.has(lineUserId)) return;
-    pendingFetchRef.current.add(lineUserId);
-    followerApi.get(lineUserId, lineOAID ? { line_oa_id: lineOAID } : undefined)
-      .then((f) => setFollowerMap((m) => ({ ...m, [lineUserId]: f })))
-      .catch(() => {})
-      .finally(() => pendingFetchRef.current.delete(lineUserId));
-  }, []);
 
   // ── Messages polling ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -179,8 +147,6 @@ export function ChatInboxPage() {
 
   const isUnread = (s: ChatSession): boolean => {
     if (s.id === selectedSession?.id) return false;
-    // last_message_at is preferred; fall back to updated_at so sessions with
-    // no explicit last_message_at value still show the unread dot.
     const activityAt = s.last_message_at || s.updated_at;
     if (!activityAt) return false;
     return !lastViewedMap[s.id] || new Date(activityAt) > new Date(lastViewedMap[s.id]);
@@ -257,20 +223,18 @@ export function ChatInboxPage() {
     setSaveAsKB(false);
     setKbTitle("");
     markRead(session);
-    setMobileShowChat(true); // on mobile: switch to conversation view
-    // Eagerly fetch profile so the conversation header shows the name right away
-    if (session.follower_id) requestFollowerFetch(session.follower_id, session.line_oa_id);
+    setMobileShowChat(true);
   };
 
-  const selectedFollower = selectedSession?.follower_id ? followerMap[selectedSession.follower_id] : undefined;
-  const selectedName = selectedFollower?.display_name || selectedSession?.line_chat_id || "";
+  // Derive display name and picture URL directly from denormalized session fields
+  const selectedName = selectedSession?.follower_display_name || selectedSession?.line_chat_id || "";
+  const selectedPicUrl = selectedSession?.follower_picture_url || "";
 
   return (
     <AppLayout title="Chat Inbox" fullHeight>
     <div className="flex h-full overflow-hidden bg-gray-100">
 
       {/* ── Left Panel: Session List ─────────────────────────────────────── */}
-      {/* On mobile: hidden when chat is open. On md+: always visible */}
       <div className={`${mobileShowChat ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 border-r flex-col bg-white shadow-sm`}>
         {/* Header */}
         <div className="px-4 py-4 border-b">
@@ -326,16 +290,10 @@ export function ChatInboxPage() {
               <SessionListItem
                 key={s.id}
                 session={s}
-                follower={followerMap[s.follower_id ?? ""] ?? undefined}
                 lastMessage={lastMsgMap[s.id]}
                 isSelected={selectedSession?.id === s.id}
                 unread={isUnread(s)}
                 onClick={() => handleSelectSession(s)}
-                onVisible={(sess) =>
-                  sess.follower_id
-                    ? requestFollowerFetch(sess.follower_id, sess.line_oa_id)
-                    : undefined
-                }
               />
             ))
           )}
@@ -356,13 +314,11 @@ export function ChatInboxPage() {
               >
                 <ChevronLeft size={20} />
               </button>
-              <Avatar follower={selectedFollower} name={selectedName} size={9} />
+              <Avatar pictureUrl={selectedPicUrl} name={selectedName} size={9} />
               <div className="min-w-0">
                 <div className="font-semibold text-sm text-gray-900 truncate">{selectedName}</div>
                 <div className="hidden md:flex text-xs text-gray-400 items-center gap-1.5">
-                  {selectedFollower
-                    ? selectedSession.line_chat_id
-                    : (selectedSession.follower_id ? `Follower: ${selectedSession.follower_id.slice(0, 8)}…` : "Anonymous")}
+                  <span>{selectedSession.line_chat_id}</span>
                   <span className="text-gray-300">·</span>
                   <span>{messages.length} messages</span>
                 </div>
@@ -413,7 +369,12 @@ export function ChatInboxPage() {
               <div className="text-center text-gray-400 text-sm py-8">No messages yet</div>
             )}
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} follower={selectedFollower} />
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                followerName={selectedSession.follower_display_name}
+                followerPicUrl={selectedSession.follower_picture_url}
+              />
             ))}
             <div ref={messagesEndRef} />
           </div>
@@ -550,22 +511,23 @@ export function ChatInboxPage() {
   );
 }
 
-// ── Avatar ──────────────────────────────────────────────────────────────────
+// ── Avatar ───────────────────────────────────────────────────────────────────
+// pictureUrl: LINE profile picture (stored in chat_sessions.follower_picture_url)
+// name: display name — used for the alt text and initial fallback
 
-function Avatar({ follower, name, size = 8 }: { follower?: Follower; name: string; size?: number }) {
+function Avatar({ pictureUrl, name, size = 8 }: { pictureUrl?: string; name: string; size?: number }) {
   const initial = name.charAt(0).toUpperCase() || "?";
   const sizeClass = `w-${size} h-${size}`;
 
-  if (follower?.picture_url) {
+  if (pictureUrl) {
     return (
       <img
-        src={follower.picture_url}
-        alt={follower.display_name || name}
+        src={pictureUrl}
+        alt={name}
         className={`${sizeClass} rounded-full object-cover flex-shrink-0 border border-gray-200`}
         onError={(e) => {
           // Fallback to initials on broken image
           (e.currentTarget as HTMLImageElement).style.display = "none";
-          e.currentTarget.parentElement?.querySelector(".avatar-fallback")?.classList.remove("hidden");
         }}
       />
     );
@@ -582,51 +544,24 @@ function Avatar({ follower, name, size = 8 }: { follower?: Follower; name: strin
 
 function SessionListItem({
   session,
-  follower,
   lastMessage,
   isSelected,
   unread,
   onClick,
-  onVisible,
 }: {
   session: ChatSession;
-  follower?: Follower;
   lastMessage?: ChatMessage;
   isSelected: boolean;
   unread: boolean;
   onClick: () => void;
-  onVisible?: (session: ChatSession) => void;
 }) {
-  const name = follower?.display_name || session.line_chat_id;
+  // Use denormalized display name stored on the session; fall back to LINE chat ID
+  const name = session.follower_display_name || session.line_chat_id;
   const lastTime = session.last_message_at ? relativeTime(session.last_message_at) : null;
   const chatTypeLabel = CHAT_TYPE_LABELS[session.chat_type] ?? session.chat_type;
 
-  // ── Lazy-load follower profile via IntersectionObserver ─────────────────
-  // Fire onVisible only once per mount (or until follower is loaded).
-  // rootMargin: "100px" pre-fetches rows slightly before they scroll into view.
-  const rowRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (follower || !onVisible || !session.follower_id) return;
-    const el = rowRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          onVisible(session);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.1, rootMargin: "100px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  // Re-run only if follower loads (so we stop observing) or session changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [follower, session.follower_id, session.line_oa_id]);
-
   return (
     <div
-      ref={rowRef}
       onClick={onClick}
       className={`px-4 py-3.5 border-b cursor-pointer transition-colors ${
         isSelected
@@ -637,7 +572,7 @@ function SessionListItem({
       <div className="flex items-start gap-2.5">
         {/* Avatar */}
         <div className="relative flex-shrink-0 mt-0.5">
-          <Avatar follower={follower} name={name} size={9} />
+          <Avatar pictureUrl={session.follower_picture_url} name={name} size={9} />
           {unread && (
             <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
           )}
@@ -681,7 +616,15 @@ function SessionListItem({
 
 // ── MessageBubble ────────────────────────────────────────────────────────────
 
-function MessageBubble({ message, follower }: { message: ChatMessage; follower?: Follower }) {
+function MessageBubble({
+  message,
+  followerName,
+  followerPicUrl,
+}: {
+  message: ChatMessage;
+  followerName?: string;
+  followerPicUrl?: string;
+}) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
   const isAgent = message.role === "human_agent";
@@ -704,7 +647,7 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
       {/* User avatar (left side) */}
       {isUser && (
         <div className="flex-shrink-0 mb-1">
-          <Avatar follower={follower} name={follower?.display_name || "User"} size={7} />
+          <Avatar pictureUrl={followerPicUrl} name={followerName || "User"} size={7} />
         </div>
       )}
 
@@ -731,7 +674,6 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
         <div className={`max-w-xs lg:max-w-sm rounded-2xl shadow-sm border overflow-hidden ${isUser ? "rounded-tl-sm border-gray-200" : "rounded-tr-sm border-green-300"}`}>
           {/* header bar */}
           <div className={`px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold ${isUser ? "bg-gray-100 text-gray-600" : isAgent ? "bg-orange-500 text-white" : "bg-green-500 text-white"}`}>
-            {/* flex icon */}
             <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 flex-shrink-0">
               <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v2a1 1 0 01-1 1H3a1 1 0 01-1-1V3zm0 6a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H3a1 1 0 01-1-1V9zm8-1a1 1 0 00-1 1v4a1 1 0 001 1h2a1 1 0 001-1V9a1 1 0 00-1-1h-2z" />
             </svg>
@@ -742,7 +684,7 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
             <p className="font-medium text-gray-700">{message.content}</p>
             <p className="text-[10px] text-gray-400 mt-1">Rich card sent via LINE</p>
           </div>
-          <div className={`text-xs px-3 py-1 flex justify-end border-t ${isUser ? "text-gray-400 border-gray-100" : "text-gray-400 border-gray-100"}`}>
+          <div className="text-xs px-3 py-1 flex justify-end border-t text-gray-400 border-gray-100">
             {timeStr}
           </div>
         </div>

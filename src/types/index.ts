@@ -289,6 +289,8 @@ export interface ChatSession {
   chat_type: ChatType;
   line_chat_id: string;
   follower_id: string;
+  follower_display_name: string;
+  follower_picture_url: string;
   mode: ChatMode;
   assigned_admin_id: string;
   escalation_reason?: string;
