@@ -65,15 +65,7 @@ export function LONPublicSubscribePage() {
       setSuccess(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to subscribe. Please try again.";
-      // Show friendly message for 404 (phone not linked to LINE account)
-      if (msg.includes("404") || msg.includes("Not found")) {
-        setErrorMsg(
-          "Your phone number is not linked to a LINE account that has granted LON consent. " +
-          "Please ensure you have completed the consent form first."
-        );
-      } else {
-        setErrorMsg(msg);
-      }
+      setErrorMsg(msg);
     } finally {
       setSubmitting(false);
     }
