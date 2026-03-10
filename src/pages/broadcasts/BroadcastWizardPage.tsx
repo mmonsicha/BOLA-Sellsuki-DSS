@@ -176,7 +176,7 @@ export function BroadcastWizardPage() {
   const [selectedOAIds, setSelectedOAIds] = useState<Set<string>>(new Set());
 
   // Step 2 fields
-  const [targetType, setTargetType] = useState<"all" | "segment" | "manual">("all");
+  const [targetType, setTargetType] = useState<"all" | "segment" | "manual" | "lon_subscribers">("all");
   const [targetSegmentId, setTargetSegmentId] = useState("");
   const [manualUserIds, setManualUserIds] = useState("");
 
@@ -510,6 +510,7 @@ export function BroadcastWizardPage() {
                       { value: "all", label: "All Followers", description: "Send to everyone following your OA" },
                       { value: "segment", label: "Segment", description: "Target followers matching a saved segment" },
                       { value: "manual", label: "Custom List", description: "Paste specific LINE user IDs" },
+                      { value: "lon_subscribers", label: "LON Subscribers", description: "Send to users who opted in via LINE Notification Messaging" },
                     ] as const
                   ).map((option) => (
                     <label
@@ -586,6 +587,7 @@ export function BroadcastWizardPage() {
                 {targetType === "manual" && (
                   <span>{manualIds.length} user{manualIds.length !== 1 ? "s" : ""} per selected OA</span>
                 )}
+                {targetType === "lon_subscribers" && <span>All active LON subscribers for selected OA</span>}
               </div>
             </CardContent>
           </Card>

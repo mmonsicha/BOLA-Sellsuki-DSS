@@ -36,7 +36,7 @@ interface Form {
   message_type: "text" | "flex";
   message_template: string;
   flex_message_id: string;
-  target_type: "follower" | "segment" | "all_followers" | "line_group";
+  target_type: "follower" | "segment" | "all_followers" | "line_group" | "lon_subscribers";
   target_segment_id: string;
   target_follower_ids: string[];
 }
@@ -522,6 +522,7 @@ export function CreateAutoPushDialog({
             disabled={saving}
           >
             <option value="all_followers">All Followers</option>
+            <option value="lon_subscribers">LON Subscribers (LINE Notification)</option>
             <option value="segment">Specific Segment</option>
             <option value="follower">Single Follower</option>
             <option value="line_group" disabled>LINE Group Chat (Coming Soon)</option>

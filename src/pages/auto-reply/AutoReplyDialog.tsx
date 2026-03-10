@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, X, GripVertical, Trash2 } from "lucide-react";
 import { autoReplyApi } from "@/api/autoReply";
-import type { AutoReply, TriggerType, MatchMode } from "@/types";
+import { quickReplyApi } from "@/api/richMenu";
+import type { AutoReply, QuickReply, TriggerType, MatchMode } from "@/types";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -184,6 +185,7 @@ interface FormState {
   match_mode: MatchMode;
   keywords: string[];
   postback_data: string;
+  quick_reply_id: string;
   messages: MessageItem[];
 }
 
@@ -195,6 +197,7 @@ const defaultForm = (): FormState => ({
   match_mode: "contains",
   keywords: [],
   postback_data: "",
+  quick_reply_id: "",
   messages: [{ type: "text", payload: { text: "" } }],
 });
 
@@ -207,6 +210,7 @@ function formFromAutoReply(ar: AutoReply): FormState {
     match_mode: ar.match_mode || "contains",
     keywords: ar.keywords || [],
     postback_data: ar.postback_data || "",
+    quick_reply_id: ar.quick_reply_id || "",
     messages: (ar.messages as unknown as MessageItem[]) || [{ type: "text", payload: { text: "" } }],
   };
 }
@@ -226,13 +230,20 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
   const [form, setForm] = useState<FormState>(defaultForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [quickReplySets, setQuickReplySets] = useState<QuickReply[]>([]);
 
   useEffect(() => {
     if (open) {
       setForm(existing ? formFromAutoReply(existing) : defaultForm());
       setError("");
+      // Load quick reply sets for this OA
+      if (lineOAId) {
+        quickReplyApi.list(WORKSPACE_ID, lineOAId)
+          .then((res) => setQuickReplySets(res.data ?? []))
+          .catch(() => setQuickReplySets([]));
+      }
     }
-  }, [open, existing]);
+  }, [open, existing, lineOAId]);
 
   if (!open) return null;
 
@@ -268,6 +279,7 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
           keywords: form.trigger === "keyword" ? form.keywords : [],
           match_mode: form.trigger === "keyword" ? form.match_mode : undefined,
           postback_data: form.trigger === "postback" ? form.postback_data : undefined,
+          quick_reply_id: form.quick_reply_id || undefined,
           messages: msgs,
         });
       } else {
@@ -281,6 +293,7 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
           keywords: form.trigger === "keyword" ? form.keywords : [],
           match_mode: form.trigger === "keyword" ? form.match_mode : undefined,
           postback_data: form.trigger === "postback" ? form.postback_data : undefined,
+          quick_reply_id: form.quick_reply_id || undefined,
           messages: msgs,
         });
       }
@@ -418,6 +431,22 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
               messages={form.messages}
               onChange={(msgs) => set("messages", msgs)}
             />
+          </Field>
+
+          {/* Quick Reply Set */}
+          <Field label="Quick Reply Set" hint="Optional. Attach tap-able chips to the last message.">
+            <select
+              className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+              value={form.quick_reply_id}
+              onChange={(e) => set("quick_reply_id", e.target.value)}
+            >
+              <option value="">None</option>
+              {quickReplySets.map((qr) => (
+                <option key={qr.id} value={qr.id}>
+                  {qr.name} ({qr.items?.length ?? 0} chips)
+                </option>
+              ))}
+            </select>
           </Field>
 
           {error && (
