@@ -52,7 +52,6 @@ const navSections: NavSection[] = [
       { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
       { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
       { label: "Registration Forms", href: "/registration-forms", icon: ClipboardList },
-      { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
     ],
   },
   {
@@ -76,6 +75,7 @@ const navSections: NavSection[] = [
   },
   {
     items: [
+      { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
       { label: "Settings", href: "/settings", icon: Settings },
       { label: "Integration Guide", href: "/integration", icon: BookOpen },
     ],
