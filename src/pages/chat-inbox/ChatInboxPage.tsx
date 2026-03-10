@@ -346,7 +346,7 @@ export function ChatInboxPage() {
               <Avatar follower={selectedFollower} name={selectedName} size={9} />
               <div className="min-w-0">
                 <div className="font-semibold text-sm text-gray-900 truncate">{selectedName}</div>
-                <div className="text-xs text-gray-400 flex items-center gap-1.5">
+                <div className="hidden md:flex text-xs text-gray-400 items-center gap-1.5">
                   {selectedFollower
                     ? selectedSession.line_chat_id
                     : (selectedSession.follower_id ? `Follower: ${selectedSession.follower_id.slice(0, 8)}…` : "Anonymous")}
@@ -600,7 +600,7 @@ function SessionListItem({
         <div className="relative flex-shrink-0 mt-0.5">
           <Avatar follower={follower} name={name} size={9} />
           {unread && (
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
           )}
         </div>
 
@@ -647,6 +647,7 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
   const isSystem = message.role === "system";
   const isAgent = message.role === "human_agent";
   const isImage = message.message_type === "image";
+  const isFlex = message.message_type === "flex";
 
   if (isSystem) {
     return (
@@ -657,6 +658,7 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
   }
 
   const timeStr = new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const senderLabel = isAgent ? "You" : "Auto-Reply";
 
   return (
     <div className={`flex items-end gap-2 ${isUser ? "justify-start" : "justify-end"}`}>
@@ -668,8 +670,13 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
       )}
 
       {isImage ? (
-        /* Image bubble */
+        /* ── Image bubble ── */
         <div className={`max-w-xs lg:max-w-sm rounded-2xl overflow-hidden shadow-sm ${isUser ? "rounded-tl-sm" : "rounded-tr-sm"}`}>
+          {!isUser && (
+            <div className={`text-xs px-3 pt-1.5 pb-0.5 font-medium opacity-80 ${isAgent ? "bg-orange-500 text-white" : "bg-green-500 text-white"}`}>
+              {senderLabel}
+            </div>
+          )}
           <img
             src={toDisplayUrl(message.content)}
             alt="Image"
@@ -680,8 +687,28 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
             {timeStr}
           </div>
         </div>
+      ) : isFlex ? (
+        /* ── Flex message card ── */
+        <div className={`max-w-xs lg:max-w-sm rounded-2xl shadow-sm border overflow-hidden ${isUser ? "rounded-tl-sm border-gray-200" : "rounded-tr-sm border-green-300"}`}>
+          {/* header bar */}
+          <div className={`px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold ${isUser ? "bg-gray-100 text-gray-600" : isAgent ? "bg-orange-500 text-white" : "bg-green-500 text-white"}`}>
+            {/* flex icon */}
+            <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 flex-shrink-0">
+              <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v2a1 1 0 01-1 1H3a1 1 0 01-1-1V3zm0 6a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H3a1 1 0 01-1-1V9zm8-1a1 1 0 00-1 1v4a1 1 0 001 1h2a1 1 0 001-1V9a1 1 0 00-1-1h-2z" />
+            </svg>
+            {isUser ? "Flex Card" : senderLabel + " · Flex"}
+          </div>
+          {/* alt text body */}
+          <div className={`px-3 py-2.5 text-sm ${isUser ? "bg-white text-gray-800" : isAgent ? "bg-orange-50 text-gray-800" : "bg-green-50 text-gray-800"}`}>
+            <p className="font-medium text-gray-700">{message.content}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Rich card sent via LINE</p>
+          </div>
+          <div className={`text-xs px-3 py-1 flex justify-end border-t ${isUser ? "text-gray-400 border-gray-100" : "text-gray-400 border-gray-100"}`}>
+            {timeStr}
+          </div>
+        </div>
       ) : (
-        /* Text bubble */
+        /* ── Text bubble ── */
         <div className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-2.5 rounded-2xl text-sm shadow-sm ${
           isUser
             ? "bg-white text-gray-800 border border-gray-200 rounded-tl-sm"
@@ -690,9 +717,7 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
             : "bg-green-500 text-white rounded-tr-sm"
         }`}>
           {!isUser && (
-            <div className="text-xs opacity-75 mb-1 font-medium">
-              {isAgent ? "You" : "Bot"}
-            </div>
+            <div className="text-xs opacity-75 mb-1 font-medium">{senderLabel}</div>
           )}
           <div className="whitespace-pre-wrap break-words">{message.content}</div>
           <div className={`text-xs mt-1.5 ${isUser ? "text-gray-400" : "opacity-60"}`}>
