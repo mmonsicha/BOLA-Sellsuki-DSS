@@ -36,6 +36,7 @@ import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscri
 import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFormsPage";
 import { RegistrationFormBuilderPage } from "@/pages/registration-forms/RegistrationFormBuilderPage";
 import { RegistrationSubmissionsPage } from "@/pages/registration-forms/RegistrationSubmissionsPage";
+import { AnalyticsDashboardPage } from "@/pages/analytics/AnalyticsDashboardPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { ToastProvider } from "@/components/ui/toast";
@@ -127,6 +128,9 @@ function Router() {
     if (segments[1]) return <RegistrationFormBuilderPage />;
     return <RegistrationFormsPage />;
   }
+
+  // Analytics
+  if (path.startsWith("/analytics")) return <AnalyticsDashboardPage />;
 
   // 404
   return (

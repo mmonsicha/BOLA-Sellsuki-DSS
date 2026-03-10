@@ -68,6 +68,12 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: "Analytics",
+    items: [
+      { label: "Analytics Dashboard", href: "/analytics", icon: BarChart2 },
+    ],
+  },
+  {
     title: "Assets",
     items: [
       { label: "Media Library", href: "/media", icon: Image },
