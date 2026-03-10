@@ -4,6 +4,9 @@ import type { Follower, PaginatedResponse } from "@/types";
 export interface ListFollowersParams {
   workspace_id: string;
   line_oa_id?: string;
+  search?: string;        // LIKE on display_name, phone, email
+  follow_status?: string; // "following" | "unfollowed" | "blocked"
+  tag?: string;           // exact tag name match
   page?: number;
   page_size?: number;
 }
