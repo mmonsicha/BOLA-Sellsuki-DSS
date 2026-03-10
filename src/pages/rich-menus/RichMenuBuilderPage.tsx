@@ -15,6 +15,8 @@ import { useToast } from "@/components/ui/toast";
 const LINE_LARGE_WIDTH = 2500;
 const LINE_LARGE_HEIGHT = 1686;
 const LINE_COMPACT_HEIGHT = 843;
+/** Fixed display width of the canvas in CSS pixels — never changes with window size. */
+const CANVAS_DISPLAY_W = 640;
 const AREA_COLORS = [
   "rgba(59,130,246,0.35)",
   "rgba(16,185,129,0.35)",
@@ -84,7 +86,9 @@ type BuilderAction =
   | { type: "SELECT_AREA"; id: string | null }
   | { type: "TOGGLE_DRAW_MODE" }
   | { type: "TOGGLE_PREVIEW_MODE" }
-  | { type: "MARK_CLEAN" };
+  | { type: "MARK_CLEAN" }
+  // After a successful save, update the areas for the current page with real IDs from server.
+  | { type: "SYNC_PAGE_AREAS"; pageId: string; savedAreas: RichMenuPageArea[] };
 
 function toAreaId(a: RichMenuPageArea | null | undefined, idx: number): string {
   return a?.id || `new-${idx}`;
@@ -168,6 +172,18 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
       return { ...state, previewMode: !state.previewMode, drawMode: false, selectedAreaId: null };
     case "MARK_CLEAN":
       return { ...state, dirty: false };
+    case "SYNC_PAGE_AREAS": {
+      // Replace areas in state with server-returned areas (real IDs), and keep
+      // state.pages in sync so SET_PAGE later loads the correct areas.
+      const freshAreas = pageToAreas(
+        { areas: action.savedAreas } as RichMenuPage,
+        action.pageId,
+      );
+      const updatedPages = state.pages.map((p) =>
+        p.id === action.pageId ? { ...p, areas: action.savedAreas } : p,
+      );
+      return { ...state, areas: freshAreas, pages: updatedPages, dirty: false };
+    }
     default:
       return state;
   }
@@ -539,7 +555,6 @@ export function RichMenuBuilderPage() {
   const menuId = window.location.pathname.split("/")[2];
   const [state, dispatch] = useReducer(builderReducer, initialState);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [canvasSize, setCanvasSize] = useState({ w: 500, h: 337 });
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [drawCurrent, setDrawCurrent] = useState<{ x: number; y: number } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -557,20 +572,13 @@ export function RichMenuBuilderPage() {
   const lineH = menu?.size_type === "compact" ? LINE_COMPACT_HEIGHT : LINE_LARGE_HEIGHT;
   const lineW = LINE_LARGE_WIDTH;
 
-  // Measure canvas
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const ro = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) {
-        const w = entry.contentRect.width;
-        const h = w * (lineH / lineW);
-        setCanvasSize({ w, h });
-      }
-    });
-    ro.observe(canvasRef.current);
-    return () => ro.disconnect();
-  }, [lineH, lineW]);
+  // Canvas is a fixed CANVAS_DISPLAY_W × proportional-height — never responsive.
+  // Keeping this as a derived value (not state) means it's always in sync with
+  // the menu's size_type and never lags behind a ResizeObserver callback.
+  const canvasSize = {
+    w: CANVAS_DISPLAY_W,
+    h: Math.round(CANVAS_DISPLAY_W * lineH / lineW),
+  };
 
   // Load menu
   useEffect(() => {
@@ -625,31 +633,28 @@ export function RichMenuBuilderPage() {
       }
       await richMenuApi.update(menu.id, menuPayload);
 
-      // Save areas for current page
+      // Replace all areas for the current page in one atomic call.
+      // This prevents duplicate areas (stale "new-..." IDs) and syncs real IDs back to state.
       if (currentPage) {
-        for (const area of areas) {
-          const areaData: Partial<RichMenuPageArea> = {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: area.height,
-            action_type: area.action_type,
-            action_label: area.action_label,
-            action_uri: area.action_uri,
-            action_text: area.action_text,
-            action_data: area.action_data,
-            action_display_text: area.action_display_text,
-            target_page_number: area.target_page_number,
-          };
-          if (area.id.startsWith("new-")) {
-            await richMenuAreaApi.create(menu.id, currentPage.id, areaData);
-          } else {
-            await richMenuAreaApi.update(menu.id, currentPage.id, area.id, areaData);
-          }
-        }
+        const areaPayload = areas.map((area) => ({
+          x: area.x,
+          y: area.y,
+          width: area.width,
+          height: area.height,
+          action_type: area.action_type,
+          action_label: area.action_label,
+          action_uri: area.action_uri,
+          action_text: area.action_text,
+          action_data: area.action_data,
+          action_display_text: area.action_display_text,
+          target_page_number: area.target_page_number,
+        }));
+        const savedAreas = await richMenuAreaApi.replaceAll(menu.id, currentPage.id, areaPayload);
+        // Sync real IDs back so the next save updates instead of creates.
+        dispatch({ type: "SYNC_PAGE_AREAS", pageId: currentPage.id, savedAreas });
+      } else {
+        dispatch({ type: "MARK_CLEAN" });
       }
-
-      dispatch({ type: "MARK_CLEAN" });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
       toast.success("Saved", "Menu settings and areas have been saved.");
@@ -665,6 +670,9 @@ export function RichMenuBuilderPage() {
     setIsPublishing(true);
     setPublishSuccess(false);
     try {
+      // Auto-save current page's unsaved areas before publishing so the backend
+      // always sees the latest state regardless of which page is currently open.
+      await handleSave();
       const updated = await richMenuApi.publish(menu.id);
       dispatch({ type: "LOAD_MENU", menu: updated });
       setPublishSuccess(true);
@@ -753,31 +761,23 @@ export function RichMenuBuilderPage() {
 
   // Draw mode mouse events
   // Coords are stored as CSS PIXELS relative to the canvas content box.
-  // This eliminates all scale-mismatch between input (mouse) and output (preview rect).
+  // canvasSize is fixed (CANVAS_DISPLAY_W), so there is no stale-value race.
   const getCanvasPx = useCallback((e: React.MouseEvent): { x: number; y: number } => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
-    // Clamp to the canvas content area (subtract 1px border on each side)
     const borderW = 1;
-    const contentW = rect.width - borderW * 2;
-    const contentH = rect.height - borderW * 2;
-    const x = Math.round(Math.max(0, Math.min(e.clientX - rect.left - borderW, contentW)));
-    const y = Math.round(Math.max(0, Math.min(e.clientY - rect.top - borderW, contentH)));
+    const x = Math.round(Math.max(0, Math.min(e.clientX - rect.left - borderW, canvasSize.w)));
+    const y = Math.round(Math.max(0, Math.min(e.clientY - rect.top - borderW, canvasSize.h)));
     return { x, y };
-  }, []);
+  }, [canvasSize.w, canvasSize.h]);
 
-  // Convert CSS px (content-box relative) → LINE pixel coordinates
+  // Convert CSS px (content-box relative) → LINE pixel coordinates.
   const pxToLine = useCallback((px: number, py: number): { x: number; y: number } => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
-    const rect = canvasRef.current.getBoundingClientRect();
-    const borderW = 1;
-    const contentW = rect.width - borderW * 2;
-    const contentH = rect.height - borderW * 2;
     return {
-      x: Math.round((px / contentW) * lineW),
-      y: Math.round((py / contentH) * lineH),
+      x: Math.max(0, Math.min(Math.round((px / canvasSize.w) * lineW), lineW)),
+      y: Math.max(0, Math.min(Math.round((py / canvasSize.h) * lineH), lineH)),
     };
-  }, [lineH, lineW]);
+  }, [canvasSize.w, canvasSize.h, lineH, lineW]);
 
   const onCanvasMouseDown = (e: React.MouseEvent) => {
     if (!drawMode) {
@@ -1093,80 +1093,86 @@ export function RichMenuBuilderPage() {
             </div>
           </div>
 
-          {/* CENTER PANEL: Canvas */}
-          <div className="flex-1 min-w-0 flex flex-col gap-2">
-            {drawMode && (
-              <div className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-1 border border-blue-200">
-                Draw mode: click and drag on the canvas to define a new area. Press Esc to cancel.
-              </div>
-            )}
-            {previewMode && (
-              <div className="text-xs text-green-600 bg-green-50 rounded px-2 py-1 border border-green-200">
-                Preview mode: click on areas to see what action would be triggered.
-              </div>
-            )}
-            <div
-              ref={canvasRef}
-              style={{
-                width: "100%",
-                height: canvasSize.h,
-                position: "relative",
-                background: currentPage?.image_url ? `url(${currentPage.image_url}) center/cover no-repeat` : "#e5e7eb",
-                borderRadius: 8,
-                overflow: "hidden",
-                cursor: drawMode ? "crosshair" : "default",
-                userSelect: "none",
-                border: "1px solid #d1d5db",
-              }}
-              onMouseDown={onCanvasMouseDown}
-              onMouseMove={onCanvasMouseMove}
-              onMouseUp={onCanvasMouseUp}
-              onMouseLeave={() => { if (drawStart) { setDrawStart(null); setDrawCurrent(null); } }}
-            >
-              {/* Placeholder when no image */}
-              {!currentPage?.image_url && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-sm gap-2">
-                  <Upload className="h-8 w-8 opacity-40" />
-                  <span>No image — upload via page settings</span>
-                  <span className="text-xs opacity-60">
-                    {menu.size_type === "large" ? "2500 × 1686 px" : "2500 × 843 px"}
-                  </span>
+          {/* CENTER PANEL: overflow-only container — canvas is a fixed-size block inside */}
+          <div className="flex-1 min-w-0 overflow-x-auto overflow-y-auto">
+            {/* Fixed-width inner block — canvas never resizes with the window */}
+            <div style={{ width: CANVAS_DISPLAY_W }}>
+              {previewMode && (
+                <div className="text-xs text-green-600 bg-green-50 rounded px-2 py-1 border border-green-200 mb-2">
+                  Preview mode: click on areas to see what action would be triggered.
                 </div>
               )}
+              <div
+                ref={canvasRef}
+                style={{
+                  width: CANVAS_DISPLAY_W,
+                  height: canvasSize.h,
+                  position: "relative",
+                  background: currentPage?.image_url ? `url(${currentPage.image_url}) center/cover no-repeat` : "#e5e7eb",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  cursor: drawMode ? "crosshair" : "default",
+                  userSelect: "none",
+                  border: "1px solid #d1d5db",
+                }}
+                onMouseDown={onCanvasMouseDown}
+                onMouseMove={onCanvasMouseMove}
+                onMouseUp={onCanvasMouseUp}
+                onMouseLeave={() => { if (drawStart) { setDrawStart(null); setDrawCurrent(null); } }}
+              >
+                {/* Placeholder when no image */}
+                {!currentPage?.image_url && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-sm gap-2">
+                    <Upload className="h-8 w-8 opacity-40" />
+                    <span>No image — upload via page settings</span>
+                    <span className="text-xs opacity-60">
+                      {menu.size_type === "large" ? "2500 × 1686 px" : "2500 × 843 px"}
+                    </span>
+                  </div>
+                )}
 
-              {/* Area overlays */}
-              {areas.map((area, i) => (
-                <AreaOverlay
-                  key={area.id}
-                  area={area}
-                  index={i}
-                  canvasW={canvasSize.w}
-                  canvasH={canvasSize.h}
-                  lineW={lineW}
-                  lineH={lineH}
-                  selected={area.id === selectedAreaId}
-                  previewMode={previewMode}
-                  drawMode={drawMode}
-                  onSelect={(id) => dispatch({ type: "SELECT_AREA", id })}
-                  onResize={(id, patch) => dispatch({ type: "UPDATE_AREA", id, patch })}
-                />
-              ))}
+                {/* Area overlays */}
+                {areas.map((area, i) => (
+                  <AreaOverlay
+                    key={area.id}
+                    area={area}
+                    index={i}
+                    canvasW={canvasSize.w}
+                    canvasH={canvasSize.h}
+                    lineW={lineW}
+                    lineH={lineH}
+                    selected={area.id === selectedAreaId}
+                    previewMode={previewMode}
+                    drawMode={drawMode}
+                    onSelect={(id) => dispatch({ type: "SELECT_AREA", id })}
+                    onResize={(id, patch) => dispatch({ type: "UPDATE_AREA", id, patch })}
+                  />
+                ))}
 
-              {/* Draw preview rect */}
-              {drawPreviewStyle && <div style={drawPreviewStyle} />}
-            </div>
+                {/* Draw preview rect */}
+                {drawPreviewStyle && <div style={drawPreviewStyle} />}
+              </div>
 
-            {/* Area count info */}
-            <div className="text-xs text-muted-foreground">
-              {areas.length} area{areas.length !== 1 ? "s" : ""} on this page
-              {areas.length < 20 && !drawMode && !previewMode && (
-                <button
-                  className="ml-2 text-blue-600 hover:underline"
-                  onClick={() => dispatch({ type: "TOGGLE_DRAW_MODE" })}
-                >
-                  + Add area
-                </button>
-              )}
+              {/* Area count / draw-mode hint — fixed height to avoid layout shift */}
+              <div className="text-xs min-h-[1.25rem] flex items-center mt-1">
+                {drawMode ? (
+                  <span className="text-blue-600">
+                    Click and drag on the canvas to define a new area. Press Esc to cancel.
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {areas.length} area{areas.length !== 1 ? "s" : ""} on this page
+                    {areas.length < 20 && !previewMode && (
+                      <button
+                        className="ml-2 text-blue-600 hover:underline"
+                        onClick={() => dispatch({ type: "TOGGLE_DRAW_MODE" })}
+                      >
+                        + Add area
+                      </button>
+                    )}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

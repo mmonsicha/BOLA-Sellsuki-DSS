@@ -349,9 +349,12 @@ export function RichMenusPage() {
     }
   };
 
+  // Only the first is_default menu is treated as the active default; extras are shown as regular
+  // menus (data inconsistency guard — backend should only allow one default at a time).
   const defaultMenu = menus.find((m) => m.is_default);
-  const scheduledMenus = menus.filter((m) => !m.is_default && (m.starts_at || m.ends_at));
-  const alwaysOnMenus = menus.filter((m) => !m.is_default && !m.starts_at && !m.ends_at);
+  const nonDefaultMenus = menus.filter((m) => m !== defaultMenu);
+  const scheduledMenus = nonDefaultMenus.filter((m) => m.starts_at || m.ends_at);
+  const alwaysOnMenus = nonDefaultMenus.filter((m) => !m.starts_at && !m.ends_at);
 
   return (
     <AppLayout title="Rich Menus">

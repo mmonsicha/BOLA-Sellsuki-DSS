@@ -278,15 +278,18 @@ interface TestPanelProps {
 }
 
 function TestPanel({ assignment, lineOAId, menus }: TestPanelProps) {
+  const toast = useToast();
   const menuName = (id: string) => menus.find((m) => m.id === id)?.name ?? id.slice(0, 8);
   const [followerID, setFollowerID] = useState("");
   const [result, setResult] = useState<{ matched: boolean; rich_menu_id: string; reason: string } | null>(null);
   const [testing, setTesting] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [open, setOpen] = useState(false);
 
   const handleTest = async () => {
     if (!followerID.trim()) return;
     setTesting(true);
+    setResult(null);
     try {
       const res = await richMenuAssignmentApi.evaluate(lineOAId, followerID.trim());
       setResult(res);
@@ -294,6 +297,19 @@ function TestPanel({ assignment, lineOAId, menus }: TestPanelProps) {
       setResult({ matched: false, rich_menu_id: "", reason: e instanceof Error ? e.message : "Error" });
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleApply = async () => {
+    if (!followerID.trim()) return;
+    setApplying(true);
+    try {
+      await richMenuAssignmentApi.apply(lineOAId, followerID.trim());
+      toast.success("Rich menu applied", "LINE rich menu has been updated for this follower.");
+    } catch (e: unknown) {
+      toast.error("Apply failed", e instanceof Error ? e.message : "An unexpected error occurred.");
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -313,11 +329,20 @@ function TestPanel({ assignment, lineOAId, menus }: TestPanelProps) {
           className="h-7 text-xs flex-1"
           value={followerID}
           onChange={(e) => setFollowerID(e.target.value)}
-          placeholder="Follower ID"
+          placeholder="Follower ID or LINE user ID"
           onKeyDown={(e) => e.key === "Enter" && handleTest()}
         />
         <Button size="sm" className="h-7 text-xs" onClick={handleTest} disabled={testing || !followerID.trim()}>
           {testing ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Evaluate"}
+        </Button>
+        <Button
+          size="sm"
+          className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+          onClick={handleApply}
+          disabled={applying || !followerID.trim()}
+          title="Evaluate rules and immediately apply rich menu via LINE API"
+        >
+          {applying ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Apply"}
         </Button>
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setOpen(false); setResult(null); }}>
           &times;
