@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
+  Bell,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { lineOAApi } from "@/api/lineOA";
@@ -373,7 +374,76 @@ export function LineOADetailPage() {
           </CardContent>
         </Card>
 
-        {/* ── Card 2: General Settings ──────────────────────────────────────── */}
+        {/* ── Card 2: LON Settings ─────────────────────────────────────────── */}
+        {(() => {
+          const backendOrigin = oa.webhook_url
+            ? new URL(oa.webhook_url).origin
+            : window.location.origin;
+          const consentURL = `${backendOrigin}/v1/lon/consent-callback`;
+          const revokeURL = `${backendOrigin}/v1/lon/revoke-callback`;
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Bell size={16} />
+                  LINE Notification Messaging (LON)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Configure these callback URLs in your{" "}
+                  <a
+                    href="https://developers.line.biz/console/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline underline-offset-2"
+                  >
+                    LINE Developers Console
+                  </a>{" "}
+                  under{" "}
+                  <strong>Messaging API → LINE Notification Messaging → Consent settings</strong>.
+                </p>
+
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Consent Callback URL</label>
+                    <div className="flex items-center gap-2">
+                      <ReadonlyInput value={consentURL} />
+                      <CopyButton text={consentURL} />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      LINE calls this URL when a user grants LON consent.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Revoke Callback URL</label>
+                    <div className="flex items-center gap-2">
+                      <ReadonlyInput value={revokeURL} />
+                      <CopyButton text={revokeURL} />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      LINE calls this URL when a user revokes LON consent.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-md bg-muted/60 border px-4 py-3 text-xs text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground">Setup steps in LINE Developers Console:</p>
+                  <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                    <li>Go to your channel → <strong>Messaging API</strong> tab</li>
+                    <li>Scroll to <strong>LINE Notification Messaging</strong></li>
+                    <li>Paste the Consent Callback URL above</li>
+                    <li>Paste the Revoke Callback URL above</li>
+                    <li>Save changes</li>
+                  </ol>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
+        {/* ── Card 3: General Settings ──────────────────────────────────────── */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -433,7 +503,7 @@ export function LineOADetailPage() {
           </CardContent>
         </Card>
 
-        {/* ── Card 3: Credentials ──────────────────────────────────────────── */}
+        {/* ── Card 4: Credentials ──────────────────────────────────────────── */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -496,7 +566,7 @@ export function LineOADetailPage() {
           </CardContent>
         </Card>
 
-        {/* ── Card 4: Danger Zone ───────────────────────────────────────────── */}
+        {/* ── Card 5: Danger Zone ───────────────────────────────────────────── */}
         <Card className="border-destructive/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base text-destructive">
