@@ -4,9 +4,21 @@ import { followerApi } from "@/api/follower";
 import { lineOAApi } from "@/api/lineOA";
 import type { ChatSession, ChatMessage, Follower, Media, LineOA } from "@/types";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { ImageIcon, X } from "lucide-react";
+import { ChevronLeft, ImageIcon, X } from "lucide-react";
 import { MediaPickerDialog } from "./MediaPickerDialog";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
+
+// Convert absolute CDN/ngrok URL to a relative /media/... path so the
+// browser fetches it via the Vite proxy → backend media proxy → MinIO,
+// bypassing the ngrok browser interstitial page.
+function toDisplayUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  try {
+    const u = new URL(url);
+    if (u.pathname.startsWith("/media/")) return u.pathname;
+  } catch { /* already relative or invalid */ }
+  return url;
+}
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -79,6 +91,9 @@ export function ChatInboxPage() {
   // Media attachment
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Mobile responsive: show chat panel instead of list on small screens
+  const [mobileShowChat, setMobileShowChat] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -166,10 +181,14 @@ export function ChatInboxPage() {
     return true;
   });
 
-  const isUnread = (s: ChatSession): boolean =>
-    s.id !== selectedSession?.id &&
-    !!s.last_message_at &&
-    (!lastViewedMap[s.id] || new Date(s.last_message_at) > new Date(lastViewedMap[s.id]));
+  const isUnread = (s: ChatSession): boolean => {
+    if (s.id === selectedSession?.id) return false;
+    // last_message_at is preferred; fall back to updated_at so sessions with
+    // no explicit last_message_at value still show the unread dot.
+    const activityAt = s.last_message_at || s.updated_at;
+    if (!activityAt) return false;
+    return !lastViewedMap[s.id] || new Date(activityAt) > new Date(lastViewedMap[s.id]);
+  };
 
   const markRead = (session: ChatSession) => {
     const now = new Date().toISOString();
@@ -242,6 +261,7 @@ export function ChatInboxPage() {
     setSaveAsKB(false);
     setKbTitle("");
     markRead(session);
+    setMobileShowChat(true); // on mobile: switch to conversation view
   };
 
   const selectedFollower = selectedSession?.follower_id ? followerMap[selectedSession.follower_id] : undefined;
@@ -252,7 +272,8 @@ export function ChatInboxPage() {
     <div className="flex h-full overflow-hidden bg-gray-100">
 
       {/* ── Left Panel: Session List ─────────────────────────────────────── */}
-      <div className="w-80 flex-shrink-0 border-r flex flex-col bg-white shadow-sm">
+      {/* On mobile: hidden when chat is open. On md+: always visible */}
+      <div className={`${mobileShowChat ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 border-r flex-col bg-white shadow-sm`}>
         {/* Header */}
         <div className="px-4 py-4 border-b">
           <h1 className="font-bold text-lg text-gray-900">Chat Inbox</h1>
@@ -320,10 +341,18 @@ export function ChatInboxPage() {
 
       {/* ── Right Panel: Conversation ────────────────────────────────────── */}
       {selectedSession ? (
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className={`${mobileShowChat ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0`}>
           {/* Conversation Header */}
           <div className="px-5 py-3.5 border-b flex items-center justify-between bg-white shadow-sm flex-shrink-0">
             <div className="flex items-center gap-3 min-w-0">
+              {/* Back button — mobile only */}
+              <button
+                onClick={() => setMobileShowChat(false)}
+                className="md:hidden flex-shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 -ml-1"
+                aria-label="Back to session list"
+              >
+                <ChevronLeft size={20} />
+              </button>
               <Avatar follower={selectedFollower} name={selectedName} size={9} />
               <div className="min-w-0">
                 <div className="font-semibold text-sm text-gray-900 truncate">{selectedName}</div>
@@ -395,7 +424,7 @@ export function ChatInboxPage() {
                   <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden bg-gray-200">
                     {selectedMedia.type === "image" ? (
                       <img
-                        src={selectedMedia.thumbnail_url || selectedMedia.url}
+                        src={toDisplayUrl(selectedMedia.thumbnail_url || selectedMedia.url)}
                         alt={selectedMedia.name}
                         className="w-full h-full object-cover"
                       />
@@ -492,7 +521,7 @@ export function ChatInboxPage() {
           )}
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+        <div className="hidden md:flex flex-1 flex-col items-center justify-center text-gray-400">
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
             <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -652,7 +681,7 @@ function MessageBubble({ message, follower }: { message: ChatMessage; follower?:
         /* Image bubble */
         <div className={`max-w-xs lg:max-w-sm rounded-2xl overflow-hidden shadow-sm ${isUser ? "rounded-tl-sm" : "rounded-tr-sm"}`}>
           <img
-            src={message.content}
+            src={toDisplayUrl(message.content)}
             alt="Image"
             className="w-full object-cover block"
             style={{ maxHeight: "240px" }}
