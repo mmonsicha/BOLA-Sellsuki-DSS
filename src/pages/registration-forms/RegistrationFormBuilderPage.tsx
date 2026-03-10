@@ -76,7 +76,7 @@ function FieldEditorDialog({ field, onSave, onClose }: FieldEditorProps) {
           <DialogTitle>Edit Field</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 px-6">
           <div className="space-y-2">
             <Label htmlFor="field-key">Field Key *</Label>
             <Input
