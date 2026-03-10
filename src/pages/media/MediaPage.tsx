@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Upload, RefreshCw, Copy, Trash2, FileImage, Film, Music, File,
-  Edit, Link, Tag, RotateCcw, AlertTriangle, Clock,
+  Edit, Tag, RotateCcw, AlertTriangle, Clock, X, ExternalLink, Check,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { mediaApi } from "@/api/media";
@@ -50,22 +50,105 @@ function trashCountdown(deletedAt: string): string {
   return `Deleted ${daysAgo}d ago · Expires in ${daysLeft}d`;
 }
 
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+function Lightbox({ media, onClose }: { media: Media; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center"
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white/80 hover:text-white"
+        >
+          <X size={24} />
+        </button>
+
+        {media.type === "image" || media.type === "rich_menu" ? (
+          <img
+            src={media.url}
+            alt={media.alt_text || media.name}
+            className="max-w-full max-h-[80vh] rounded-lg object-contain shadow-2xl"
+          />
+        ) : media.type === "video" ? (
+          <video src={media.url} controls className="max-w-full max-h-[80vh] rounded-lg shadow-2xl" />
+        ) : media.type === "audio" ? (
+          <div className="bg-white rounded-xl p-8 shadow-2xl flex flex-col items-center gap-4">
+            <Music size={48} className="text-muted-foreground" />
+            <p className="font-medium">{media.name}</p>
+            <audio src={media.url} controls />
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl p-8 shadow-2xl flex flex-col items-center gap-4">
+            <File size={48} className="text-muted-foreground" />
+            <p className="font-medium">{media.name}</p>
+            <a href={media.url} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" className="gap-2">
+                <ExternalLink size={14} /> Open file
+              </Button>
+            </a>
+          </div>
+        )}
+
+        <div className="mt-3 text-white/70 text-sm text-center">
+          {media.name}
+          {media.width > 0 && <span className="ml-2 text-white/40">{media.width}×{media.height}px</span>}
+          <span className="ml-2 text-white/40">{formatBytes(media.size)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── CopyButton ────────────────────────────────────────────────────────────────
+function CopyButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button
+      onClick={copy}
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+      title="Copy URL"
+    >
+      {copied ? <Check size={11} className="text-green-500" /> : <Copy size={11} />}
+      {copied ? "Copied" : "Copy link"}
+    </button>
+  );
+}
+
+// ── MediaCard ─────────────────────────────────────────────────────────────────
 interface MediaCardProps {
   m: Media;
   onDelete: (id: string) => void;
   onEdit: (m: Media) => void;
+  onPreview: (m: Media) => void;
   deletingId: string | null;
 }
 
-function MediaCard({ m, onDelete, onEdit, deletingId }: MediaCardProps) {
+function MediaCard({ m, onDelete, onEdit, onPreview, deletingId }: MediaCardProps) {
   const TypeIcon = typeIcon[m.type] ?? File;
   const isFile = m.type === "file";
+  const canPreview = ["image", "rich_menu", "video", "audio"].includes(m.type);
 
   return (
-    <Card>
-      <CardContent className="flex items-center gap-4 p-4">
-        {/* Thumbnail */}
-        <div className="w-14 h-14 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
+    <Card className="hover:shadow-sm transition-shadow">
+      <CardContent className="flex items-center gap-3 p-3">
+        {/* Thumbnail — clickable */}
+        <div
+          className={`w-12 h-12 rounded-md bg-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center ${canPreview ? "cursor-pointer hover:opacity-80 transition-opacity ring-offset-1 hover:ring-2 hover:ring-primary/40" : ""}`}
+          onClick={() => canPreview && onPreview(m)}
+          title={canPreview ? "Click to preview" : undefined}
+        >
           {m.thumbnail_url || (m.type === "image" && m.url) ? (
             <img
               src={m.thumbnail_url || m.url}
@@ -73,102 +156,72 @@ function MediaCard({ m, onDelete, onEdit, deletingId }: MediaCardProps) {
               className="w-full h-full object-cover"
             />
           ) : (
-            <TypeIcon size={20} className="text-gray-400" />
+            <TypeIcon size={18} className="text-gray-400" />
           )}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium truncate">{m.name}</span>
-            <Badge variant={typeVariant[m.type] ?? "secondary"}>{m.type}</Badge>
+          {/* Row 1: name + badges */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-medium text-sm truncate max-w-[200px]">{m.name}</span>
+            <Badge variant={typeVariant[m.type] ?? "secondary"} className="text-xs">{m.type}</Badge>
             {isFile && (
-              <Badge variant="warning" className="text-xs gap-0.5">
-                <AlertTriangle size={10} /> LINE
+              <Badge variant="warning" className="text-xs gap-0.5 py-0">
+                <AlertTriangle size={9} /> LINE
               </Badge>
             )}
             {m.usage_count > 0 && (
-              <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-300">
-                Used {m.usage_count}x
+              <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-300 py-0">
+                ×{m.usage_count}
               </Badge>
             )}
           </div>
 
-          {/* Alt text */}
-          {m.alt_text && (
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className="text-xs text-blue-500 truncate max-w-xs">{m.alt_text}</span>
-            </div>
-          )}
-
-          <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
-            <span>{m.original_name}</span>
-            <span>·</span>
-            <span>{formatBytes(m.size)}</span>
-            {m.width > 0 && <><span>·</span><span>{m.width}x{m.height}px</span></>}
-            {m.mime_type && <><span>·</span><span>{m.mime_type}</span></>}
+          {/* Row 2: size · dimensions · alt text */}
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-xs text-muted-foreground">{formatBytes(m.size)}</span>
+            {m.width > 0 && <span className="text-xs text-muted-foreground">{m.width}×{m.height}</span>}
+            {m.alt_text && (
+              <span className="text-xs text-blue-500 truncate max-w-[160px]" title={m.alt_text}>
+                "{m.alt_text}"
+              </span>
+            )}
           </div>
 
-          {/* Tags */}
-          {m.tags && m.tags.length > 0 && (
-            <div className="flex items-center gap-1 mt-1 flex-wrap">
-              <Tag size={10} className="text-muted-foreground" />
-              {m.tags.map(tag => (
-                <span key={tag} className="text-xs bg-muted px-1.5 py-0.5 rounded">{tag}</span>
-              ))}
-            </div>
-          )}
-
-          {/* URL + action URL */}
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-xs text-muted-foreground truncate max-w-xs">{m.url}</span>
-            {m.url && (
-              <button
-                onClick={() => navigator.clipboard.writeText(m.url)}
-                className="text-muted-foreground hover:text-foreground flex-shrink-0"
-                title="Copy URL"
-              >
-                <Copy size={11} />
-              </button>
+          {/* Row 3: tags + copy button */}
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            {m.tags && m.tags.length > 0 && (
+              <>
+                <Tag size={9} className="text-muted-foreground" />
+                {m.tags.map(tag => (
+                  <span key={tag} className="text-xs bg-muted px-1 py-0 rounded">{tag}</span>
+                ))}
+              </>
             )}
-            {m.action_url && (
-              <a
-                href={m.action_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-blue-500 flex-shrink-0"
-                title="Action URL"
-              >
-                <Link size={11} />
-              </a>
-            )}
+            {m.url && <CopyButton url={m.url} />}
           </div>
         </div>
 
         {/* Date */}
-        <div className="text-xs text-muted-foreground flex-shrink-0 text-right hidden sm:block">
-          <div>{new Date(m.created_at).toLocaleDateString()}</div>
-          {m.updated_at && m.updated_at !== m.created_at && (
-            <div className="text-muted-foreground/60">
-              upd {new Date(m.updated_at).toLocaleDateString()}
-            </div>
-          )}
+        <div className="text-xs text-muted-foreground flex-shrink-0 text-right hidden md:block">
+          {new Date(m.created_at).toLocaleDateString()}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(m)} title="Edit">
-            <Edit size={14} />
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(m)} title="Edit">
+            <Edit size={13} />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className={`h-8 w-8 ${m.usage_count > 0 ? "text-muted-foreground/40 cursor-not-allowed" : "text-destructive hover:text-destructive"}`}
+            className={`h-7 w-7 ${m.usage_count > 0 ? "text-muted-foreground/30 cursor-not-allowed" : "text-destructive/70 hover:text-destructive"}`}
             disabled={deletingId === m.id || m.usage_count > 0}
             onClick={() => onDelete(m.id)}
-            title={m.usage_count > 0 ? "Cannot delete: asset is in use" : "Move to trash"}
+            title={m.usage_count > 0 ? "In use — cannot delete" : "Move to trash"}
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </Button>
         </div>
       </CardContent>
@@ -176,6 +229,7 @@ function MediaCard({ m, onDelete, onEdit, deletingId }: MediaCardProps) {
   );
 }
 
+// ── MediaPage ─────────────────────────────────────────────────────────────────
 export function MediaPage() {
   const [media, setMedia] = useState<Media[]>([]);
   const [deletedMedia, setDeletedMedia] = useState<Media[]>([]);
@@ -187,6 +241,7 @@ export function MediaPage() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [editMedia, setEditMedia] = useState<Media | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<Media | null>(null);
   const [activeTab, setActiveTab] = useState("library");
 
   const loadLibrary = () => {
@@ -208,10 +263,14 @@ export function MediaPage() {
   };
 
   useEffect(() => { loadLibrary(); }, []);
+  useEffect(() => { if (activeTab === "trash") loadDeleted(); }, [activeTab]);
 
+  // Close lightbox on Escape
   useEffect(() => {
-    if (activeTab === "trash") loadDeleted();
-  }, [activeTab]);
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setPreviewMedia(null); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Move this file to trash? You can restore it within 7 days.")) return;
@@ -238,14 +297,6 @@ export function MediaPage() {
     } finally {
       setRestoringId(null);
     }
-  };
-
-  const handleUploaded = (m: Media) => {
-    setMedia(prev => [m, ...prev]);
-  };
-
-  const handleUpdated = (updated: Media) => {
-    setMedia(prev => prev.map(m => m.id === updated.id ? updated : m));
   };
 
   const filtered = media.filter(m => {
@@ -276,8 +327,8 @@ export function MediaPage() {
             </TabsList>
 
             {activeTab === "library" && (
-              <Button className="gap-2" onClick={() => setShowUpload(true)}>
-                <Upload size={16} />
+              <Button size="sm" className="gap-2" onClick={() => setShowUpload(true)}>
+                <Upload size={14} />
                 Upload
               </Button>
             )}
@@ -285,11 +336,10 @@ export function MediaPage() {
 
           {/* Library Tab */}
           <TabsContent value="library">
-            {/* Filters */}
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
               <input
                 type="text"
-                className="border rounded-md px-3 py-1.5 text-sm bg-background flex-1 min-w-[180px]"
+                className="border rounded-md px-3 py-1.5 text-sm bg-background flex-1 min-w-[160px]"
                 placeholder="Search by name..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -309,8 +359,7 @@ export function MediaPage() {
 
             {loading && (
               <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                <RefreshCw size={16} className="animate-spin" />
-                Loading...
+                <RefreshCw size={16} className="animate-spin" /> Loading...
               </div>
             )}
 
@@ -319,25 +368,23 @@ export function MediaPage() {
                 <CardContent className="text-center py-12">
                   <div className="text-4xl mb-3">🖼️</div>
                   <p className="font-medium">No media files yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Upload images and files to use in your messages.
-                  </p>
-                  <Button className="mt-4 gap-2" onClick={() => setShowUpload(true)}>
-                    <Upload size={16} />
-                    Upload
+                  <p className="text-sm text-muted-foreground mt-1">Upload images and files to use in your messages.</p>
+                  <Button className="mt-4 gap-2" size="sm" onClick={() => setShowUpload(true)}>
+                    <Upload size={14} /> Upload
                   </Button>
                 </CardContent>
               </Card>
             )}
 
             {!loading && filtered.length > 0 && (
-              <div className="grid gap-3">
+              <div className="grid gap-2">
                 {filtered.map(m => (
                   <MediaCard
                     key={m.id}
                     m={m}
                     onDelete={handleDelete}
                     onEdit={setEditMedia}
+                    onPreview={setPreviewMedia}
                     deletingId={deletingId}
                   />
                 ))}
@@ -347,14 +394,13 @@ export function MediaPage() {
 
           {/* Recently Deleted Tab */}
           <TabsContent value="trash">
-            <p className="text-sm text-muted-foreground mb-4">
-              Deleted files are kept for 7 days. After that they are permanently removed.
+            <p className="text-xs text-muted-foreground mb-3">
+              Deleted files are kept for 7 days, then permanently removed.
             </p>
 
             {loadingDeleted && (
               <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                <RefreshCw size={16} className="animate-spin" />
-                Loading...
+                <RefreshCw size={16} className="animate-spin" /> Loading...
               </div>
             )}
 
@@ -363,50 +409,46 @@ export function MediaPage() {
                 <CardContent className="text-center py-12">
                   <div className="text-4xl mb-3">🗑️</div>
                   <p className="font-medium">Nothing here</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Deleted items are kept for 7 days.
-                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Deleted items are kept for 7 days.</p>
                 </CardContent>
               </Card>
             )}
 
             {!loadingDeleted && deletedMedia.length > 0 && (
-              <div className="grid gap-3">
+              <div className="grid gap-2">
                 {deletedMedia.map(m => {
                   const TypeIcon = typeIcon[m.type] ?? File;
                   return (
-                    <Card key={m.id} className="opacity-80">
-                      <CardContent className="flex items-center gap-4 p-4">
-                        <div className="w-14 h-14 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                    <Card key={m.id} className="opacity-75">
+                      <CardContent className="flex items-center gap-3 p-3">
+                        <div className="w-12 h-12 rounded-md bg-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
                           {m.thumbnail_url || (m.type === "image" && m.url) ? (
                             <img src={m.thumbnail_url || m.url} alt={m.name} className="w-full h-full object-cover" />
                           ) : (
-                            <TypeIcon size={20} className="text-gray-400" />
+                            <TypeIcon size={18} className="text-gray-400" />
                           )}
                         </div>
-
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">{m.name}</span>
-                            <Badge variant={typeVariant[m.type] ?? "secondary"}>{m.type}</Badge>
+                            <span className="font-medium text-sm truncate">{m.name}</span>
+                            <Badge variant={typeVariant[m.type] ?? "secondary"} className="text-xs">{m.type}</Badge>
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5">{formatBytes(m.size)}</div>
                           {m.deleted_at && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <Clock size={10} className="text-orange-500" />
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Clock size={9} className="text-orange-500" />
                               <span className="text-xs text-orange-500">{trashCountdown(m.deleted_at)}</span>
                             </div>
                           )}
                         </div>
-
                         <Button
                           variant="outline"
                           size="sm"
-                          className="gap-1.5 flex-shrink-0"
+                          className="gap-1.5 flex-shrink-0 text-xs h-7"
                           disabled={restoringId === m.id}
                           onClick={() => handleRestore(m.id)}
                         >
-                          <RotateCcw size={12} />
+                          <RotateCcw size={11} />
                           {restoringId === m.id ? "Restoring..." : "Restore"}
                         </Button>
                       </CardContent>
@@ -419,18 +461,21 @@ export function MediaPage() {
         </Tabs>
       </div>
 
+      {/* Lightbox */}
+      {previewMedia && <Lightbox media={previewMedia} onClose={() => setPreviewMedia(null)} />}
+
       <UploadMediaDialog
         open={showUpload}
         workspaceId={WORKSPACE_ID}
         onClose={() => setShowUpload(false)}
-        onUploaded={handleUploaded}
+        onUploaded={(m) => setMedia(prev => [m, ...prev])}
       />
 
       <EditMediaDialog
         open={!!editMedia}
         media={editMedia}
         onClose={() => setEditMedia(null)}
-        onUpdated={handleUpdated}
+        onUpdated={(updated) => setMedia(prev => prev.map(m => m.id === updated.id ? updated : m))}
       />
     </AppLayout>
   );

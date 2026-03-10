@@ -3,10 +3,10 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { aiChatbotConfigApi } from "@/api/aiChatbot";
+import { aiChatbotConfigApi, testLLMConnection } from "@/api/aiChatbot";
 import type { AIChatbotConfig, LineOA } from "@/types";
 import { lineOAApi } from "@/api/lineOA";
-import { Bot, Save, ToggleLeft, ToggleRight } from "lucide-react";
+import { Bot, Save, Wifi } from "lucide-react";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -18,9 +18,9 @@ const LLM_PROVIDERS = [
 ];
 
 const LLM_MODELS: Record<string, string[]> = {
-  openai: ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
-  anthropic: ["claude-haiku-4-5", "claude-sonnet-4-5", "claude-3-haiku-20240307"],
-  google: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4o-2024-11-20", "gpt-4-turbo", "gpt-3.5-turbo"],
+  anthropic: ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
+  google: ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
   custom: [],
 };
 
@@ -30,6 +30,8 @@ export function ChatbotSettingsPage() {
   const [config, setConfig] = useState<AIChatbotConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -61,6 +63,7 @@ export function ChatbotSettingsPage() {
     if (!selectedOAId) return;
     setLoading(true);
     setConfig(null);
+    setTestResult(null);
     aiChatbotConfigApi.get(selectedOAId)
       .then((cfg) => {
         setConfig(cfg);
@@ -80,7 +83,6 @@ export function ChatbotSettingsPage() {
         });
       })
       .catch(() => {
-        // Config not found for this OA — reset to defaults
         setConfig(null);
         setForm({
           is_enabled: false,
@@ -105,6 +107,7 @@ export function ChatbotSettingsPage() {
     setSaving(true);
     setError(null);
     setSuccess(null);
+    setTestResult(null);
     try {
       await aiChatbotConfigApi.upsert({
         workspace_id: WORKSPACE_ID,
@@ -131,26 +134,61 @@ export function ChatbotSettingsPage() {
     }
   };
 
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    const result = await testLLMConnection(WORKSPACE_ID);
+    setTestResult(result);
+    setTesting(false);
+    setTimeout(() => setTestResult(null), 5000);
+  };
+
   const update = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
 
   return (
     <AppLayout title="AI Chatbot Settings">
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <Bot size={20} />
             <p className="text-sm text-muted-foreground">Configure AI chatbot per LINE OA</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Enable/Disable toggle */}
             {config && (
-              <button onClick={handleToggle} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-                {form.is_enabled
-                  ? <ToggleRight size={20} className="text-green-600" />
-                  : <ToggleLeft size={20} />}
-                <span>{form.is_enabled ? "Enabled" : "Disabled"}</span>
+              <button
+                onClick={handleToggle}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  form.is_enabled
+                    ? "bg-green-100 text-green-700 hover:bg-green-200"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                <span className={`inline-block w-2 h-2 rounded-full ${form.is_enabled ? "bg-green-500" : "bg-gray-400"}`} />
+                {form.is_enabled ? "Enabled" : "Disabled"}
               </button>
             )}
+
+            {/* Test Connection */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTestConnection}
+              disabled={testing || !selectedOAId}
+            >
+              <Wifi size={14} className="mr-1" />
+              {testing ? "Testing..." : "Test Connection"}
+            </Button>
+
+            {testResult && (
+              <span className={`text-xs px-2 py-1 rounded-md font-medium ${
+                testResult.ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+              }`}>
+                {testResult.message}
+              </span>
+            )}
+
             <Button onClick={handleSave} disabled={saving || !selectedOAId} size="sm">
               <Save size={14} className="mr-1" />
               {saving ? "Saving..." : "Save Settings"}
@@ -237,6 +275,9 @@ export function ChatbotSettingsPage() {
                     onChange={(e) => update("llm_api_key", e.target.value)}
                     placeholder={config ? "Leave blank to keep existing key" : "Enter API key"}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    API key is validated on first message send, not on save.
+                  </p>
                 </div>
 
                 {(form.llm_provider === "custom" || form.llm_provider === "openai") && (
@@ -253,21 +294,23 @@ export function ChatbotSettingsPage() {
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Temperature: {form.llm_temperature.toFixed(2)}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium">
+                      Temperature: <span className="font-mono">{form.llm_temperature.toFixed(2)}</span>
+                    </label>
+                  </div>
                   <input
                     type="range"
                     min={0}
                     max={1}
                     step={0.05}
-                    className="w-full"
+                    className="w-full accent-blue-500"
                     value={form.llm_temperature}
                     onChange={(e) => update("llm_temperature", parseFloat(e.target.value))}
                   />
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>Precise (0)</span>
-                    <span>Creative (1)</span>
+                    <span className="text-blue-500">◆ Precise (0)</span>
+                    <span className="text-orange-500">◆ Creative (1)</span>
                   </div>
                 </div>
               </CardContent>
@@ -278,15 +321,17 @@ export function ChatbotSettingsPage() {
               <CardHeader><CardTitle className="text-base">Behavior</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Confidence Threshold: {form.confidence_threshold.toFixed(2)}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium">
+                      Confidence Threshold: <span className="font-mono">{form.confidence_threshold.toFixed(2)}</span>
+                    </label>
+                  </div>
                   <input
                     type="range"
                     min={0}
                     max={1}
                     step={0.05}
-                    className="w-full"
+                    className="w-full accent-green-500"
                     value={form.confidence_threshold}
                     onChange={(e) => update("confidence_threshold", parseFloat(e.target.value))}
                   />
@@ -294,6 +339,9 @@ export function ChatbotSettingsPage() {
                     <span>Low (0)</span>
                     <span>High (1)</span>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    AI escalates to human when confidence falls below this threshold.
+                  </p>
                 </div>
 
                 <div>
@@ -306,6 +354,9 @@ export function ChatbotSettingsPage() {
                     value={form.max_context_turns}
                     onChange={(e) => update("max_context_turns", parseInt(e.target.value) || 10)}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Number of previous messages included as context for each reply.
+                  </p>
                 </div>
 
                 <div>
@@ -346,7 +397,14 @@ export function ChatbotSettingsPage() {
 
             {/* System Prompt */}
             <Card className="lg:col-span-2">
-              <CardHeader><CardTitle className="text-base">System Prompt</CardTitle></CardHeader>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">System Prompt</CardTitle>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {form.system_prompt.length} characters
+                  </span>
+                </div>
+              </CardHeader>
               <CardContent>
                 <textarea
                   className="w-full border rounded-md px-3 py-2 text-sm resize-none font-mono"

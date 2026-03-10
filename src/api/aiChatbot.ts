@@ -102,7 +102,9 @@ export const chatSessionApi = {
   },
 
   async sendMessage(id: string, data: {
-    content: string;
+    content?: string;
+    image_url?: string;
+    image_preview_url?: string;
     admin_id?: string;
     workspace_id?: string;
     save_as_knowledge?: boolean;
@@ -186,6 +188,22 @@ export const knowledgeBaseApi = {
     return res.json();
   },
 };
+
+// ---- Test LLM Connection (lightweight backend reachability check) ----
+
+export async function testLLMConnection(workspaceId: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch(`${BASE}/knowledge-base/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspace_id: workspaceId, query: "test", top_k: 1 }),
+    });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    return { ok: true, message: "Backend reachable ✓" };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Connection failed" };
+  }
+}
 
 // ---- Unanswered Questions ----
 

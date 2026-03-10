@@ -19,6 +19,7 @@ import { WebhookDetailPage } from "@/pages/webhook-settings/WebhookDetailPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
 import { IntegrationGuidePage } from "@/pages/integration/IntegrationGuidePage";
 import { ChatbotSettingsPage } from "@/pages/ai-chatbot/ChatbotSettingsPage";
+import { ChatbotAnalyticsPage } from "@/pages/ai-chatbot/ChatbotAnalyticsPage";
 import { ChatSessionsPage } from "@/pages/ai-chatbot/ChatSessionsPage";
 import { ChatSessionDetailPage } from "@/pages/ai-chatbot/ChatSessionDetailPage";
 import { KnowledgeBasePage } from "@/pages/knowledge-base/KnowledgeBasePage";
@@ -91,6 +92,7 @@ function Router() {
   if (path.startsWith("/integration")) return <IntegrationGuidePage />;
 
   // AI Chatbot routes
+  if (path.startsWith("/chatbot-analytics")) return <ChatbotAnalyticsPage />;
   if (path.startsWith("/chatbot-settings")) return <ChatbotSettingsPage />;
   if (segments[0] === "chat-sessions") {
     if (segments[1]) return <ChatSessionDetailPage />;
