@@ -13,21 +13,9 @@ import type { Media } from "@/types";
 import { UploadMediaDialog } from "./UploadMediaDialog";
 import { EditMediaDialog } from "./EditMediaDialog";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+import { toDisplayUrl } from "@/lib/mediaUtils";
 
-// Convert a CDN/ngrok URL to a relative path for browser display.
-// This routes through the Vite dev proxy (/media/* → localhost:8080/media/*)
-// instead of loading from the external CDN domain (which may show an
-// ngrok browser-warning interstitial). The original CDN URL is kept for
-// "Copy link" so LINE can fetch via the public ngrok tunnel.
-function toDisplayUrl(url: string | null | undefined): string {
-  if (!url) return "";
-  try {
-    const u = new URL(url);
-    if (u.pathname.startsWith("/media/")) return u.pathname; // → "/media/..."
-  } catch { /* already relative */ }
-  return url;
-}
+const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 const typeIcon: Record<string, React.ElementType> = {
   image:     FileImage,

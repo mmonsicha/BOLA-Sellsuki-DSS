@@ -8,17 +8,7 @@ import { ChevronLeft, ImageIcon, X } from "lucide-react";
 import { MediaPickerDialog } from "./MediaPickerDialog";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 
-// Convert absolute CDN/ngrok URL to a relative /media/... path so the
-// browser fetches it via the Vite proxy → backend media proxy → MinIO,
-// bypassing the ngrok browser interstitial page.
-function toDisplayUrl(url: string | null | undefined): string {
-  if (!url) return "";
-  try {
-    const u = new URL(url);
-    if (u.pathname.startsWith("/media/")) return u.pathname;
-  } catch { /* already relative or invalid */ }
-  return url;
-}
+import { toDisplayUrl } from "@/lib/mediaUtils";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 

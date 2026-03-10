@@ -6,19 +6,9 @@ import { quickReplyApi } from "@/api/richMenu";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import type { AutoReply, QuickReply, TriggerType, MatchMode, Media } from "@/types";
 import { MediaPickerDialog } from "@/pages/chat-inbox/MediaPickerDialog";
+import { toDisplayUrl } from "@/lib/mediaUtils";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
-
-// Route image display through Vite proxy (/media/*) instead of the CDN/ngrok
-// domain to avoid the ngrok browser-warning interstitial in <img> tags.
-function toDisplayUrl(url: string | null | undefined): string {
-  if (!url) return "";
-  try {
-    const u = new URL(url);
-    if (u.pathname.startsWith("/media/")) return u.pathname;
-  } catch { /* already relative */ }
-  return url;
-}
 
 // ── Constants ──────────────────────────────────────────────────────────────
 

@@ -3,17 +3,9 @@ import { mediaApi } from "@/api/media";
 import type { Media } from "@/types";
 import { X, RefreshCw, FileImage, Film, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toDisplayUrl } from "@/lib/mediaUtils";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
-
-function toDisplayUrl(url: string | null | undefined): string {
-  if (!url) return "";
-  try {
-    const u = new URL(url);
-    if (u.pathname.startsWith("/media/")) return u.pathname;
-  } catch { /* already relative */ }
-  return url;
-}
 
 type MediaFilter = "all" | "image" | "video";
 
