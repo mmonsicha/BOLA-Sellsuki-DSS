@@ -9,6 +9,17 @@ import { MediaPickerDialog } from "@/pages/chat-inbox/MediaPickerDialog";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
+// Route image display through Vite proxy (/media/*) instead of the CDN/ngrok
+// domain to avoid the ngrok browser-warning interstitial in <img> tags.
+function toDisplayUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  try {
+    const u = new URL(url);
+    if (u.pathname.startsWith("/media/")) return u.pathname;
+  } catch { /* already relative */ }
+  return url;
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; description: string; icon: string }[] = [
@@ -141,7 +152,7 @@ function ImageVideoEditor({ payload, onChange, mediaType }: {
         >
           {hasUrl && isImage ? (
             <img
-              src={payload.original_content_url}
+              src={toDisplayUrl(payload.original_content_url)}
               alt="Preview"
               className="w-full h-full object-cover"
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = ""; }}
