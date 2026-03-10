@@ -394,37 +394,39 @@ export function RegistrationFormBuilderPage() {
     <AppLayout title={`Form Builder — ${form.name}`}>
       <div className="space-y-4">
         {/* Back + Header */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          {/* Breadcrumb row */}
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             <a
               href="/registration-forms"
-              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground flex-shrink-0"
             >
               <ChevronLeft className="h-4 w-4" />
               Back to forms
             </a>
-            <span className="text-muted-foreground">/</span>
-            <span className="font-medium text-sm">{form.name}</span>
+            <span className="text-muted-foreground flex-shrink-0">/</span>
+            <span className="font-medium text-sm truncate max-w-[120px] sm:max-w-none">{form.name}</span>
             <Badge
               className={
                 form.is_active
-                  ? "bg-green-100 text-green-700 border-green-200"
-                  : "bg-gray-100 text-gray-500 border-gray-200"
+                  ? "bg-green-100 text-green-700 border-green-200 flex-shrink-0"
+                  : "bg-gray-100 text-gray-500 border-gray-200 flex-shrink-0"
               }
             >
               {form.is_active ? "Active" : "Inactive"}
             </Badge>
           </div>
-          <div className="flex items-center gap-2">
-            <a
-              href={`/registration-forms/${form.id}/submissions`}
-              className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-2"
-            >
-              View Submissions ({form.submission_count})
-            </a>
+          {/* Actions row */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button variant="outline" size="sm" asChild>
+              <a href={`/registration-forms/${form.id}/submissions`}>
+                View Submissions ({form.submission_count})
+              </a>
+            </Button>
             <Button
               onClick={handleSave}
               disabled={saving || !dirty}
+              size="sm"
               className="bg-green-600 hover:bg-green-700"
             >
               {saving ? (
