@@ -22,6 +22,7 @@ import {
   Bell,
   ScrollText,
   ClipboardList,
+  BarChart2,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -47,13 +48,10 @@ const navSections: NavSection[] = [
       { label: "Broadcasts", href: "/broadcasts", icon: Radio },
       { label: "Auto Reply", href: "/auto-reply", icon: ChevronRight },
       { label: "Auto Push Messages", href: "/auto-push-messages", icon: Radio },
-      { label: "Flex Messages", href: "/flex-messages", icon: Layers },
       { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
-      { label: "Quick Replies", href: "/quick-replies", icon: MessageCircleDashed },
       { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
       { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
       { label: "Registration Forms", href: "/registration-forms", icon: ClipboardList },
-      { label: "Media Library", href: "/media", icon: Image },
       { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
     ],
   },
@@ -65,6 +63,15 @@ const navSections: NavSection[] = [
       { label: "Chat Sessions", href: "/chat-sessions", icon: MessagesSquare },
       { label: "Knowledge Base", href: "/knowledge-base", icon: Database },
       { label: "Unanswered Questions", href: "/unanswered-questions", icon: HelpCircle },
+      { label: "Analytics", href: "/chatbot-analytics", icon: BarChart2 },
+    ],
+  },
+  {
+    title: "Assets",
+    items: [
+      { label: "Media Library", href: "/media", icon: Image },
+      { label: "Flex Messages", href: "/flex-messages", icon: Layers },
+      { label: "Quick Replies", href: "/quick-replies", icon: MessageCircleDashed },
     ],
   },
   {
@@ -110,9 +117,7 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
       >
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-gray-700">
-          <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-line flex items-center justify-center font-bold text-white text-sm">
-            B
-          </div>
+          <img src="/bola-logo.svg" alt="BOLA" className="flex-shrink-0 w-8 h-8 rounded-lg" />
           {!collapsed && (
             <div>
               <div className="font-bold text-sm leading-none">BOLA</div>
