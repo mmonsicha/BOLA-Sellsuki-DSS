@@ -6,6 +6,15 @@ import { Button } from "@/components/ui/button";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
+function toDisplayUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  try {
+    const u = new URL(url);
+    if (u.pathname.startsWith("/media/")) return u.pathname;
+  } catch { /* already relative */ }
+  return url;
+}
+
 type MediaFilter = "all" | "image" | "video";
 
 interface MediaPickerDialogProps {
@@ -145,7 +154,7 @@ function MediaThumb({
     >
       {thumbUrl ? (
         <img
-          src={thumbUrl}
+          src={toDisplayUrl(thumbUrl)}
           alt={media.alt_text || media.name}
           className="w-full h-full object-cover"
         />
