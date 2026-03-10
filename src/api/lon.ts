@@ -55,6 +55,23 @@ export interface LONPublicOAInfo {
   picture_url: string;
 }
 
+export interface LIFFConsentParams {
+  line_oa_id: string;
+  line_user_id: string;
+  notification_token: string;
+}
+
+export interface SendConsentRequestParams {
+  line_oa_id: string;
+  follower_line_user_ids?: string[];
+  custom_message?: string;
+}
+
+export interface SendConsentRequestResult {
+  sent: number;
+  failed: number;
+}
+
 export const lonApi = {
   listSubscribers: (params: ListLONSubscribersParams) =>
     api.get<ListLONSubscribersResponse>("/v1/lon-subscribers", params),
@@ -79,4 +96,10 @@ export const lonApi = {
 
   getPublicOAInfo: (lineOAId: string) =>
     api.get<LONPublicOAInfo>("/v1/public/lon/oa-info", { line_oa_id: lineOAId }),
+
+  liffConsent: (params: LIFFConsentParams) =>
+    api.post<{ id: string }>("/v1/public/lon/liff-consent", params),
+
+  sendConsentRequest: (params: SendConsentRequestParams) =>
+    api.post<SendConsentRequestResult>("/v1/lon/send-consent-request", params),
 };

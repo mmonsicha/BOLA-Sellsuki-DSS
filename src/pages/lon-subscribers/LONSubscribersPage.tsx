@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { QRCodeSVG } from "qrcode.react";
 import {
   RefreshCw, Bell, Phone, X, CheckCircle2,
-  Upload, QrCode, Copy, ChevronDown, ChevronUp, Info,
+  Upload, QrCode, Copy, ChevronDown, ChevronUp, Info, Send,
 } from "lucide-react";
 import type { LONSubscriber, LONSubscriberStats, LineOA } from "@/types";
-import { lonApi, type BulkSubscribeByPhoneResult } from "@/api/lon";
+import { lonApi, type BulkSubscribeByPhoneResult, type SendConsentRequestResult } from "@/api/lon";
 import { lineOAApi } from "@/api/lineOA";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
@@ -279,6 +279,153 @@ function QRModal({ lineOAId, lineOAName, onClose }: QRModalProps) {
   );
 }
 
+// ─── Send Consent Request Modal ───────────────────────────────────────────────
+
+interface SendConsentModalProps {
+  lineOA: LineOA;
+  onClose: () => void;
+}
+
+function SendConsentModal({ lineOA, onClose }: SendConsentModalProps) {
+  const [customMessage, setCustomMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<SendConsentRequestResult | null>(null);
+  const [error, setError] = useState("");
+
+  const hasLiff = Boolean(lineOA.liff_id);
+
+  async function handleSend() {
+    if (!hasLiff) return;
+    setSending(true);
+    setError("");
+    try {
+      const res = await lonApi.sendConsentRequest({
+        line_oa_id: lineOA.id,
+        custom_message: customMessage.trim() || undefined,
+      });
+      setResult(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send consent requests.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-background rounded-lg shadow-xl w-full max-w-md mx-4">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b">
+          <div className="flex items-center gap-2 font-semibold">
+            <Send size={16} />
+            Send Consent Request
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {!hasLiff ? (
+            /* No LIFF configured */
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                <Bell size={16} className="mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium">LIFF ID not configured</p>
+                  <p className="text-xs mt-1">
+                    To send consent requests, you must first set a <strong>LIFF App ID</strong> for{" "}
+                    <strong>{lineOA.name}</strong> in the LINE OA settings page.
+                  </p>
+                  <p className="text-xs mt-1">
+                    The LIFF app's endpoint URL should be set to:{" "}
+                    <code className="bg-amber-100 px-1 rounded text-xs">
+                      {window.location.origin}/lon/subscribe/{lineOA.id}?liff_id=YOUR_LIFF_ID
+                    </code>
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => (window.location.pathname = `/line-oa/${lineOA.id}`)}
+                >
+                  Go to LINE OA Settings
+                </Button>
+              </div>
+            </div>
+          ) : result ? (
+            /* Result */
+            <div className="space-y-3">
+              <div className="flex gap-6 text-sm py-2">
+                <span className="text-green-600 font-medium">✅ {result.sent} sent</span>
+                <span className="text-muted-foreground font-medium">
+                  {result.failed > 0 ? `❌ ${result.failed} failed` : "0 failed"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Followers who have already subscribed were skipped. Each eligible follower received a
+                Flex Message with an "Enable Notifications" button that opens your LIFF app.
+              </p>
+            </div>
+          ) : (
+            /* Form */
+            <div className="space-y-4">
+              <div className="rounded-md bg-muted/60 border px-4 py-3 text-xs text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground text-sm">What happens:</p>
+                <ul className="list-disc list-inside space-y-0.5 pl-1">
+                  <li>BOLA fetches followers of <strong>{lineOA.name}</strong></li>
+                  <li>Followers who already subscribed are skipped</li>
+                  <li>Each remaining follower receives a Flex Message card with an
+                    &nbsp;<strong>"Enable Notifications"</strong> button</li>
+                  <li>Tapping the button opens your LIFF app in LINE to grant consent</li>
+                </ul>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Custom message (optional)</label>
+                <textarea
+                  className="w-full border rounded-md px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                  placeholder={`e.g. "Enable notifications to get exclusive deals from ${lineOA.name}!"`}
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
+                  maxLength={200}
+                />
+                <p className="text-xs text-muted-foreground text-right">{customMessage.length}/200</p>
+              </div>
+
+              {error && (
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onClose}>
+            {result ? "Close" : "Cancel"}
+          </Button>
+          {hasLiff && !result && (
+            <Button
+              size="sm"
+              disabled={sending || !hasLiff}
+              onClick={handleSend}
+              className="gap-1.5"
+            >
+              {sending ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
+              {sending ? "Sending..." : "Send to Followers"}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── API Integration Info ─────────────────────────────────────────────────────
 
 function APIInfoPanel({ lineOAId }: { lineOAId: string }) {
@@ -400,6 +547,9 @@ export function LONSubscribersPage() {
 
   // QR modal
   const [showQRModal, setShowQRModal] = useState(false);
+
+  // Send consent request modal
+  const [showConsentModal, setShowConsentModal] = useState(false);
 
   const selectedOA = lineOAs.find((oa) => oa.id === selectedLineOAId);
 
@@ -539,6 +689,16 @@ export function LONSubscribersPage() {
             >
               <QrCode size={14} />
               QR Code
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowConsentModal(true)}
+              className="gap-1.5"
+              disabled={!selectedLineOAId}
+            >
+              <Send size={14} />
+              Send Consent Request
             </Button>
             <Button
               variant="outline"
@@ -731,6 +891,12 @@ export function LONSubscribersPage() {
           lineOAId={selectedLineOAId}
           lineOAName={selectedOA.name}
           onClose={() => setShowQRModal(false)}
+        />
+      )}
+      {showConsentModal && selectedOA && (
+        <SendConsentModal
+          lineOA={selectedOA}
+          onClose={() => setShowConsentModal(false)}
         />
       )}
     </AppLayout>

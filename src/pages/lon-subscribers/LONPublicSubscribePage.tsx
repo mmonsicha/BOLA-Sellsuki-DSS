@@ -3,14 +3,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bell, Phone, CheckCircle2, RefreshCw, AlertCircle } from "lucide-react";
 import { lonApi, type LONPublicOAInfo } from "@/api/lon";
+import liff from "@line/liff";
 
 /**
- * LONPublicSubscribePage — unauthenticated page accessed via QR code scan.
+ * LONPublicSubscribePage — unauthenticated page accessed via QR code scan or LIFF push message.
  *
  * Route: /lon/subscribe/:lineOAId
- * No BOLA login required. Anyone who scans the QR code can subscribe.
+ * No BOLA login required.
  *
- * Flow:
+ * Flow A — LIFF (opened from LINE app via liff.line.me URL):
+ *  1. Detect LIFF context via liff.isInClient()
+ *  2. Initialize LIFF SDK with the OA's liff_id (passed as ?liff_id= query param)
+ *  3. Call liff.getNotificationToken() → get notification token + userId
+ *  4. POST to /v1/public/lon/liff-consent
+ *  5. Show success screen (no phone form needed)
+ *
+ * Flow B — Phone (opened via browser QR scan):
  *  1. Fetch public OA info (name, basic_id, picture_url)
  *  2. User enters their phone number (E.164)
  *  3. Submit → POST /v1/lon/subscribe-by-phone
@@ -20,6 +28,8 @@ export function LONPublicSubscribePage() {
   // Extract lineOAId from URL: /lon/subscribe/<id>
   const segments = window.location.pathname.split("/").filter(Boolean);
   const lineOAId = segments[2] ?? "";
+  const urlParams = new URLSearchParams(window.location.search);
+  const liffId = urlParams.get("liff_id") ?? "";
 
   const [oaInfo, setOAInfo] = useState<LONPublicOAInfo | null>(null);
   const [oaError, setOAError] = useState(false);
@@ -30,18 +40,73 @@ export function LONPublicSubscribePage() {
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // LIFF states
+  const [liffMode, setLiffMode] = useState(false);
+  const [liffLoading, setLiffLoading] = useState(false);
+
   useEffect(() => {
     if (!lineOAId) {
       setOAError(true);
       setLoadingOA(false);
       return;
     }
+
+    // Fetch OA info first (needed for both flows)
     lonApi
       .getPublicOAInfo(lineOAId)
-      .then((info) => setOAInfo(info))
+      .then((info) => {
+        setOAInfo(info);
+        // After we have OA info, try LIFF if we have a liff_id
+        if (liffId) {
+          attemptLIFFFlow(liffId);
+        }
+      })
       .catch(() => setOAError(true))
       .finally(() => setLoadingOA(false));
-  }, [lineOAId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineOAId, liffId]);
+
+  async function attemptLIFFFlow(id: string) {
+    // Only attempt if running inside the LINE app
+    if (!liff.isInClient()) {
+      // Not in LINE app — fall through to phone form
+      return;
+    }
+    setLiffMode(true);
+    setLiffLoading(true);
+    try {
+      await liff.init({ liffId: id });
+      if (!liff.isLoggedIn()) {
+        liff.login({ redirectUri: window.location.href });
+        return;
+      }
+      const token = await liff.getNotificationToken();
+      if (!token) {
+        setErrorMsg("LINE did not return a notification token. Please try the phone number method.");
+        setLiffMode(false);
+        setLiffLoading(false);
+        return;
+      }
+      const profile = await liff.getProfile();
+      await lonApi.liffConsent({
+        line_oa_id: lineOAId,
+        line_user_id: profile.userId,
+        notification_token: token,
+      });
+      setSuccess(true);
+    } catch (err) {
+      // If LIFF flow fails, fall back to phone form
+      const msg = err instanceof Error ? err.message : "LIFF consent failed.";
+      if (msg.toLowerCase().includes("cancel") || msg.toLowerCase().includes("deny")) {
+        setErrorMsg("You chose not to enable notifications. You can still subscribe by phone number below.");
+      } else {
+        setErrorMsg(msg);
+      }
+      setLiffMode(false);
+    } finally {
+      setLiffLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,10 +137,17 @@ export function LONPublicSubscribePage() {
   }
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (loadingOA) {
+  if (loadingOA || liffLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <RefreshCw size={24} className="animate-spin text-muted-foreground" />
+        <div className="text-center space-y-3">
+          <RefreshCw size={24} className="animate-spin text-muted-foreground mx-auto" />
+          {liffLoading && (
+            <p className="text-sm text-muted-foreground">
+              Connecting to LINE notifications…
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -137,7 +209,21 @@ export function LONPublicSubscribePage() {
     );
   }
 
-  // ── Subscribe form ─────────────────────────────────────────────────────────
+  // ── LIFF mode: show waiting screen while LIFF loads (shouldn't normally reach here) ──
+  if (liffMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <Card className="w-full max-w-sm">
+          <CardContent className="py-10 text-center space-y-3">
+            <Bell size={32} className="mx-auto text-line animate-pulse" />
+            <p className="font-semibold">Waiting for LINE consent…</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Subscribe form (phone flow) ─────────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-sm">
