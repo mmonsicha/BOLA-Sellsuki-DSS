@@ -167,6 +167,12 @@ export function LineOADetailPage() {
   const [savedCreds, setSavedCreds] = useState(false);
   const [credsError, setCredsError] = useState("");
 
+  // LON LIFF settings
+  const [liffId, setLiffId] = useState("");
+  const [savingLiff, setSavingLiff] = useState(false);
+  const [savedLiff, setSavedLiff] = useState(false);
+  const [liffError, setLiffError] = useState("");
+
   // Danger zone
   const [deleting, setDeleting] = useState(false);
 
@@ -179,6 +185,7 @@ export function LineOADetailPage() {
         setName(data.name);
         setDescription(data.description ?? "");
         setIsDefault(data.is_default);
+        setLiffId(data.liff_id ?? "");
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -227,6 +234,23 @@ export function LineOADetailPage() {
       setCredsError(err instanceof Error ? err.message : "Failed to update credentials.");
     } finally {
       setSavingCreds(false);
+    }
+  };
+
+  const handleSaveLiff = async () => {
+    if (!oa) return;
+    setLiffError("");
+    setSavingLiff(true);
+    try {
+      const updated = await lineOAApi.update(oa.id, { liff_id: liffId.trim() });
+      setOa(updated);
+      setLiffId(updated.liff_id ?? "");
+      setSavedLiff(true);
+      setTimeout(() => setSavedLiff(false), 2000);
+    } catch (err) {
+      setLiffError(err instanceof Error ? err.message : "Failed to save LIFF ID.");
+    } finally {
+      setSavingLiff(false);
     }
   };
 
@@ -437,6 +461,64 @@ export function LineOADetailPage() {
                     <li>Paste the Revoke Callback URL above</li>
                     <li>Save changes</li>
                   </ol>
+                </div>
+
+                {/* LIFF ID field */}
+                <div className="pt-2 border-t space-y-3">
+                  <div>
+                    <p className="text-sm font-medium mb-0.5">LIFF App ID (for consent push)</p>
+                    <p className="text-xs text-muted-foreground">
+                      When set, BOLA can send a Flex Message button to followers that opens
+                      your LIFF app so they can grant LON consent directly in LINE.
+                      Create a LIFF app in the{" "}
+                      <a
+                        href="https://developers.line.biz/console/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline underline-offset-2"
+                      >
+                        LINE Developers Console
+                      </a>{" "}
+                      and set its endpoint URL to{" "}
+                      <code className="bg-muted px-1 rounded">
+                        {window.location.origin}/lon/subscribe/{oa.id}?liff_id=YOUR_LIFF_ID
+                      </code>
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <TextInput
+                      value={liffId}
+                      onChange={setLiffId}
+                      placeholder="e.g. 1234567890-AbCdEfGh"
+                      disabled={savingLiff}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Format: <code className="bg-muted px-1 rounded">&lt;channelId&gt;-&lt;suffix&gt;</code>
+                    </p>
+                  </div>
+                  {liffError && (
+                    <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                      {liffError}
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleSaveLiff}
+                      disabled={savingLiff}
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 min-w-[120px]"
+                    >
+                      {savingLiff ? (
+                        <RefreshCw size={13} className="animate-spin" />
+                      ) : savedLiff ? (
+                        <CheckCircle2 size={13} className="text-green-500" />
+                      ) : (
+                        <Save size={13} />
+                      )}
+                      {savedLiff ? "Saved!" : savingLiff ? "Saving..." : "Save LIFF ID"}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

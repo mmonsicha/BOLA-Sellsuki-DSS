@@ -18,6 +18,15 @@ export interface CreateLineOABody {
   is_default?: boolean;
 }
 
+export interface UpdateLineOABody {
+  name?: string;
+  description?: string;
+  channel_secret?: string;
+  channel_access_token?: string;
+  is_default?: boolean;
+  liff_id?: string;
+}
+
 export const lineOAApi = {
   list: (params: ListLineOAsParams) =>
     api.get<{ data: LineOA[] }>("/v1/line-oas", params),
@@ -28,7 +37,7 @@ export const lineOAApi = {
   create: (body: CreateLineOABody) =>
     api.post<LineOA>("/v1/line-oas", body),
 
-  update: (id: string, body: Partial<CreateLineOABody>) =>
+  update: (id: string, body: UpdateLineOABody) =>
     api.put<LineOA>(`/v1/line-oas/${id}`, body),
 
   delete: (id: string) =>

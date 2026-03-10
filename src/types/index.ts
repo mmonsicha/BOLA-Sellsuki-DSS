@@ -8,6 +8,7 @@ export interface LineOA {
   channel_id: string;
   webhook_url: string;
   basic_id: string;
+  liff_id: string;
   status: "active" | "inactive" | "error";
   is_default: boolean;
   created_at: string;
