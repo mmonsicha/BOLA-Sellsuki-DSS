@@ -109,6 +109,7 @@ export interface AutoReply {
   keywords: string[];
   match_mode: MatchMode;
   postback_data: string;
+  quick_reply_id?: string;
   messages: Array<{ type: string; payload: unknown }>;
   created_at: string;
   updated_at: string;
@@ -412,8 +413,47 @@ export interface QuickReplyItem {
 export interface QuickReply {
   id: string;
   workspace_id: string;
+  line_oa_id: string;
   name: string;
   items: QuickReplyItem[];
   created_at: string;
   updated_at: string;
+}
+
+// ---- LON (LINE Notification Messaging) ----
+export type LONSubscriberStatus = "active" | "revoked" | "expired";
+export type LONDeliveryStatus = "success" | "failed" | "pending";
+
+export interface LONSubscriber {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  follower_id?: string;
+  line_user_id: string;
+  status: LONSubscriberStatus;
+  source: string;
+  consent_at: string;
+  revoked_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LONSubscriberStats {
+  total: number;
+  active: number;
+  revoked: number;
+  expired: number;
+}
+
+export interface LONDeliveryLog {
+  id: string;
+  workspace_id: string;
+  lon_subscriber_id: string;
+  line_user_id: string;
+  messages: Array<Record<string, unknown>>;
+  status: LONDeliveryStatus;
+  error_message?: string;
+  http_status_code?: number;
+  triggered_by: string;
+  sent_at: string;
 }

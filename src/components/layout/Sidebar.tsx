@@ -19,6 +19,8 @@ import {
   Inbox,
   LayoutTemplate,
   MessageCircleDashed,
+  Bell,
+  ScrollText,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -47,6 +49,8 @@ const navSections: NavSection[] = [
       { label: "Flex Messages", href: "/flex-messages", icon: Layers },
       { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
       { label: "Quick Replies", href: "/quick-replies", icon: MessageCircleDashed },
+      { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
+      { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
       { label: "Media", href: "/media", icon: Image },
       { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
     ],
