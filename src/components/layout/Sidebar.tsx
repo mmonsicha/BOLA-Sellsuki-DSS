@@ -21,6 +21,7 @@ import {
   MessageCircleDashed,
   Bell,
   ScrollText,
+  ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -51,6 +52,7 @@ const navSections: NavSection[] = [
       { label: "Quick Replies", href: "/quick-replies", icon: MessageCircleDashed },
       { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
       { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
+      { label: "Registration Forms", href: "/registration-forms", icon: ClipboardList },
       { label: "Media Library", href: "/media", icon: Image },
       { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
     ],

@@ -31,6 +31,9 @@ import { QuickRepliesPage } from "@/pages/quick-replies/QuickRepliesPage";
 import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
 import { LONDeliveryLogsPage } from "@/pages/lon-delivery-logs/LONDeliveryLogsPage";
 import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscribePage";
+import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFormsPage";
+import { RegistrationFormBuilderPage } from "@/pages/registration-forms/RegistrationFormBuilderPage";
+import { RegistrationSubmissionsPage } from "@/pages/registration-forms/RegistrationSubmissionsPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { ToastProvider } from "@/components/ui/toast";
@@ -113,6 +116,13 @@ function Router() {
   // LON — authenticated pages
   if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
   if (path.startsWith("/lon-delivery-logs")) return <LONDeliveryLogsPage />;
+
+  // Registration Forms
+  if (segments[0] === "registration-forms") {
+    if (segments[1] && segments[2] === "submissions") return <RegistrationSubmissionsPage />;
+    if (segments[1]) return <RegistrationFormBuilderPage />;
+    return <RegistrationFormsPage />;
+  }
 
   // 404
   return (
