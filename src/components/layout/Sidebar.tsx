@@ -12,6 +12,7 @@ import {
   Menu,
   Layers,
   BookOpen,
+  BookMarked,
   Bot,
   MessagesSquare,
   Database,
@@ -24,6 +25,7 @@ import {
   ClipboardList,
   BarChart2,
   PhoneCall,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -65,6 +67,8 @@ const navSections: NavSection[] = [
       { label: "Knowledge Base", href: "/knowledge-base", icon: Database },
       { label: "Unanswered Questions", href: "/unanswered-questions", icon: HelpCircle },
       { label: "Analytics", href: "/chatbot-analytics", icon: BarChart2 },
+      { label: "Admin Performance", href: "/admin-performance", icon: BarChart2 },
+      { label: "Reply Templates", href: "/reply-templates", icon: FileText },
     ],
   },
   {
@@ -86,6 +90,7 @@ const navSections: NavSection[] = [
       { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
       { label: "Settings", href: "/settings", icon: Settings },
       { label: "Integration Guide", href: "/integration", icon: BookOpen },
+      { label: "User Manual", href: "/user-manual", icon: BookMarked },
     ],
   },
 ];

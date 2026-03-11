@@ -37,6 +37,9 @@ import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFo
 import { RegistrationFormBuilderPage } from "@/pages/registration-forms/RegistrationFormBuilderPage";
 import { RegistrationSubmissionsPage } from "@/pages/registration-forms/RegistrationSubmissionsPage";
 import { AnalyticsDashboardPage } from "@/pages/analytics/AnalyticsDashboardPage";
+import { UserManualPage } from "@/pages/user-manual/UserManualPage";
+import { AdminPerformancePage } from "@/pages/admin-performance/AdminPerformancePage";
+import { ReplyTemplatesPage } from "@/pages/admin-performance/ReplyTemplatesPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { ToastProvider } from "@/components/ui/toast";
@@ -131,6 +134,13 @@ function Router() {
 
   // Analytics
   if (path.startsWith("/analytics")) return <AnalyticsDashboardPage />;
+
+  // Admin Performance
+  if (path.startsWith("/admin-performance")) return <AdminPerformancePage />;
+  if (path.startsWith("/reply-templates")) return <ReplyTemplatesPage />;
+
+  // User Manual
+  if (path.startsWith("/user-manual")) return <UserManualPage />;
 
   // 404
   return (
