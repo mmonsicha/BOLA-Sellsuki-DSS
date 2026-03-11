@@ -537,3 +537,58 @@ export interface FormSubmission {
   ip_address: string;
   submitted_at: string;
 }
+
+// ---- Analytics & CDP ----
+export interface AnalyticsEvent {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  line_user_id: string;
+  follower_id: string;
+  event_type: string;
+  element_type: string;
+  element_id: string;
+  element_label: string;
+  target_url: string;
+  occurred_at: string;
+}
+
+export interface TopElementStats {
+  element_id: string;
+  element_label: string;
+  element_type: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+}
+
+export interface AnalyticsSummary {
+  total_clicks: number;
+  total_impressions: number;
+  ctr: number;
+  unique_users: number;
+  top_elements: TopElementStats[];
+}
+
+export interface FollowerBehaviorSummary {
+  id: string;
+  workspace_id: string;
+  follower_id: string;
+  total_clicks: number;
+  total_impressions: number;
+  total_messages_sent: number;
+  chat_sessions_count: number;
+  last_active_at: string | null;
+  first_active_at: string | null;
+  most_clicked_label: string;
+  most_clicked_element_type: string;
+  engagement_score: number;
+  interest_tags: string[];
+  behavior_custom_fields: Record<string, unknown>;
+  updated_at: string;
+}
+
+export interface AnalyticsEventConfig {
+  token: string;
+  tracking_url: string;
+}

@@ -3,9 +3,11 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, Plus, X, CheckCircle, XCircle } from "lucide-react";
-import type { Follower } from "@/types";
+import { ArrowLeft, RefreshCw, Plus, X, CheckCircle, XCircle, Activity } from "lucide-react";
+import type { Follower, FollowerBehaviorSummary } from "@/types";
 import { followerApi } from "@/api/follower";
+import { analyticsApi } from "@/api/analytics";
+import { workspaceApi } from "@/api/workspace";
 
 const followStatusVariant = {
   following: "success" as const,
@@ -161,6 +163,102 @@ function CustomFieldsEditor({
   );
 }
 
+function engagementColor(score: number): string {
+  if (score >= 61) return "bg-green-100 text-green-800";
+  if (score >= 31) return "bg-yellow-100 text-yellow-800";
+  return "bg-gray-100 text-gray-600";
+}
+
+function BehaviorSection({ followerId, workspaceId }: { followerId: string; workspaceId: string }) {
+  const [behavior, setBehavior] = useState<FollowerBehaviorSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    analyticsApi
+      .getFollowerBehavior(workspaceId, followerId)
+      .then(setBehavior)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [followerId, workspaceId]);
+
+  if (loading) return null;
+  if (!behavior) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity size={16} />
+          Engagement Behavior
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Engagement Score */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">Engagement Score</span>
+          <span className={`text-sm font-bold px-2.5 py-0.5 rounded-full ${engagementColor(behavior.engagement_score)}`}>
+            {behavior.engagement_score.toFixed(1)}
+          </span>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">Total Clicks</div>
+            <div className="font-semibold">{behavior.total_clicks.toLocaleString()}</div>
+          </div>
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">Impressions</div>
+            <div className="font-semibold">{behavior.total_impressions.toLocaleString()}</div>
+          </div>
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">Messages Sent</div>
+            <div className="font-semibold">{behavior.total_messages_sent.toLocaleString()}</div>
+          </div>
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">Chat Sessions</div>
+            <div className="font-semibold">{behavior.chat_sessions_count.toLocaleString()}</div>
+          </div>
+        </div>
+
+        {/* Last Active */}
+        {behavior.last_active_at && (
+          <div className="text-sm">
+            <span className="text-muted-foreground">Last Active: </span>
+            <span>{new Date(behavior.last_active_at).toLocaleString()}</span>
+          </div>
+        )}
+
+        {/* Most Clicked */}
+        {behavior.most_clicked_label && (
+          <div className="text-sm">
+            <span className="text-muted-foreground">Most Clicked: </span>
+            <span className="font-medium">{behavior.most_clicked_label}</span>
+            {behavior.most_clicked_element_type && (
+              <Badge variant="outline" className="ml-2 text-xs capitalize">
+                {behavior.most_clicked_element_type.replace("_", " ")}
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {/* Interest Tags */}
+        {behavior.interest_tags && behavior.interest_tags.length > 0 && (
+          <div>
+            <div className="text-sm text-muted-foreground mb-2">Interest Tags</div>
+            <div className="flex flex-wrap gap-1">
+              {behavior.interest_tags.map((tag) => (
+                <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FollowerDetailPage() {
   const id = window.location.pathname.split("/")[2];
   const [follower, setFollower] = useState<Follower | null>(null);
@@ -169,6 +267,7 @@ export function FollowerDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string>("");
 
   const [form, setForm] = useState<FormState>({
     email: "",
@@ -177,6 +276,13 @@ export function FollowerDetailPage() {
     tags: [],
     custom_fields: {},
   });
+
+  useEffect(() => {
+    workspaceApi.list({}).then((res) => {
+      const ws = (res as any).data?.[0] || (res as any)[0];
+      if (ws) setWorkspaceId(ws.id);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     followerApi
@@ -395,6 +501,9 @@ export function FollowerDetailPage() {
             />
           </CardContent>
         </Card>
+
+        {/* Behavior Summary */}
+        {workspaceId && <BehaviorSection followerId={id} workspaceId={workspaceId} />}
 
         {/* Save */}
         <div className="flex items-center gap-3 pb-8">
