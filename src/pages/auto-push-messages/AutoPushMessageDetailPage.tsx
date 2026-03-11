@@ -2,17 +2,18 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, ArrowLeft, Copy, Check, RefreshCw, Trash2, CheckCircle, XCircle, ChevronDown } from "lucide-react";
+import { AlertCircle, ArrowLeft, Copy, Check, RefreshCw, Trash2, CheckCircle, XCircle, ChevronDown, Search, ExternalLink } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { autoPushMessageApi } from "@/api/autoPushMessage";
 import { flexMessageApi } from "@/api/flexMessage";
 import type { FlexMessage } from "@/api/flexMessage";
 import { segmentApi } from "@/api/segment";
+import { followerApi } from "@/api/follower";
 import { webhookSettingApi } from "@/api/webhookSetting";
 import { DeliveryLogsTable } from "./DeliveryLogsTable";
 import { MessageTemplateEditor } from "./MessageTemplateEditor";
-import type { AutoPushMessage, Segment } from "@/types";
+import type { AutoPushMessage, Segment, Follower } from "@/types";
 import type { WebhookSetting } from "@/api/webhookSetting";
 import type { DeliveryLog } from "@/api/autoPushMessage";
 import { cn } from "@/lib/utils";
@@ -141,6 +142,13 @@ export function AutoPushMessageDetailPage() {
   // Flex combobox state
   const [flexSelectorOpen, setFlexSelectorOpen] = useState(false);
   const [flexSearch, setFlexSearch] = useState("");
+
+  // Follower search state (for "Single Follower" target type)
+  const [followerSearch, setFollowerSearch] = useState("");
+  const [followerResults, setFollowerResults] = useState<Follower[]>([]);
+  const [followerSearching, setFollowerSearching] = useState(false);
+  const [followerDropdownOpen, setFollowerDropdownOpen] = useState(false);
+  const followerSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Delivery Logs
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
@@ -640,6 +648,111 @@ export function AutoPushMessageDetailPage() {
                     </option>
                   ))}
                 </select>
+              </Field>
+            )}
+
+            {/* Conditional: Single Follower — search input with dropdown */}
+            {form.targetType === "follower" && (
+              <Field
+                label="LINE User ID"
+                required
+                hint="กรอก LINE User ID หรือค้นหาจากชื่อผู้ติดตาม (เช่น Uxxxxxxxxxx)"
+              >
+                <div className="space-y-2">
+                  {/* Follower search */}
+                  <div className="relative">
+                    <div className="flex items-center border rounded-md px-3 py-2 gap-2 bg-background focus-within:ring-2 focus-within:ring-ring">
+                      <Search size={14} className="text-muted-foreground flex-shrink-0" />
+                      <input
+                        type="text"
+                        className="flex-1 text-sm bg-transparent focus:outline-none"
+                        placeholder="ค้นหาผู้ติดตามจากชื่อ..."
+                        value={followerSearch}
+                        disabled={saving}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFollowerSearch(val);
+                          setFollowerDropdownOpen(true);
+                          if (followerSearchRef.current) clearTimeout(followerSearchRef.current);
+                          if (!val.trim()) {
+                            setFollowerResults([]);
+                            setFollowerDropdownOpen(false);
+                            return;
+                          }
+                          followerSearchRef.current = setTimeout(async () => {
+                            setFollowerSearching(true);
+                            try {
+                              const res = await followerApi.list({
+                                workspace_id: apm?.workspace_id ?? "00000000-0000-0000-0000-000000000001",
+                                line_oa_id: apm?.line_oa_id,
+                                search: val.trim(),
+                                page: 1,
+                                page_size: 10,
+                              });
+                              setFollowerResults(res.data ?? []);
+                            } catch {
+                              setFollowerResults([]);
+                            } finally {
+                              setFollowerSearching(false);
+                            }
+                          }, 400);
+                        }}
+                        onFocus={() => {
+                          if (followerResults.length > 0) setFollowerDropdownOpen(true);
+                        }}
+                      />
+                      {followerSearching && <RefreshCw size={14} className="animate-spin text-muted-foreground flex-shrink-0" />}
+                    </div>
+
+                    {/* Dropdown results */}
+                    {followerDropdownOpen && followerResults.length > 0 && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setFollowerDropdownOpen(false)} />
+                        <div className="absolute z-20 mt-1 w-full bg-background border rounded-md shadow-lg max-h-56 overflow-y-auto">
+                          {followerResults.map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-muted text-sm flex items-center gap-3 border-b last:border-b-0"
+                              onClick={() => {
+                                setForm((prev) => ({ ...prev }));
+                                // Store the selected user ID in the message template placeholder
+                                // The actual user id goes to the webhook payload as target_line_user_id
+                                setFollowerSearch(f.display_name || f.line_user_id);
+                                setFollowerDropdownOpen(false);
+                                setFollowerResults([]);
+                              }}
+                            >
+                              {f.picture_url ? (
+                                <img src={f.picture_url} alt={f.display_name} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                                  <span className="text-xs font-bold">{(f.display_name || "?")[0].toUpperCase()}</span>
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-medium truncate">{f.display_name || "(ไม่มีชื่อ)"}</p>
+                                <p className="text-xs text-muted-foreground font-mono truncate">{f.line_user_id}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Manual LINE User ID input */}
+                  <p className="text-xs text-muted-foreground">หรือกรอก LINE User ID โดยตรงใน Webhook Payload</p>
+                  <a
+                    href="https://developers.line.biz/en/docs/messaging-api/getting-user-ids/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-line underline"
+                  >
+                    วิธีหา User ID
+                    <ExternalLink size={10} />
+                  </a>
+                </div>
               </Field>
             )}
 

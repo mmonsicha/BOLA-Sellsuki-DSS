@@ -10,6 +10,16 @@ import { broadcastApi } from "@/api/broadcast";
 import type { Broadcast, BroadcastStatus, LineOA } from "@/types";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 
+// ─── Status filter tabs ──────────────────────────────────────────────────────
+
+const STATUS_TABS: { value: string; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "draft", label: "Draft" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "sent", label: "Sent" },
+  { value: "failed", label: "Failed" },
+];
+
 // ─── Status config ──────────────────────────────────────────────────────────
 
 const statusConfig: Record<
@@ -101,6 +111,11 @@ interface CampaignGroupProps {
 function CampaignGroup({ campaignId, broadcasts }: CampaignGroupProps) {
   const [expanded, setExpanded] = useState(true);
   const shortId = campaignId.slice(-8);
+  // Use the first broadcast's name as the campaign label when it looks like a campaign name,
+  // otherwise fall back to the short UUID display.
+  const campaignLabel = broadcasts[0]?.name
+    ? broadcasts[0].name
+    : `Campaign #${shortId}`;
 
   return (
     <div className="space-y-2">
@@ -112,7 +127,10 @@ function CampaignGroup({ campaignId, broadcasts }: CampaignGroupProps) {
       >
         {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         <span>Campaign</span>
-        <Badge variant="outline" className="text-xs font-mono">#{shortId}</Badge>
+        <span className="text-foreground font-semibold">{campaignLabel}</span>
+        {broadcasts[0]?.name && (
+          <Badge variant="outline" className="text-xs font-mono">#{shortId}</Badge>
+        )}
         <span className="text-xs text-muted-foreground ml-auto">
           {broadcasts.length} broadcast{broadcasts.length !== 1 ? "s" : ""}
         </span>
@@ -139,6 +157,7 @@ export function BroadcastsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Load workspace + LINE OAs on mount
   useEffect(() => {
@@ -179,12 +198,18 @@ export function BroadcastsPage() {
       .finally(() => setLoading(false));
   }, [workspaceId, selectedLineOAId]);
 
+  // Apply status filter
+  const filteredBroadcasts =
+    statusFilter === "all"
+      ? broadcasts
+      : broadcasts.filter((b) => b.status === statusFilter);
+
   // Group broadcasts by campaign_id
   const grouped = (() => {
     const campaignMap = new Map<string, Broadcast[]>();
     const standalone: Broadcast[] = [];
 
-    for (const b of broadcasts) {
+    for (const b of filteredBroadcasts) {
       if (b.campaign_id) {
         const list = campaignMap.get(b.campaign_id) ?? [];
         list.push(b);
@@ -222,6 +247,24 @@ export function BroadcastsPage() {
           showAll={true}
         />
 
+        {/* Status filter tabs */}
+        <div className="flex flex-wrap gap-1.5">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setStatusFilter(tab.value)}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                statusFilter === tab.value
+                  ? "bg-line text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Error */}
         {error && (
           <Card className="border-destructive">
@@ -240,7 +283,7 @@ export function BroadcastsPage() {
           </div>
         )}
 
-        {/* Empty */}
+        {/* Empty — no broadcasts at all */}
         {!loading && !error && broadcasts.length === 0 && (
           <Card>
             <CardContent className="text-center py-12">
@@ -260,8 +303,26 @@ export function BroadcastsPage() {
           </Card>
         )}
 
+        {/* Empty — broadcasts exist but none match the active filter */}
+        {!loading && !error && broadcasts.length > 0 && filteredBroadcasts.length === 0 && (
+          <Card>
+            <CardContent className="text-center py-12">
+              <p className="font-medium text-muted-foreground">
+                No broadcasts with status "{STATUS_TABS.find((t) => t.value === statusFilter)?.label}"
+              </p>
+              <button
+                type="button"
+                className="mt-2 text-sm text-line underline"
+                onClick={() => setStatusFilter("all")}
+              >
+                Clear filter
+              </button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Broadcast list */}
-        {!loading && !error && broadcasts.length > 0 && (
+        {!loading && !error && filteredBroadcasts.length > 0 && (
           <div className="space-y-4">
             {/* Campaign groups */}
             {Array.from(grouped.campaignMap.entries()).map(([campaignId, items]) => (
