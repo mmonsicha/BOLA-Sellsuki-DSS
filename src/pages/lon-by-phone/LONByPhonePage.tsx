@@ -39,7 +39,7 @@ function HowItWorksInfographic() {
       >
         <div className="flex items-center gap-2">
           <Bell size={16} className="text-gray-600" />
-          <span className="font-bold text-sm">LINE 通知の送信方法</span>
+          <span className="font-bold text-sm">วิธีส่ง LINE Notification</span>
           <span className="text-xs text-muted-foreground ml-1">
             — How Each System Works
           </span>

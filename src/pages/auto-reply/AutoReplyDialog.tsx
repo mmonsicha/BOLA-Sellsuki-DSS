@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Plus, X, ImageIcon, Film, Type, Code2, Layers, Sticker, AlertTriangle } from "lucide-react";
 import { autoReplyApi } from "@/api/autoReply";
 import { quickReplyApi } from "@/api/richMenu";
@@ -593,14 +594,11 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-xl max-h-[92vh] flex flex-col">
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="sm:max-w-xl max-h-[92vh] flex flex-col p-0 overflow-hidden">
 
         {/* ── Header ──────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
           <div>
             <h2 className="font-semibold text-base text-gray-900">
               {isEdit ? "Edit Auto Reply" : "New Auto Reply"}
@@ -609,7 +607,11 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
               {isEdit ? "Update the rule settings below" : "Configure trigger and response messages"}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+          <button
+            onClick={onClose}
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Close dialog"
+          >
             <X size={16} />
           </button>
         </div>
@@ -769,7 +771,7 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
         </form>
 
         {/* ── Footer ──────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50 rounded-b-2xl flex-shrink-0">
           <p className="text-xs text-gray-400">
             {isEdit ? `Editing rule for ${form.trigger} trigger` : `New ${form.trigger} rule`}
           </p>
@@ -786,7 +788,7 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

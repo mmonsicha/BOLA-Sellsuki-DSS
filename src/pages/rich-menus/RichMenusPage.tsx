@@ -8,6 +8,16 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { LayoutTemplate, Copy, Trash2, Plus, List, LayoutGrid, RefreshCw, Send, Star } from "lucide-react";
 import type { RichMenu, LineOA } from "@/types";
 import { richMenuApi } from "@/api/richMenu";
@@ -237,6 +247,7 @@ export function RichMenusPage() {
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; isPublished: boolean } | null>(null);
 
   useEffect(() => {
     lineOAApi.list({ workspace_id: WORKSPACE_ID })
@@ -300,8 +311,13 @@ export function RichMenusPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this rich menu? This cannot be undone.")) return;
+  const handleDelete = (id: string) => {
+    const menu = menus.find((m) => m.id === id);
+    if (!menu) return;
+    setDeleteTarget({ id, name: menu.name, isPublished: !!menu.published_at });
+  };
+
+  const handleConfirmedDelete = async (id: string) => {
     try {
       await richMenuApi.delete(id);
       setMenus((prev) => prev.filter((m) => m.id !== id));
@@ -491,6 +507,29 @@ export function RichMenusPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.isPublished
+                ? `Rich Menu นี้กำลังใช้งานอยู่ การลบจะทำให้ผู้ติดตามไม่เห็น Rich Menu ทันที คุณต้องการลบ "${deleteTarget?.name}" ใช่หรือไม่?`
+                : `คุณต้องการลบ "${deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* New Menu Dialog */}
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>

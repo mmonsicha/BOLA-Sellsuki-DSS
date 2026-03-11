@@ -10,6 +10,17 @@ import { CreateAutoPushDialog } from "./CreateAutoPushDialog";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/components/ui/toast";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -73,11 +84,13 @@ function DeliveryStats({ apm }: { apm: AutoPushMessage }) {
 }
 
 export function AutoPushMessagesPage() {
+  const toast = useToast();
   const [apms, setApms] = useState<AutoPushMessage[]>([]);
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedLineOAId, setSelectedLineOAId] = useState<string>("");
 
@@ -114,20 +127,19 @@ export function AutoPushMessagesPage() {
       const updated = await autoPushMessageApi.toggle(apm.id, apm.is_enabled);
       setApms((prev) => prev.map((s) => (s.id === apm.id ? updated.data! : s)));
     } catch {
-      alert("Failed to toggle auto push message");
+      toast.error("Failed to toggle auto push message");
     } finally {
       setTogglingId(null);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this auto push message? This cannot be undone.")) return;
+  const handleConfirmedDelete = async (id: string) => {
     setDeletingId(id);
     try {
       await autoPushMessageApi.delete(id);
       setApms((prev) => prev.filter((s) => s.id !== id));
     } catch {
-      alert("Failed to delete auto push message");
+      toast.error("Failed to delete auto push message");
     } finally {
       setDeletingId(null);
     }
@@ -267,7 +279,7 @@ export function AutoPushMessagesPage() {
                         size="icon"
                         className="text-destructive hover:text-destructive h-8 w-8"
                         disabled={deletingId === apm.id}
-                        onClick={() => handleDelete(apm.id)}
+                        onClick={() => setDeleteTarget({ id: apm.id, name: apm.name })}
                       >
                         <Trash2 size={14} />
                       </Button>
@@ -286,6 +298,27 @@ export function AutoPushMessagesPage() {
         onClose={() => setCreateOpen(false)}
         onCreated={handleAutoPushCreated}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ "{deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
