@@ -10,7 +10,7 @@ import { toDisplayUrl } from "@/lib/mediaUtils";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
-type TabFilter = "all" | "ai" | "human";
+type TabFilter = "all" | "ai" | "human" | "group";
 
 const ESCALATION_LABELS: Record<string, string> = {
   low_confidence: "Low Confidence",
@@ -123,6 +123,7 @@ export function ChatInboxPage() {
     fetchMessages();
     const t = setInterval(fetchMessages, 2000);
     return () => clearInterval(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSession?.id]);
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────
@@ -135,6 +136,7 @@ export function ChatInboxPage() {
     if (!selectedSession) return;
     const updated = sessions.find((s) => s.id === selectedSession.id);
     if (updated) setSelectedSession(updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -142,6 +144,7 @@ export function ChatInboxPage() {
     if (selectedOAId && s.line_oa_id !== selectedOAId) return false;
     if (activeTab === "ai") return s.mode === "ai";
     if (activeTab === "human") return s.mode === "human";
+    if (activeTab === "group") return s.chat_type === "group" || s.chat_type === "room";
     return true;
   });
 
@@ -156,6 +159,7 @@ export function ChatInboxPage() {
     const now = new Date().toISOString();
     const updated = { ...lastViewedMap, [session.id]: now };
     setLastViewedMap(updated);
+    // eslint-disable-next-line no-empty
     try { localStorage.setItem("chatInbox_lastViewed", JSON.stringify(updated)); } catch {}
   };
 
@@ -192,7 +196,7 @@ export function ChatInboxPage() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
@@ -257,7 +261,7 @@ export function ChatInboxPage() {
 
         {/* Tab bar */}
         <div className="flex border-b bg-gray-50">
-          {(["all", "ai", "human"] as const).map((tab) => (
+          {(["all", "ai", "human", "group"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -267,7 +271,7 @@ export function ChatInboxPage() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              {tab === "ai" ? "AI Active" : tab === "human" ? "Human Active" : "All"}
+              {tab === "ai" ? "AI" : tab === "human" ? "Human" : tab === "group" ? "Groups" : "All"}
             </button>
           ))}
         </div>
@@ -280,9 +284,7 @@ export function ChatInboxPage() {
             <div className="p-6 text-center">
               <div className="text-gray-400 text-sm">No sessions found</div>
               <div className="text-gray-300 text-xs mt-1">
-                {activeTab !== "all"
-                  ? `No ${activeTab === "ai" ? "AI active" : "human active"} sessions`
-                  : "No conversations yet"}
+                {activeTab === "ai" ? "No AI active sessions" : activeTab === "human" ? "No human active sessions" : activeTab === "group" ? "No group sessions" : "No conversations yet"}
               </div>
             </div>
           ) : (
@@ -316,7 +318,12 @@ export function ChatInboxPage() {
               </button>
               <Avatar pictureUrl={selectedPicUrl} name={selectedName} size={9} />
               <div className="min-w-0">
-                <div className="font-semibold text-sm text-gray-900 truncate">{selectedName}</div>
+                <div className="flex items-center gap-1.5">
+                  <div className="font-semibold text-sm text-gray-900 truncate">{selectedName}</div>
+                  {(selectedSession.chat_type === "group" || selectedSession.chat_type === "room") && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium flex-shrink-0">Group</span>
+                  )}
+                </div>
                 <div className="hidden md:flex text-xs text-gray-400 items-center gap-1.5">
                   <span>{selectedSession.line_chat_id}</span>
                   <span className="text-gray-300">·</span>
@@ -335,14 +342,14 @@ export function ChatInboxPage() {
             <div className="flex gap-2 flex-shrink-0 ml-4">
               {selectedSession.mode === "ai" ? (
                 <button
-                  onClick={handleTakeover}
+                  onClick={() => void handleTakeover()}
                   className="px-3 py-1.5 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 font-medium transition-colors"
                 >
                   Take Over
                 </button>
               ) : (
                 <button
-                  onClick={handleHandback}
+                  onClick={() => void handleHandback()}
                   className="px-3 py-1.5 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 font-medium transition-colors"
                 >
                   Hand Back to AI
@@ -374,6 +381,7 @@ export function ChatInboxPage() {
                 message={msg}
                 followerName={selectedSession.follower_display_name}
                 followerPicUrl={selectedSession.follower_picture_url}
+                isGroupChat={selectedSession.chat_type === "group" || selectedSession.chat_type === "room"}
               />
             ))}
             <div ref={messagesEndRef} />
@@ -431,7 +439,7 @@ export function ChatInboxPage() {
                     <ImageIcon size={16} />
                   </button>
                   <button
-                    onClick={handleSend}
+                    onClick={() => void handleSend()}
                     disabled={sending || (!inputText.trim() && !selectedMedia)}
                     className="px-5 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -476,7 +484,7 @@ export function ChatInboxPage() {
             <div className="px-5 py-4 border-t bg-gray-50 flex-shrink-0">
               <div className="text-sm text-gray-500 text-center">
                 AI is handling this conversation.{" "}
-                <button onClick={handleTakeover} className="text-orange-600 hover:underline font-medium">
+                <button onClick={() => void handleTakeover()} className="text-orange-600 hover:underline font-medium">
                   Click "Take Over"
                 </button>{" "}
                 to reply manually.
@@ -559,6 +567,10 @@ function SessionListItem({
   const name = session.follower_display_name || session.line_chat_id;
   const lastTime = session.last_message_at ? relativeTime(session.last_message_at) : null;
   const chatTypeLabel = CHAT_TYPE_LABELS[session.chat_type] ?? session.chat_type;
+  const isGroup = session.chat_type === "group" || session.chat_type === "room";
+  const avatarUrl = isGroup
+    ? (session.group_picture_url || session.follower_picture_url)
+    : session.follower_picture_url;
 
   return (
     <div
@@ -572,7 +584,7 @@ function SessionListItem({
       <div className="flex items-start gap-2.5">
         {/* Avatar */}
         <div className="relative flex-shrink-0 mt-0.5">
-          <Avatar pictureUrl={session.follower_picture_url} name={name} size={9} />
+          <Avatar pictureUrl={avatarUrl} name={name} size={9} />
           {unread && (
             <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
           )}
@@ -620,10 +632,12 @@ function MessageBubble({
   message,
   followerName,
   followerPicUrl,
+  isGroupChat,
 }: {
   message: ChatMessage;
   followerName?: string;
   followerPicUrl?: string;
+  isGroupChat?: boolean;
 }) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
@@ -641,6 +655,9 @@ function MessageBubble({
 
   const timeStr = new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const senderLabel = isAgent ? "You" : "Auto-Reply";
+  const groupSenderLabel = isGroupChat && isUser
+    ? (message.sender_display_name || message.sender_user_id || null)
+    : null;
 
   return (
     <div className={`flex items-end gap-2 ${isUser ? "justify-start" : "justify-end"}`}>
@@ -690,6 +707,10 @@ function MessageBubble({
         </div>
       ) : (
         /* ── Text bubble ── */
+        <div className="flex flex-col">
+          {groupSenderLabel && (
+            <div className="text-xs text-gray-500 mb-1 px-1">{groupSenderLabel}</div>
+          )}
         <div className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-2.5 rounded-2xl text-sm shadow-sm ${
           isUser
             ? "bg-white text-gray-800 border border-gray-200 rounded-tl-sm"
@@ -704,6 +725,7 @@ function MessageBubble({
           <div className={`text-xs mt-1.5 ${isUser ? "text-gray-400" : "opacity-60"}`}>
             {timeStr}
           </div>
+        </div>
         </div>
       )}
     </div>
