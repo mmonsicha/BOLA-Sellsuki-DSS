@@ -5,18 +5,20 @@ include:
 
 
 variables:
-  # Skip all test
-  E2E_TEST_IMAGE_NAME: 'registry.fountain.sellsuki.com/dockerhub/library/alpine:3.15'
-  E2E_TEST_BEFORE_SCRIPT: 'echo "1 + 1"'
-  E2E_TEST_SCRIPT: 'echo "1 + 1"'
+  # Unit tests — run Vitest
+  UNIT_TEST_IMAGE_NAME: 'registry.fountain.sellsuki.com/dockerhub/library/node:20'
+  UNIT_TEST_BEFORE_SCRIPT: 'npm ci'
+  UNIT_TEST_SCRIPT: 'npm run test:run'
 
-  UNIT_TEST_IMAGE_NAME: 'registry.fountain.sellsuki.com/dockerhub/library/alpine:3.15'
-  UNIT_TEST_BEFORE_SCRIPT: 'echo "1 + 1"'
-  UNIT_TEST_SCRIPT: 'echo "1 + 1"'
-
+  # Integration tests — skip for now
   INTEGRATION_TEST_IMAGE_NAME: 'registry.fountain.sellsuki.com/dockerhub/library/alpine:3.15'
-  INTEGRATION_TEST_BEFORE_SCRIPT: 'echo "1 + 1"'
-  INTEGRATION_TEST_SCRIPT: 'echo "1 + 1"'
+  INTEGRATION_TEST_BEFORE_SCRIPT: 'echo "skip"'
+  INTEGRATION_TEST_SCRIPT: 'echo "skip"'
+
+  # E2E tests — skip for now (requires running backend)
+  E2E_TEST_IMAGE_NAME: 'registry.fountain.sellsuki.com/dockerhub/library/alpine:3.15'
+  E2E_TEST_BEFORE_SCRIPT: 'echo "skip"'
+  E2E_TEST_SCRIPT: 'echo "skip"'
 
 #### Stagings ####
 .variables_export_staging_frontend:
