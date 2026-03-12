@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   RefreshCw, Save, Building2, Globe, Shield,
-  Webhook, CheckCircle, XCircle, Clock, Eye, EyeOff, ChevronDown, ChevronUp
+  Webhook, CheckCircle, XCircle, Clock, Eye, EyeOff, ChevronDown, ChevronUp,
+  KeyRound,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { workspaceApi } from "@/api/workspace";
 import { outboundEventApi } from "@/api/outboundEvent";
+import { authApi } from "@/api/auth";
 import type { Workspace, OutboundWebhookConfig, OutboundDeliveryLog } from "@/types";
 import { useToast } from "@/components/ui/toast";
 
@@ -30,6 +32,14 @@ export function SettingsPage() {
   const [showSecret, setShowSecret] = useState(false);
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [webhookSaved, setWebhookSaved] = useState(false);
+
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   // Delivery logs state
   const [logs, setLogs] = useState<OutboundDeliveryLog[]>([]);
@@ -87,6 +97,29 @@ export function SettingsPage() {
       toast.error("Failed to save settings");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error("New password must be at least 8 characters");
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await authApi.changePassword(WORKSPACE_ID, currentPassword, newPassword);
+      toast.success("Password changed successfully");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch {
+      toast.error("Failed to change password. Check your current password and try again.");
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -364,6 +397,79 @@ export function SettingsPage() {
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Change Password */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <KeyRound size={16} />
+              Change Password
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Only applies when using local password authentication.
+            </p>
+            <div>
+              <label className="text-sm font-medium">Current Password</label>
+              <div className="relative mt-1">
+                <input
+                  type={showCurrentPw ? "text" : "password"}
+                  className="w-full border rounded-md px-3 py-2 pr-10 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Enter current password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPw(!showCurrentPw)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">New Password</label>
+              <div className="relative mt-1">
+                <input
+                  type={showNewPw ? "text" : "password"}
+                  className="w-full border rounded-md px-3 py-2 pr-10 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Min 8 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPw(!showNewPw)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Confirm New Password</label>
+              <input
+                type="password"
+                className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Repeat new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button
+                onClick={() => { void handleChangePassword(); }}
+                disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword}
+                className="gap-2"
+              >
+                {savingPassword ? <RefreshCw size={14} className="animate-spin" /> : <KeyRound size={14} />}
+                {savingPassword ? "Saving..." : "Change Password"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
