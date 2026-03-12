@@ -18,13 +18,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { LayoutTemplate, Copy, Trash2, Plus, List, LayoutGrid, RefreshCw, Send, Star } from "lucide-react";
+import { LayoutTemplate, Copy, Trash2, Plus, List, LayoutGrid, RefreshCw, Send, Star, ChevronLeft } from "lucide-react";
 import type { RichMenu, LineOA } from "@/types";
-import { richMenuApi } from "@/api/richMenu";
+import { richMenuApi, richMenuPageApi, richMenuAreaApi } from "@/api/richMenu";
 import { lineOAApi } from "@/api/lineOA";
 import { useToast } from "@/components/ui/toast";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 import { oaLabel } from "@/lib/lineOAUtils";
+import { TemplateGalleryStep } from "@/components/rich_menu/TemplateGalleryStep";
+import { pctToLineArea } from "@/data/richMenuPresets";
+import type { RichMenuPreset } from "@/data/richMenuPresets";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -236,18 +239,23 @@ export function RichMenusPage() {
   const [menus, setMenus] = useState<RichMenu[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"timeline" | "grid">("timeline");
+  const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; isPublished: boolean } | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
+
+  // ---- Create modal state ----
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [modalStep, setModalStep] = useState<1 | 2>(1);
+  const [selectedPreset, setSelectedPreset] = useState<RichMenuPreset | null>(null);
+  const [presetChosen, setPresetChosen] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newDescription, setNewDescription] = useState("");
+  const [newChatBarText, setNewChatBarText] = useState("");
   const [newSizeType, setNewSizeType] = useState<"large" | "compact">("large");
   const [newMenuType, setNewMenuType] = useState<"static" | "dynamic">("static");
   const [newLineOAId, setNewLineOAId] = useState("");
   const [creating, setCreating] = useState(false);
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
-  const [publishingId, setPublishingId] = useState<string | null>(null);
-  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; isPublished: boolean } | null>(null);
 
   useEffect(() => {
     lineOAApi.list({ workspace_id: WORKSPACE_ID })
@@ -273,24 +281,76 @@ export function RichMenusPage() {
       .finally(() => setLoading(false));
   }, [selectedOA]);
 
-  const handleCreate = async () => {
+  // Pre-fill settings form when user picks a preset
+  useEffect(() => {
+    if (selectedPreset) {
+      setNewSizeType(selectedPreset.sizeType);
+      setNewName((prev) => prev || selectedPreset.name);
+      setNewChatBarText((prev) => prev || selectedPreset.chatBarText);
+    }
+  }, [selectedPreset]);
+
+  function resetAndClose() {
+    setShowNewDialog(false);
+    setModalStep(1);
+    setSelectedPreset(null);
+    setPresetChosen(false);
+    setNewName("");
+    setNewChatBarText("");
+    setNewSizeType("large");
+    setNewMenuType("static");
+    setNewLineOAId("");
+  }
+
+  function handleGallerySelect(preset: RichMenuPreset | null) {
+    setSelectedPreset(preset);
+    setPresetChosen(true);
+  }
+
+  const handleCreateWithTemplate = async () => {
     if (!newName.trim() || !newLineOAId) return;
     setCreating(true);
     try {
+      // 1. Create the rich menu
       const rm = await richMenuApi.create({
         name: newName.trim(),
-        description: newDescription.trim(),
+        chat_bar_text: newChatBarText.trim() || newName.trim(),
         line_oa_id: newLineOAId,
-        workspace_id: lineOAs.find((o) => o.id === newLineOAId)?.workspace_id ?? "",
+        workspace_id: lineOAs.find((o) => o.id === newLineOAId)?.workspace_id ?? WORKSPACE_ID,
         size_type: newSizeType,
         menu_type: newMenuType,
       });
-      setShowNewDialog(false);
-      setNewName("");
-      setNewDescription("");
-      setNewSizeType("large");
-      setNewMenuType("static");
-      setNewLineOAId("");
+
+      // 2. Create the first page
+      const page = await richMenuPageApi.create(rm.id, {
+        page_number: 1,
+        tab_label: "Page 1",
+      });
+
+      // 3. If preset has areas, apply them atomically
+      const presetAreas = selectedPreset?.pages[0]?.areas ?? [];
+      if (presetAreas.length > 0) {
+        const areaPayload = presetAreas.map((a, i) => {
+          const coords = pctToLineArea(a, newSizeType);
+          return {
+            x: coords.x,
+            y: coords.y,
+            width: coords.width,
+            height: coords.height,
+            action_type: "uri",
+            action_label: a.label,
+            action_uri: "",
+            action_text: "",
+            action_data: "",
+            action_display_text: "",
+            target_page_number: 0,
+            area_order: i + 1,
+          };
+        });
+        await richMenuAreaApi.replaceAll(rm.id, page.id, areaPayload);
+      }
+
+      resetAndClose();
       window.location.href = `/rich-menus/${rm.id}`;
     } catch (e: unknown) {
       toast.error("Failed to create menu", e instanceof Error ? e.message : "An unexpected error occurred.");
@@ -351,7 +411,6 @@ export function RichMenusPage() {
     setSettingDefaultId(menu.id);
     try {
       const updated = await richMenuApi.setDefault(menu.id);
-      // Mark all others as non-default, update the one that changed
       setMenus((prev) => prev.map((m) => (m.id === menu.id ? updated : { ...m, is_default: false })));
       toast.success("Set as default", `"${menu.name}" is now the default rich menu.`);
     } catch (e: unknown) {
@@ -361,8 +420,6 @@ export function RichMenusPage() {
     }
   };
 
-  // Only the first is_default menu is treated as the active default; extras are shown as regular
-  // menus (data inconsistency guard — backend should only allow one default at a time).
   const defaultMenu = menus.find((m) => m.is_default);
   const nonDefaultMenus = menus.filter((m) => m !== defaultMenu);
   const scheduledMenus = nonDefaultMenus.filter((m) => m.starts_at || m.ends_at);
@@ -447,10 +504,10 @@ export function RichMenusPage() {
               <TimelineRow
                 key={defaultMenu.id}
                 menu={defaultMenu}
-                onDuplicate={handleDuplicate}
+                onDuplicate={(m) => void handleDuplicate(m)}
                 onDelete={handleDelete}
-                onPublish={handlePublish}
-                onSetDefault={handleSetDefault}
+                onPublish={(m) => void handlePublish(m)}
+                onSetDefault={(m) => void handleSetDefault(m)}
                 duplicating={duplicatingId === defaultMenu.id}
                 publishing={publishingId === defaultMenu.id}
                 settingDefault={settingDefaultId === defaultMenu.id}
@@ -461,10 +518,10 @@ export function RichMenusPage() {
               <TimelineRow
                 key={m.id}
                 menu={m}
-                onDuplicate={handleDuplicate}
+                onDuplicate={(menu) => void handleDuplicate(menu)}
                 onDelete={handleDelete}
-                onPublish={handlePublish}
-                onSetDefault={handleSetDefault}
+                onPublish={(menu) => void handlePublish(menu)}
+                onSetDefault={(menu) => void handleSetDefault(menu)}
                 duplicating={duplicatingId === m.id}
                 publishing={publishingId === m.id}
                 settingDefault={settingDefaultId === m.id}
@@ -479,10 +536,10 @@ export function RichMenusPage() {
               <TimelineRow
                 key={m.id}
                 menu={m}
-                onDuplicate={handleDuplicate}
+                onDuplicate={(menu) => void handleDuplicate(menu)}
                 onDelete={handleDelete}
-                onPublish={handlePublish}
-                onSetDefault={handleSetDefault}
+                onPublish={(menu) => void handlePublish(menu)}
+                onSetDefault={(menu) => void handleSetDefault(menu)}
                 duplicating={duplicatingId === m.id}
                 publishing={publishingId === m.id}
                 settingDefault={settingDefaultId === m.id}
@@ -495,10 +552,10 @@ export function RichMenusPage() {
               <MenuCard
                 key={m.id}
                 menu={m}
-                onDuplicate={handleDuplicate}
+                onDuplicate={(menu) => void handleDuplicate(menu)}
                 onDelete={handleDelete}
-                onPublish={handlePublish}
-                onSetDefault={handleSetDefault}
+                onPublish={(menu) => void handlePublish(menu)}
+                onSetDefault={(menu) => void handleSetDefault(menu)}
                 duplicating={duplicatingId === m.id}
                 publishing={publishingId === m.id}
                 settingDefault={settingDefaultId === m.id}
@@ -523,7 +580,7 @@ export function RichMenusPage() {
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+              onClick={() => { void handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
             >
               ลบ
             </AlertDialogAction>
@@ -531,115 +588,176 @@ export function RichMenusPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* New Menu Dialog */}
-      <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
-        <DialogContent className="w-full sm:max-w-2xl p-4 sm:p-8">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-2xl">Create New Rich Menu</DialogTitle>
-            <p className="text-sm text-muted-foreground mt-2">Design interactive menu experiences for your LINE OA</p>
-          </DialogHeader>
+      {/* ── Create Menu Dialog — 2 steps ──────────────────────────────────── */}
+      <Dialog open={showNewDialog} onOpenChange={(open) => { if (!open) resetAndClose(); }}>
+        {/* Step 1: Template Gallery */}
+        {modalStep === 1 && (
+          <DialogContent className="w-full sm:max-w-4xl p-0 gap-0 overflow-hidden">
+            <DialogHeader className="px-6 pt-10 pb-2">
+              <DialogTitle className="text-xl">Choose a Template</DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Pick a layout to start with — you can customise everything in the builder.
+                Click <strong>?</strong> on any card for a LINE OA use-case guide.
+              </p>
+            </DialogHeader>
 
-          <div className="space-y-6 py-2">
-            {/* LINE OA Selector */}
-            <div className="space-y-2">
-              <Label htmlFor="dialog-oa-select" className="font-semibold">Select LINE OA *</Label>
-              <Select value={newLineOAId} onValueChange={setNewLineOAId}>
-                <SelectTrigger id="dialog-oa-select" className="w-full">
-                  <SelectValue>
-                    {newLineOAId
-                      ? (lineOAs.find((o) => o.id === newLineOAId) ? oaLabel(lineOAs.find((o) => o.id === newLineOAId)!) : newLineOAId.slice(0, 12))
-                      : <span className="text-muted-foreground">Choose a LINE OA...</span>}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {lineOAs.map((oa) => (
-                    <SelectItem key={oa.id} value={oa.id}>
-                      {oaLabel(oa)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Menu Name */}
-            <div className="space-y-2">
-              <Label htmlFor="dialog-name" className="font-semibold">Menu Name *</Label>
-              <Input
-                id="dialog-name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Main Menu, Support Menu"
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                autoFocus
-                className="text-base"
+            <div className="overflow-y-auto max-h-[55vh] px-6 py-4">
+              <TemplateGalleryStep
+                selectedId={selectedPreset?.id ?? null}
+                onSelect={handleGallerySelect}
               />
             </div>
 
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="dialog-desc" className="text-sm">Description</Label>
-              <Input
-                id="dialog-desc"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="Optional description for internal reference"
-                className="text-sm text-muted-foreground"
-              />
-            </div>
+            <DialogFooter className="px-6 py-4 border-t gap-2">
+              <Button variant="outline" onClick={resetAndClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => setModalStep(2)}
+                disabled={!presetChosen}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Next: Settings →
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
 
-            {/* Size Type & Menu Type */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Step 2: Menu Settings */}
+        {modalStep === 2 && (
+          <DialogContent className="w-full sm:max-w-2xl p-4 sm:p-8">
+            <DialogHeader className="pb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-muted-foreground hover:text-foreground -ml-2"
+                  onClick={() => setModalStep(1)}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Back
+                </Button>
+              </div>
+              <DialogTitle className="text-2xl">Menu Settings</DialogTitle>
+              {selectedPreset && selectedPreset.pages[0]?.areas.length > 0 ? (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Template:{" "}
+                  <strong>{selectedPreset.name}</strong>
+                  {" "}
+                  <Badge variant="outline" className="text-xs ml-1">
+                    {selectedPreset.sizeType}
+                  </Badge>
+                  {" "}
+                  <span className="text-muted-foreground">
+                    · {selectedPreset.pages[0].areas.length} areas pre-configured
+                  </span>
+                </p>
+              ) : selectedPreset ? (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Blank canvas — draw your own areas in the builder.
+                </p>
+              ) : null}
+            </DialogHeader>
+
+            <div className="space-y-6 py-2">
+              {/* LINE OA Selector */}
               <div className="space-y-2">
-                <Label htmlFor="dialog-size" className="text-sm font-semibold">Size</Label>
-                <Select value={newSizeType} onValueChange={(v) => setNewSizeType(v as "large" | "compact")}>
-                  <SelectTrigger id="dialog-size">
-                    <SelectValue />
+                <Label htmlFor="dialog-oa-select" className="font-semibold">Select LINE OA *</Label>
+                <Select value={newLineOAId} onValueChange={setNewLineOAId}>
+                  <SelectTrigger id="dialog-oa-select" className="w-full">
+                    <SelectValue>
+                      {newLineOAId
+                        ? (lineOAs.find((o) => o.id === newLineOAId) ? oaLabel(lineOAs.find((o) => o.id === newLineOAId)!) : newLineOAId.slice(0, 12))
+                        : <span className="text-muted-foreground">Choose a LINE OA...</span>}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="large">Large</SelectItem>
-                    <SelectItem value="compact">Compact</SelectItem>
+                    {lineOAs.map((oa) => (
+                      <SelectItem key={oa.id} value={oa.id}>
+                        {oaLabel(oa)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* Menu Name */}
               <div className="space-y-2">
-                <Label htmlFor="dialog-type" className="text-sm font-semibold">Type</Label>
-                <Select value={newMenuType} onValueChange={(v) => setNewMenuType(v as "static" | "dynamic")}>
-                  <SelectTrigger id="dialog-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="static">Static</SelectItem>
-                    <SelectItem value="dynamic">Dynamic</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="dialog-name" className="font-semibold">Menu Name *</Label>
+                <Input
+                  id="dialog-name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="e.g. Main Menu, Support Menu"
+                  onKeyDown={(e) => { if (e.key === "Enter") void handleCreateWithTemplate(); }}
+                  autoFocus
+                  className="text-base"
+                />
+              </div>
+
+              {/* Chat Bar Text */}
+              <div className="space-y-2">
+                <Label htmlFor="dialog-chatbar" className="text-sm font-semibold">
+                  Chat Bar Text{" "}
+                  <span className="text-muted-foreground font-normal">(shown in the LINE chat bar)</span>
+                </Label>
+                <Input
+                  id="dialog-chatbar"
+                  value={newChatBarText}
+                  onChange={(e) => setNewChatBarText(e.target.value)}
+                  placeholder={newName || "e.g. Tap to open menu"}
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Size Type & Menu Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="dialog-size" className="text-sm font-semibold">Size</Label>
+                  <Select value={newSizeType} onValueChange={(v) => setNewSizeType(v as "large" | "compact")}>
+                    <SelectTrigger id="dialog-size">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="large">Large (2500×1686)</SelectItem>
+                      <SelectItem value="compact">Compact (2500×843)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dialog-type" className="text-sm font-semibold">Type</Label>
+                  <Select value={newMenuType} onValueChange={(v) => setNewMenuType(v as "static" | "dynamic")}>
+                    <SelectTrigger id="dialog-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="static">Static</SelectItem>
+                      <SelectItem value="dynamic">Dynamic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
-          </div>
 
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowNewDialog(false);
-                setNewName("");
-                setNewDescription("");
-                setNewSizeType("large");
-                setNewMenuType("static");
-                setNewLineOAId("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreate}
-              disabled={!newName.trim() || !newLineOAId || creating}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {creating ? "Creating..." : "Create Menu"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={resetAndClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleCreateWithTemplate()}
+                disabled={!newName.trim() || !newLineOAId || creating}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {creating ? (
+                  <><RefreshCw className="h-4 w-4 mr-1 animate-spin" /> Creating...</>
+                ) : (
+                  "Create Menu"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
       </Dialog>
     </AppLayout>
   );
