@@ -9,6 +9,17 @@ import { lineOAApi } from "@/api/lineOA";
 import type { AutoReply, LineOA, TriggerType } from "@/types";
 import { AutoReplyDialog } from "./AutoReplyDialog";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/components/ui/toast";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -29,12 +40,14 @@ const triggerVariant: Record<TriggerType, "default" | "secondary" | "success" | 
 };
 
 export function AutoReplyPage() {
+  const toast = useToast();
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [selectedOA, setSelectedOA] = useState("");
   const [autoReplies, setAutoReplies] = useState<AutoReply[]>([]);
   const [loading, setLoading] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -75,20 +88,19 @@ export function AutoReplyPage() {
       const updated = await autoReplyApi.update(ar.id, { is_enabled: !ar.is_enabled });
       setAutoReplies((prev) => prev.map((r) => (r.id === ar.id ? updated : r)));
     } catch {
-      alert("Failed to toggle auto reply");
+      toast.error("Failed to toggle auto reply");
     } finally {
       setTogglingId(null);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this auto reply?")) return;
+  const handleConfirmedDelete = async (id: string) => {
     setDeletingId(id);
     try {
       await autoReplyApi.delete(id);
       setAutoReplies((prev) => prev.filter((r) => r.id !== id));
     } catch {
-      alert("Failed to delete auto reply");
+      toast.error("Failed to delete auto reply");
     } finally {
       setDeletingId(null);
     }
@@ -301,7 +313,7 @@ export function AutoReplyPage() {
                       size="icon"
                       className="text-destructive hover:text-destructive h-8 w-8"
                       disabled={deletingId === ar.id}
-                      onClick={() => handleDelete(ar.id)}
+                      onClick={() => setDeleteTarget({ id: ar.id, name: ar.name })}
                     >
                       <Trash2 size={14} />
                     </Button>
@@ -321,6 +333,27 @@ export function AutoReplyPage() {
         onClose={() => setDialogOpen(false)}
         onSaved={handleSaved}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ "{deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

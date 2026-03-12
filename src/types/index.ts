@@ -291,6 +291,7 @@ export interface ChatSession {
   follower_id: string;
   follower_display_name: string;
   follower_picture_url: string;
+  group_picture_url?: string;
   mode: ChatMode;
   assigned_admin_id: string;
   escalation_reason?: string;
@@ -311,6 +312,8 @@ export interface ChatMessage {
   line_message_id: string;
   metadata: string;
   is_escalation_trigger: boolean;
+  sender_user_id?: string;
+  sender_display_name?: string;
   created_at: string;
 }
 
@@ -393,7 +396,7 @@ export interface RichMenu {
   chat_bar_text: string;
   selected: boolean;
   size: RichMenuSize;
-  areas: any[];
+  areas: unknown[];
   image_url: string;
   image_media_id: string;
   is_default: boolean;

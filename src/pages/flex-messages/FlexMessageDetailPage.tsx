@@ -8,6 +8,10 @@ import {
   Trash2, CheckCircle, XCircle, Eye,
   MousePointerClick, Code,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { flexMessageApi, type FlexMessage, type FlexMessageVariable } from "@/api/flexMessage";
 import { VariablesPanel } from "./builder/VariablesPanel";
@@ -102,6 +106,7 @@ export function FlexMessageDetailPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Editor mode
   const [mode, setMode] = useState<"visual" | "code">("visual");
@@ -122,7 +127,7 @@ export function FlexMessageDetailPage() {
         setLoading(false);
       }
     };
-    load();
+    void load();
   }, [id]);
 
   const handleFormatJson = () => {
@@ -168,8 +173,12 @@ export function FlexMessageDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`Delete "${fm?.name}"? This cannot be undone.`)) return;
+  const handleDelete = () => {
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmedDelete = async () => {
+    setShowDeleteDialog(false);
     setDeleting(true);
     try {
       await flexMessageApi.delete(id);
@@ -349,7 +358,7 @@ export function FlexMessageDetailPage() {
 
           <div className="flex items-center gap-2">
             {mode === "code" && <CopyButton value={content} />}
-            <Button onClick={handleSave} disabled={saving || deleting}>
+            <Button onClick={() => { void handleSave(); }} disabled={saving || deleting}>
               {saving && <RefreshCw size={14} className="mr-2 animate-spin" />}
               {saving ? "Saving..." : "Save Changes"}
             </Button>
@@ -433,6 +442,24 @@ export function FlexMessageDetailPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={(open) => !open && setShowDeleteDialog(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{fm?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleConfirmedDelete(); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

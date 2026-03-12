@@ -2,6 +2,9 @@
 // Set VITE_API_URL only if you need to point to a remote backend directly.
 const BASE_URL = import.meta.env.VITE_API_URL || "";
 
+/** Public paths that should not trigger a redirect on 401. */
+const PUBLIC_PATHS = ["/v1/auth/login", "/auth/accept-invite"];
+
 class ApiClient {
   private baseURL: string;
 
@@ -31,7 +34,6 @@ class ApiClient {
       "Content-Type": "application/json",
     };
 
-    // TODO: inject auth token from localStorage / context
     const token = localStorage.getItem("bola_token");
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -42,6 +44,14 @@ class ApiClient {
       headers,
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    // 401 on any protected endpoint → clear session and redirect to login
+    if (res.status === 401 && !PUBLIC_PATHS.some((p) => path.includes(p))) {
+      localStorage.removeItem("bola_token");
+      localStorage.removeItem("bola_workspace");
+      window.location.href = "/login";
+      return undefined as T;
+    }
 
     if (!res.ok) {
       const errData = await res.json().catch(() => ({ error: res.statusText }));

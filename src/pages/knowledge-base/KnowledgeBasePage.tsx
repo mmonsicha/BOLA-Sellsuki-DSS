@@ -6,6 +6,24 @@ import { Badge } from "@/components/ui/badge";
 import { knowledgeBaseApi } from "@/api/aiChatbot";
 import type { KnowledgeBase, KBSourceType } from "@/types";
 import { Plus, Pencil, Trash2, RefreshCw, Search, X, ToggleLeft, ToggleRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -47,6 +65,7 @@ export function KnowledgeBasePage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -111,8 +130,7 @@ export function KnowledgeBasePage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this knowledge base entry?")) return;
+  const handleConfirmedDelete = async (id: string) => {
     setDeletingId(id);
     try {
       await knowledgeBaseApi.delete(id);
@@ -336,7 +354,7 @@ export function KnowledgeBasePage() {
                             <Pencil size={13} />
                           </button>
                           <button
-                            onClick={() => handleDelete(entry.id)}
+                            onClick={() => setDeleteTarget({ id: entry.id, name: entry.title })}
                             disabled={deletingId === entry.id}
                             className="p-1.5 rounded hover:bg-red-50 text-muted-foreground hover:text-red-600"
                           >
@@ -352,14 +370,21 @@ export function KnowledgeBasePage() {
           </CardContent>
         </Card>
 
-        {/* Create / Edit Dialog */}
-        {dialogOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-background rounded-lg shadow-lg w-full max-w-lg p-6 space-y-4">
-              <h2 className="text-lg font-semibold">
+        {/* Create / Edit Dialog — uses shared Dialog component */}
+        <Dialog open={dialogOpen} onOpenChange={(open) => !open && setDialogOpen(false)}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
                 {editingEntry ? "Edit Knowledge Base Entry" : "Add Knowledge Base Entry"}
-              </h2>
+              </DialogTitle>
+              <DialogDescription>
+                {editingEntry
+                  ? "Update the title, content, tags, and status of this entry."
+                  : "Add a new FAQ or knowledge entry for the AI chatbot to reference."}
+              </DialogDescription>
+            </DialogHeader>
 
+            <div className="px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Title</label>
                 <input
@@ -410,17 +435,38 @@ export function KnowledgeBasePage() {
               </div>
 
               {error && <div className="p-2 bg-red-50 rounded text-sm text-red-700">{error}</div>}
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleSave} disabled={saving || !form.title || !form.content}>
-                  {saving ? "Saving..." : "Save"}
-                </Button>
-              </div>
             </div>
-          </div>
-        )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleSave} disabled={saving || !form.title || !form.content}>
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ "{deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

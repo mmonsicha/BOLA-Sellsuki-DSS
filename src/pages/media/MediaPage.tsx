@@ -12,6 +12,11 @@ import { mediaApi } from "@/api/media";
 import type { Media } from "@/types";
 import { UploadMediaDialog } from "./UploadMediaDialog";
 import { EditMediaDialog } from "./EditMediaDialog";
+import { useToast } from "@/components/ui/toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { toDisplayUrl } from "@/lib/mediaUtils";
 
@@ -111,7 +116,7 @@ function CopyButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
   const copy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(url).then(() => {
+    void navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
@@ -233,6 +238,7 @@ function MediaCard({ m, onDelete, onEdit, onPreview, deletingId }: MediaCardProp
 
 // ── MediaPage ─────────────────────────────────────────────────────────────────
 export function MediaPage() {
+  const toast = useToast();
   const [media, setMedia] = useState<Media[]>([]);
   const [deletedMedia, setDeletedMedia] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
@@ -245,6 +251,7 @@ export function MediaPage() {
   const [editMedia, setEditMedia] = useState<Media | null>(null);
   const [previewMedia, setPreviewMedia] = useState<Media | null>(null);
   const [activeTab, setActiveTab] = useState("library");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const loadLibrary = () => {
     setLoading(true);
@@ -274,15 +281,21 @@ export function MediaPage() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Move this file to trash? You can restore it within 7 days.")) return;
+  const handleDelete = (id: string) => {
+    setDeleteTarget(id);
+  };
+
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
     setDeletingId(id);
     try {
       await mediaApi.delete(id);
       setMedia(prev => prev.filter(m => m.id !== id));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to delete";
-      alert(msg.includes("in use") ? "Cannot delete: this asset is currently used in a message." : msg);
+      toast.error(msg.includes("in use") ? "Cannot delete: this asset is currently used in a message." : msg);
     } finally {
       setDeletingId(null);
     }
@@ -295,7 +308,7 @@ export function MediaPage() {
       setDeletedMedia(prev => prev.filter(m => m.id !== id));
       setMedia(prev => [res, ...prev]);
     } catch {
-      alert("Failed to restore media");
+      toast.error("Failed to restore media");
     } finally {
       setRestoringId(null);
     }
@@ -448,7 +461,7 @@ export function MediaPage() {
                           size="sm"
                           className="gap-1.5 flex-shrink-0 text-xs h-7"
                           disabled={restoringId === m.id}
-                          onClick={() => handleRestore(m.id)}
+                          onClick={() => { void handleRestore(m.id); }}
                         >
                           <RotateCcw size={11} />
                           {restoringId === m.id ? "Restoring..." : "Restore"}
@@ -479,6 +492,24 @@ export function MediaPage() {
         onClose={() => setEditMedia(null)}
         onUpdated={(updated) => setMedia(prev => prev.map(m => m.id === updated.id ? updated : m))}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move to trash?</AlertDialogTitle>
+            <AlertDialogDescription>You can restore it within 7 days.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleConfirmedDelete(); }}
+            >
+              Move to Trash
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

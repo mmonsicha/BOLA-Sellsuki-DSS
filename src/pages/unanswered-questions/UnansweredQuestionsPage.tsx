@@ -6,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { unansweredQuestionApi } from "@/api/aiChatbot";
 import type { UnansweredQuestion, QuestionStatus } from "@/types";
 import { RefreshCw, CheckCircle, XCircle } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -35,6 +39,9 @@ export function UnansweredQuestionsPage() {
   const [resolveForm, setResolveForm] = useState({ title: "", answer: "" });
   const [resolving, setResolving] = useState(false);
 
+  // Dismiss confirm dialog
+  const [dismissTarget, setDismissTarget] = useState<string | null>(null);
+
   const load = () => {
     setLoading(true);
     setError(null);
@@ -45,10 +52,17 @@ export function UnansweredQuestionsPage() {
       .finally(() => setLoading(false));
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [statusFilter]);
 
-  const handleDismiss = async (id: string) => {
-    if (!confirm("Dismiss this question?")) return;
+  const handleDismiss = (id: string) => {
+    setDismissTarget(id);
+  };
+
+  const handleConfirmedDismiss = async () => {
+    if (!dismissTarget) return;
+    const id = dismissTarget;
+    setDismissTarget(null);
     try {
       await unansweredQuestionApi.dismiss(id);
       load();
@@ -163,6 +177,27 @@ export function UnansweredQuestionsPage() {
           </CardContent>
         </Card>
 
+        {/* Dismiss Confirm Dialog */}
+        <AlertDialog open={!!dismissTarget} onOpenChange={(open) => !open && setDismissTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Dismiss this question?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The question will be marked as dismissed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => { void handleConfirmedDismiss(); }}
+              >
+                Dismiss
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Resolve Dialog */}
         {resolveDialogId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -197,7 +232,7 @@ export function UnansweredQuestionsPage() {
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setResolveDialogId(null)}>Cancel</Button>
-                <Button onClick={handleResolve} disabled={resolving || !resolveForm.title || !resolveForm.answer}>
+                <Button onClick={() => { void handleResolve(); }} disabled={resolving || !resolveForm.title || !resolveForm.answer}>
                   {resolving ? "Saving..." : "Save Answer"}
                 </Button>
               </div>

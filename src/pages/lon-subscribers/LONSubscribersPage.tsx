@@ -12,6 +12,11 @@ import type { LONSubscriber, LONSubscriberStats, LineOA } from "@/types";
 import { lonApi, type BulkSubscribeByPhoneResult, type SendConsentRequestResult } from "@/api/lon";
 import { lineOAApi } from "@/api/lineOA";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
+import { useToast } from "@/components/ui/toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
@@ -38,6 +43,7 @@ interface BulkImportModalProps {
 }
 
 function BulkImportModal({ lineOAId, onClose, onDone }: BulkImportModalProps) {
+  const toast = useToast();
   const [phones, setPhones] = useState<string[]>([]);
   const [rawText, setRawText] = useState("");
   const [importing, setImporting] = useState(false);
@@ -79,7 +85,7 @@ function BulkImportModal({ lineOAId, onClose, onDone }: BulkImportModalProps) {
       setResult(res);
       onDone(res);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Import failed");
+      toast.error(err instanceof Error ? err.message : "Import failed");
     } finally {
       setImporting(false);
     }
@@ -204,7 +210,7 @@ function BulkImportModal({ lineOAId, onClose, onDone }: BulkImportModalProps) {
             <Button
               size="sm"
               disabled={phones.length === 0 || phones.length > 100 || importing}
-              onClick={handleImport}
+              onClick={() => { void handleImport(); }}
               className="gap-1.5"
             >
               {importing ? <RefreshCw size={13} className="animate-spin" /> : <Upload size={13} />}
@@ -230,7 +236,7 @@ function QRModal({ lineOAId, lineOAName, onClose }: QRModalProps) {
   const [copied, setCopied] = useState(false);
 
   function copyUrl() {
-    navigator.clipboard.writeText(subscribeUrl).then(() => {
+    void navigator.clipboard.writeText(subscribeUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -414,7 +420,7 @@ function SendConsentModal({ lineOA, onClose }: SendConsentModalProps) {
             <Button
               size="sm"
               disabled={sending || !hasLiff}
-              onClick={handleSend}
+              onClick={() => { void handleSend(); }}
               className="gap-1.5"
             >
               {sending ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
@@ -461,7 +467,7 @@ function APIInfoPanel({ lineOAId }: { lineOAId: string }) {
   ];
 
   function copyText(key: string, text: string) {
-    navigator.clipboard.writeText(text).then(() => {
+    void navigator.clipboard.writeText(text).then(() => {
       setCopied(key);
       setTimeout(() => setCopied(null), 1500);
     });
@@ -527,6 +533,7 @@ function APIInfoPanel({ lineOAId }: { lineOAId: string }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function LONSubscribersPage() {
+  const toast = useToast();
   const [subscribers, setSubscribers] = useState<LONSubscriber[]>([]);
   const [stats, setStats] = useState<LONSubscriberStats | null>(null);
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
@@ -551,6 +558,9 @@ export function LONSubscribersPage() {
 
   // Send consent request modal
   const [showConsentModal, setShowConsentModal] = useState(false);
+
+  // Revoke confirm dialog
+  const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
 
   const selectedOA = lineOAs.find((oa) => oa.id === selectedLineOAId);
 
@@ -590,7 +600,13 @@ export function LONSubscribersPage() {
   }, [selectedLineOAId, statusFilter]);
 
   function handleRevoke(id: string) {
-    if (!confirm("Revoke this subscriber? They will no longer receive LON notifications.")) return;
+    setRevokeTarget(id);
+  }
+
+  function handleConfirmedRevoke() {
+    if (!revokeTarget) return;
+    const id = revokeTarget;
+    setRevokeTarget(null);
     lonApi
       .revokeSubscriber(id)
       .then(() => {
@@ -601,7 +617,7 @@ export function LONSubscribersPage() {
           setStats({ ...stats, active: stats.active - 1, revoked: stats.revoked + 1 });
         }
       })
-      .catch((err) => alert(err instanceof Error ? err.message : "Failed to revoke"));
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Failed to revoke"));
   }
 
   function handleSubscribeByPhone(e: React.FormEvent) {
@@ -892,6 +908,26 @@ export function LONSubscribersPage() {
           onClose={() => setShowConsentModal(false)}
         />
       )}
+
+      <AlertDialog open={!!revokeTarget} onOpenChange={(open) => !open && setRevokeTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke subscriber?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They will no longer receive LON notifications.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirmedRevoke}
+            >
+              Revoke
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

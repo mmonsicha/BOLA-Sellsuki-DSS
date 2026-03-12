@@ -10,6 +10,12 @@ import { RefreshCw, Plus, Trash2, Eye, Edit3, Upload, Check, Star } from "lucide
 import type { RichMenu, RichMenuPage, RichMenuPageArea } from "@/types";
 import { richMenuApi, richMenuPageApi, richMenuAreaApi } from "@/api/richMenu";
 import { useToast } from "@/components/ui/toast";
+import { BlockLayoutPicker } from "@/components/rich_menu/BlockLayoutPicker";
+import type { ApplyAreaDef } from "@/components/rich_menu/BlockLayoutPicker";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // ---- Constants ----
 const LINE_LARGE_WIDTH = 2500;
@@ -565,6 +571,8 @@ export function RichMenuBuilderPage() {
   const [showSetDefaultPrompt, setShowSetDefaultPrompt] = useState(false);
   const [isSettingDefault, setIsSettingDefault] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isApplyingLayout, setIsApplyingLayout] = useState(false);
+  const [deletePageTarget, setDeletePageTarget] = useState<string | null>(null);
   const toast = useToast();
   // drawStart/drawCurrent stored in CSS PIXELS relative to canvas content area
   // (not LINE coords) so the preview rect tracks the cursor with zero error.
@@ -620,6 +628,34 @@ export function RichMenuBuilderPage() {
   }, [selectedAreaId]);
 
   const currentPage = pages[currentPageIndex] ?? null;
+
+  const handleApplyBlockLayout = async (areaDefs: ApplyAreaDef[]) => {
+    if (!menu || !currentPage) return;
+    setIsApplyingLayout(true);
+    try {
+      const areaPayload = areaDefs.map((a, i) => ({
+        x: a.x,
+        y: a.y,
+        width: a.width,
+        height: a.height,
+        action_type: "uri",
+        action_label: a.label,
+        action_uri: "",
+        action_text: "",
+        action_data: "",
+        action_display_text: "",
+        target_page_number: 0,
+        area_order: i + 1,
+      }));
+      const savedAreas = await richMenuAreaApi.replaceAll(menu.id, currentPage.id, areaPayload);
+      dispatch({ type: "SYNC_PAGE_AREAS", pageId: currentPage.id, savedAreas });
+      toast.success("Layout applied", "Areas created — click one to edit its action.");
+    } catch (e: unknown) {
+      toast.error("Failed to apply layout", e instanceof Error ? e.message : "An unexpected error occurred.");
+    } finally {
+      setIsApplyingLayout(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!menu) return;
@@ -734,9 +770,15 @@ export function RichMenuBuilderPage() {
     }
   };
 
-  const handleDeletePage = async (pageId: string) => {
+  const handleDeletePage = (pageId: string) => {
     if (!menu || pages.length <= 1) return;
-    if (!confirm("Delete this page and all its areas?")) return;
+    setDeletePageTarget(pageId);
+  };
+
+  const handleConfirmedDeletePage = async () => {
+    if (!menu || !deletePageTarget) return;
+    const pageId = deletePageTarget;
+    setDeletePageTarget(null);
     try {
       await richMenuPageApi.delete(menu.id, pageId);
       dispatch({ type: "DELETE_PAGE", pageId });
@@ -921,17 +963,17 @@ export function RichMenuBuilderPage() {
               <Edit3 className="h-4 w-4 mr-1" />
               {drawMode ? "Drawing..." : "Draw Area"}
             </Button>
-            <Button size="sm" variant="outline" onClick={handleSave} disabled={saving || !state.dirty}>
+            <Button size="sm" variant="outline" onClick={() => void handleSave()} disabled={saving || !state.dirty}>
               {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Save"}
             </Button>
-            <Button size="sm" onClick={handlePublish} disabled={isPublishing}>
+            <Button size="sm" onClick={() => void handlePublish()} disabled={isPublishing}>
               {isPublishing
                 ? <><RefreshCw className="h-4 w-4 mr-1 animate-spin" /> Publishing...</>
                 : <><Upload className="h-4 w-4 mr-1" /> Publish to LINE</>
               }
             </Button>
             {menu.is_default ? null : menu.published_at ? (
-              <Button size="sm" variant="outline" onClick={handleSetDefault} disabled={isSettingDefault}
+              <Button size="sm" variant="outline" onClick={() => void handleSetDefault()} disabled={isSettingDefault}
                 className="border-amber-400 text-amber-700 hover:bg-amber-50"
               >
                 {isSettingDefault
@@ -956,7 +998,7 @@ export function RichMenuBuilderPage() {
               <Button size="sm" variant="outline" onClick={() => setShowSetDefaultPrompt(false)} className="h-7 text-xs">
                 Later
               </Button>
-              <Button size="sm" onClick={handleSetDefault} disabled={isSettingDefault} className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white border-0">
+              <Button size="sm" onClick={() => void handleSetDefault()} disabled={isSettingDefault} className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white border-0">
                 {isSettingDefault
                   ? <RefreshCw className="h-3 w-3 animate-spin" />
                   : <><Star className="h-3 w-3 mr-1" /> Set as Default</>
@@ -1032,7 +1074,7 @@ export function RichMenuBuilderPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Pages</h3>
-                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={handleAddPage}>
+                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => void handleAddPage()}>
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
@@ -1073,7 +1115,7 @@ export function RichMenuBuilderPage() {
                       type="file"
                       accept="image/*"
                       disabled={isUploadingImage}
-                      onChange={handleUploadImage}
+                      onChange={(e) => void handleUploadImage(e)}
                       className="hidden"
                     />
                     <Button
@@ -1187,6 +1229,16 @@ export function RichMenuBuilderPage() {
                   </span>
                 )}
               </div>
+
+              {/* Quick Start — shown when page exists but has no areas yet */}
+              {areas.length === 0 && !drawMode && !previewMode && !!currentPage && (
+                <BlockLayoutPicker
+                  sizeType={menu.size_type}
+                  onApply={(areas) => void handleApplyBlockLayout(areas)}
+                  onDrawCustom={() => dispatch({ type: "TOGGLE_DRAW_MODE" })}
+                  disabled={isApplyingLayout}
+                />
+              )}
             </div>
           </div>
 
@@ -1210,6 +1262,26 @@ export function RichMenuBuilderPage() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={!!deletePageTarget} onOpenChange={(open) => !open && setDeletePageTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this page?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete the page and all its areas. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void handleConfirmedDeletePage()}
+            >
+              Delete Page
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

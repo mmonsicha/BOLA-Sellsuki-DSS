@@ -7,11 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Trash2, RefreshCw, Edit3, MessageSquare } from "lucide-react";
 import type { QuickReply, QuickReplyItem, LineOA } from "@/types";
 import { quickReplyApi } from "@/api/richMenu";
 import { lineOAApi } from "@/api/lineOA";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
+import { useToast } from "@/components/ui/toast";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -177,6 +182,7 @@ interface EditDialogProps {
 }
 
 function EditDialog({ open, editing, lineOAID, onClose, onSaved }: EditDialogProps) {
+  const toast = useToast();
   const [name, setName] = useState("");
   const [items, setItems] = useState<QuickReplyItem[]>([emptyItem()]);
   const [saving, setSaving] = useState(false);
@@ -217,7 +223,7 @@ function EditDialog({ open, editing, lineOAID, onClose, onSaved }: EditDialogPro
       onSaved(result);
       onClose();
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Save failed");
+      toast.error(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(false);
     }
@@ -286,7 +292,7 @@ function EditDialog({ open, editing, lineOAID, onClose, onSaved }: EditDialogPro
 
         <DialogFooter className="mt-3">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!name.trim() || hasLabelErrors || saving || items.length === 0}>
+          <Button onClick={() => { void handleSave(); }} disabled={!name.trim() || hasLabelErrors || saving || items.length === 0}>
             {saving ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>
@@ -297,6 +303,7 @@ function EditDialog({ open, editing, lineOAID, onClose, onSaved }: EditDialogPro
 
 // ---- Main Page ----
 export function QuickRepliesPage() {
+  const toast = useToast();
   const [selectedLineOAId, setSelectedLineOAId] = useState<string>("");
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
@@ -305,6 +312,7 @@ export function QuickRepliesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingQR, setEditingQR] = useState<QuickReply | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   // Load LINE OAs on mount
   useEffect(() => {
@@ -334,14 +342,20 @@ export function QuickRepliesPage() {
     else setQuickReplies([]);
   }, [selectedLineOAId]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this quick reply set?")) return;
+  const handleDelete = (id: string) => {
+    setDeleteTarget(id);
+  };
+
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
     setDeletingId(id);
     try {
       await quickReplyApi.delete(id);
       setQuickReplies((prev) => prev.filter((qr) => qr.id !== id));
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
       setDeletingId(null);
     }
@@ -486,6 +500,24 @@ export function QuickRepliesPage() {
         onClose={() => { setDialogOpen(false); setEditingQR(null); }}
         onSaved={handleSaved}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete quick reply set?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleConfirmedDelete(); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

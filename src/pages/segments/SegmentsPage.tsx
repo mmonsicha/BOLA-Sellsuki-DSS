@@ -6,13 +6,26 @@ import { Plus, RefreshCw, Users, Zap, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { segmentApi } from "@/api/segment";
 import type { Segment } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/components/ui/toast";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 export function SegmentsPage() {
+  const toast = useToast();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -25,14 +38,13 @@ export function SegmentsPage() {
 
   useEffect(() => { load(); }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this segment?")) return;
+  const handleConfirmedDelete = async (id: string) => {
     setDeletingId(id);
     try {
       await segmentApi.delete(id);
       setSegments((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
-      alert("Failed to delete segment");
+      toast.error("Failed to delete segment", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {
       setDeletingId(null);
     }
@@ -130,7 +142,7 @@ export function SegmentsPage() {
                       size="icon"
                       className="text-destructive hover:text-destructive h-8 w-8"
                       disabled={deletingId === seg.id}
-                      onClick={(e) => { e.stopPropagation(); handleDelete(seg.id); }}
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: seg.id, name: seg.name }); }}
                     >
                       <Trash2 size={14} />
                     </Button>
@@ -141,6 +153,27 @@ export function SegmentsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ "{deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+            >
+              ลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

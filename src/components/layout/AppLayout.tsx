@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
+import { FeedbackWidget } from "@/components/common/FeedbackWidget";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -47,6 +48,9 @@ export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Floating feedback widget */}
+      <FeedbackWidget />
     </div>
   );
 }

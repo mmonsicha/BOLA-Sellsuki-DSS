@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
 import { ConnectLineOADialog } from "./ConnectLineOADialog";
+import { useToast } from "@/components/ui/toast";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -21,6 +22,7 @@ export function LineOAPage() {
   const [loading, setLoading] = useState(true);
   const [connectOpen, setConnectOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const load = () => {
     setLoading(true);
@@ -35,6 +37,13 @@ export function LineOAPage() {
 
   const handleCreated = (oa: LineOA) => {
     setLineOAs((prev) => [oa, ...prev]);
+    toast({
+      variant: "success",
+      title: "เชื่อมต่อ LINE OA สำเร็จ",
+      description:
+        "ตั้งค่า Rich Menu เพื่อให้ผู้ติดตามเห็นเมนูเมื่อเปิด Chat → ไปที่ Rich Menus",
+      duration: 0,
+    });
   };
 
   const copyWebhookURL = (oa: LineOA) => {

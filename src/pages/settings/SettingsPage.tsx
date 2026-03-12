@@ -10,10 +10,12 @@ import { useState, useEffect } from "react";
 import { workspaceApi } from "@/api/workspace";
 import { outboundEventApi } from "@/api/outboundEvent";
 import type { Workspace, OutboundWebhookConfig, OutboundDeliveryLog } from "@/types";
+import { useToast } from "@/components/ui/toast";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 export function SettingsPage() {
+  const toast = useToast();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,7 +84,7 @@ export function SettingsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      alert("Failed to save settings");
+      toast.error("Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -100,7 +102,7 @@ export function SettingsPage() {
       setWebhookSaved(true);
       setTimeout(() => setWebhookSaved(false), 2500);
     } catch {
-      alert("Failed to save outbound webhook settings");
+      toast.error("Failed to save outbound webhook settings");
     } finally {
       setSavingWebhook(false);
     }
@@ -169,7 +171,7 @@ export function SettingsPage() {
                   {workspace?.is_active ? "Active" : "Inactive"}
                 </Badge>
               </div>
-              <Button onClick={handleSave} disabled={saving} className="gap-2">
+              <Button onClick={() => { void handleSave(); }} disabled={saving} className="gap-2">
                 {saving
                   ? <RefreshCw size={14} className="animate-spin" />
                   : <Save size={14} />}
@@ -283,7 +285,7 @@ export function SettingsPage() {
                 {showLogs ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 Delivery Logs
               </Button>
-              <Button onClick={handleSaveWebhook} disabled={savingWebhook || !webhookURL} className="gap-2">
+              <Button onClick={() => { void handleSaveWebhook(); }} disabled={savingWebhook || !webhookURL} className="gap-2">
                 {savingWebhook
                   ? <RefreshCw size={14} className="animate-spin" />
                   : <Save size={14} />}
@@ -384,7 +386,7 @@ export function SettingsPage() {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => alert("Deactivate workspace — coming soon")}
+                onClick={() => toast.info("Deactivate workspace feature coming soon")}
               >
                 Deactivate
               </Button>

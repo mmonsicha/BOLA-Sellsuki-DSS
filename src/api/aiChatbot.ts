@@ -189,17 +189,31 @@ export const knowledgeBaseApi = {
   },
 };
 
-// ---- Test LLM Connection (lightweight backend reachability check) ----
+// ---- Test LLM Connection ----
 
-export async function testLLMConnection(workspaceId: string): Promise<{ ok: boolean; message: string }> {
+export interface TestLLMConnectionParams {
+  workspace_id: string;
+  llm_provider?: string;
+  llm_model?: string;
+  llm_api_key?: string;
+  llm_api_base_url?: string;
+}
+
+export async function testLLMConnection(
+  params: TestLLMConnectionParams
+): Promise<{ ok: boolean; message: string }> {
   try {
-    const res = await fetch(`${BASE}/knowledge-base/search`, {
+    const res = await fetch(`${BASE}/ai-chatbot/test-connection`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace_id: workspaceId, query: "test", top_k: 1 }),
+      body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error(`Server returned ${res.status}`);
-    return { ok: true, message: "Backend reachable ✓" };
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `Server returned ${res.status}`);
+    }
+    const body = await res.json().catch(() => ({}));
+    return { ok: true, message: body.message || "Connection successful ✓" };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Connection failed" };
   }

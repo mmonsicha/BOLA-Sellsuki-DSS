@@ -137,7 +137,13 @@ export function ChatbotSettingsPage() {
   const handleTestConnection = async () => {
     setTesting(true);
     setTestResult(null);
-    const result = await testLLMConnection(WORKSPACE_ID);
+    const result = await testLLMConnection({
+      workspace_id: WORKSPACE_ID,
+      llm_provider: form.llm_provider,
+      llm_model: form.llm_model,
+      llm_api_key: form.llm_api_key || undefined,
+      llm_api_base_url: form.llm_api_base_url || undefined,
+    });
     setTestResult(result);
     setTesting(false);
     setTimeout(() => setTestResult(null), 5000);
@@ -176,9 +182,10 @@ export function ChatbotSettingsPage() {
               size="sm"
               onClick={handleTestConnection}
               disabled={testing || !selectedOAId}
+              title="ทดสอบการเชื่อมต่อโดยใช้ค่าที่กรอกไว้ในฟอร์ม"
             >
               <Wifi size={14} className="mr-1" />
-              {testing ? "Testing..." : "Test Connection"}
+              {testing ? "กำลังทดสอบ..." : "ทดสอบการเชื่อมต่อ"}
             </Button>
 
             {testResult && (
@@ -276,7 +283,7 @@ export function ChatbotSettingsPage() {
                     placeholder={config ? "Leave blank to keep existing key" : "Enter API key"}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    API key is validated on first message send, not on save.
+                    API Key จะถูกทดสอบทันทีหลังกด "ทดสอบการเชื่อมต่อ" โดยใช้ค่าที่กรอกไว้ (ใช้ค่าที่กรอกไว้)
                   </p>
                 </div>
 
