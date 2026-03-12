@@ -1,0 +1,34 @@
+include:
+  - project: 'sellsuki/sre/deployment/pipeline-deployment'
+    ref: 'main'
+    file: 'pipelines/gitlab-ci-pipeline.generic-frontend-npm.yml'
+
+
+variables:
+  # Skip all test
+  E2E_TEST_IMAGE_NAME: 'registry.fountain.sellsuki.com/dockerhub/library/alpine:3.15'
+  E2E_TEST_BEFORE_SCRIPT: 'echo "1 + 1"'
+  E2E_TEST_SCRIPT: 'echo "1 + 1"'
+
+  UNIT_TEST_IMAGE_NAME: 'registry.fountain.sellsuki.com/dockerhub/library/alpine:3.15'
+  UNIT_TEST_BEFORE_SCRIPT: 'echo "1 + 1"'
+  UNIT_TEST_SCRIPT: 'echo "1 + 1"'
+
+  INTEGRATION_TEST_IMAGE_NAME: 'registry.fountain.sellsuki.com/dockerhub/library/alpine:3.15'
+  INTEGRATION_TEST_BEFORE_SCRIPT: 'echo "1 + 1"'
+  INTEGRATION_TEST_SCRIPT: 'echo "1 + 1"'
+
+#### Stagings ####
+.variables_export_staging_frontend:
+  variables:
+    CI_JOB_ENABLE: 'true'
+    DOCKER_IMAGE: 'registry.fountain.sellsuki.com/dockerhub/library/node:20'
+    APP_ENV: 'staging'
+    BUILD_OUTPUT: './dist'
+    STORYBOOK_ENABLE: 'false'
+
+    APP_URL: 'bola-web.staging-th.bearyweb.com'
+    CLOUDFRONT_DISTRIBUTION_ID: 'E3J776N4WE9KH0'
+    AWS_CERTIFICATE_ID: '702bb7c8-85c9-4fe0-83f9-31c204527ddc'
+    AWS_REGION: "ap-southeast-7"
+    FRONTEND_DEPLOYMENT_IMAGE: registry.fountain.sellsuki.com/service/frontend-deployment:1.2.0
