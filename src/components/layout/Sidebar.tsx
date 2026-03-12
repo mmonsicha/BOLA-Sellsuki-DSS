@@ -26,8 +26,11 @@ import {
   BarChart2,
   PhoneCall,
   FileText,
+  LogOut,
+  X,
 } from "lucide-react";
 import { useState } from "react";
+import { logout } from "@/lib/auth";
 
 interface NavItem {
   label: string;
@@ -87,6 +90,7 @@ const navSections: NavSection[] = [
   },
   {
     items: [
+      { label: "Team Members", href: "/admins", icon: Users },
       { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
       { label: "Settings", href: "/settings", icon: Settings },
       { label: "Integration Guide", href: "/integration", icon: BookOpen },
@@ -129,7 +133,10 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
         )}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-gray-700">
+        <div className={cn(
+          "flex items-center border-b border-gray-700",
+          collapsed ? "flex-col justify-center gap-2 px-2 py-4" : "gap-3 px-4 py-5"
+        )}>
           <img src="/bola-logo.svg" alt="BOLA" className="flex-shrink-0 w-8 h-8 rounded-lg" />
           {!collapsed && (
             <div>
@@ -139,16 +146,20 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="ml-auto text-gray-400 hover:text-white hidden md:block"
+            className={cn(
+              "text-gray-400 hover:text-white hidden md:block",
+              !collapsed && "ml-auto"
+            )}
           >
             <Menu size={16} />
           </button>
           {/* Mobile close button */}
           <button
             onClick={onMobileClose}
+            aria-label="Close menu"
             className="ml-auto text-gray-400 hover:text-white md:hidden"
           >
-            <Menu size={16} />
+            <X size={18} />
           </button>
         </div>
 
@@ -174,7 +185,8 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
                           href={item.href}
                           onClick={onMobileClose}
                           className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                            "flex items-center rounded-lg text-sm transition-colors",
+                            collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5",
                             isActive
                               ? "bg-line text-white"
                               : "text-gray-300 hover:bg-gray-800 hover:text-white"
@@ -198,11 +210,18 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
         </nav>
 
         {/* Footer */}
-        {!collapsed && (
-          <div className="px-4 py-3 border-t border-gray-700">
-            <div className="text-xs text-gray-500">BOLA v1.0.0</div>
-          </div>
-        )}
+        <div className="px-2 py-3 border-t border-gray-700">
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors w-full"
+          >
+            <LogOut size={18} className="flex-shrink-0" />
+            {!collapsed && <span>Sign out</span>}
+          </button>
+          {!collapsed && (
+            <div className="px-3 pt-1 text-xs text-gray-600">BOLA v1.0.0</div>
+          )}
+        </div>
       </aside>
     </>
   );

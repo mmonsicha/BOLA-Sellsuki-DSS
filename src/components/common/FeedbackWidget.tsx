@@ -77,7 +77,7 @@ export function FeedbackWidget() {
         onClick={() => setOpen(true)}
         aria-label="ส่งความคิดเห็น"
         title="ส่งความคิดเห็น"
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-line hover:bg-line/90 text-white rounded-full px-4 py-2.5 shadow-lg transition-all hover:shadow-xl hover:scale-105 text-sm font-medium"
+        className="fixed bottom-6 right-6 z-20 flex items-center gap-2 bg-line hover:bg-line/90 text-white rounded-full px-4 py-2.5 shadow-lg transition-all hover:shadow-xl hover:scale-105 text-sm font-medium"
       >
         <MessageSquare size={16} />
         <span className="hidden sm:inline">Feedback</span>

@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, ArrowLeft, Copy, Check, RefreshCw, Trash2, CheckCircle, XCircle, ChevronDown, Search, ExternalLink } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useState, useEffect, useRef } from "react";
 import { autoPushMessageApi } from "@/api/autoPushMessage";
 import { flexMessageApi } from "@/api/flexMessage";
@@ -102,7 +106,7 @@ function Field({
 function ReadonlyInput({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
-    navigator.clipboard.writeText(value).then(() => {
+    void navigator.clipboard.writeText(value).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -135,6 +139,7 @@ export function AutoPushMessageDetailPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [webhook, setWebhook] = useState<WebhookSetting | null>(null);
   const [flexMessages, setFlexMessages] = useState<FlexMessage[]>([]);
@@ -215,9 +220,11 @@ export function AutoPushMessageDetailPage() {
           setForm({
             name: apmData.name,
             description: apmData.description || "",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             messageType: (apmData.message_type as any) || "text",
             messageTemplate: apmData.message_template,
             flexMessageId: apmData.flex_message_id || "",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             targetType: apmData.target_type as any,
             targetSegmentId: apmData.target_segment_id || "",
             isEnabled: apmData.is_enabled,
@@ -261,7 +268,8 @@ export function AutoPushMessageDetailPage() {
         setLoading(false);
       }
     };
-    loadData();
+    void loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleSave = async () => {
@@ -305,9 +313,12 @@ export function AutoPushMessageDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Delete this auto push message? This cannot be undone.")) return;
+  const handleDelete = () => {
+    setShowDeleteDialog(true);
+  };
 
+  const handleConfirmedDelete = async () => {
+    setShowDeleteDialog(false);
     setDeleting(true);
     try {
       await autoPushMessageApi.delete(id);
@@ -417,7 +428,7 @@ export function AutoPushMessageDetailPage() {
             <Button
               variant={apm.is_enabled ? "outline" : "default"}
               size="sm"
-              onClick={handleToggle}
+              onClick={() => { void handleToggle(); }}
             >
               {apm.is_enabled ? "Disable" : "Enable"}
             </Button>
@@ -619,6 +630,7 @@ export function AutoPushMessageDetailPage() {
                 onChange={(e) =>
                   setForm({
                     ...form,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     targetType: e.target.value as any,
                     targetSegmentId: "",
                   })
@@ -770,7 +782,7 @@ export function AutoPushMessageDetailPage() {
 
             {/* Save Button */}
             <div className="border-t pt-4 flex items-center gap-2">
-              <Button onClick={handleSave} disabled={saving}>
+              <Button onClick={() => { void handleSave(); }} disabled={saving}>
                 {saving && <RefreshCw size={14} className="mr-2 animate-spin" />}
                 {saving ? "Saving..." : "Save Changes"}
               </Button>
@@ -907,12 +919,30 @@ export function AutoPushMessageDetailPage() {
           pageSize={logsPageSize}
           onPageChange={(newPage) => {
             setLogsPage(newPage);
-            loadDeliveryLogs(newPage);
+            void loadDeliveryLogs(newPage);
           }}
-          onRefresh={() => loadDeliveryLogs(logsPage)}
+          onRefresh={() => { void loadDeliveryLogs(logsPage); }}
         />
 
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={(open) => !open && setShowDeleteDialog(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete auto push message?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleConfirmedDelete(); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

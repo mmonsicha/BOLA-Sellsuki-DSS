@@ -10,6 +10,11 @@ import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
 import { flexMessageTemplates, type FlexTemplate } from "@/utils/flexMessageTemplates";
 import { FlexCardPreview } from "@/components/FlexCardPreview";
+import { useToast } from "@/components/ui/toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function getContainerType(content: string): string {
   try {
@@ -142,7 +147,7 @@ function CreateForm({ template, workspaceId, onBack, onClose }: CreateFormProps)
             placeholder="e.g., Welcome Message, Product Card"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            onKeyDown={(e) => { if (e.key === "Enter") void handleCreate(); }}
             autoFocus
             disabled={saving}
           />
@@ -162,7 +167,7 @@ function CreateForm({ template, workspaceId, onBack, onClose }: CreateFormProps)
 
         <div className="flex gap-2 justify-end">
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={handleCreate} disabled={saving || !name.trim()}>
+          <Button onClick={() => { void handleCreate(); }} disabled={saving || !name.trim()}>
             {saving ? "Creating..." : "Create & Edit"}
           </Button>
         </div>
@@ -176,6 +181,7 @@ function CreateForm({ template, workspaceId, onBack, onClose }: CreateFormProps)
 type DialogStep = "picker" | "form";
 
 export function FlexMessagesPage() {
+  const toast = useToast();
   const [templates, setTemplates] = useState<FlexMessage[]>([]);
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,6 +193,7 @@ export function FlexMessagesPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<FlexTemplate | null>(null);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FlexMessage | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -206,7 +213,7 @@ export function FlexMessagesPage() {
         setLoading(false);
       }
     };
-    load();
+    void load();
   }, []);
 
   const openCreate = () => setDialogStep("picker");
@@ -217,14 +224,20 @@ export function FlexMessagesPage() {
     setDialogStep("form");
   };
 
-  const handleDelete = async (fm: FlexMessage) => {
-    if (!confirm(`Delete "${fm.name}"? This cannot be undone.`)) return;
+  const handleDelete = (fm: FlexMessage) => {
+    setDeleteTarget(fm);
+  };
+
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return;
+    const fm = deleteTarget;
+    setDeleteTarget(null);
     setDeletingId(fm.id);
     try {
       await flexMessageApi.delete(fm.id);
       setTemplates((prev) => prev.filter((t) => t.id !== fm.id));
     } catch {
-      alert("Failed to delete template");
+      toast.error("Failed to delete template");
     } finally {
       setDeletingId(null);
     }
@@ -365,6 +378,24 @@ export function FlexMessagesPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleConfirmedDelete(); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

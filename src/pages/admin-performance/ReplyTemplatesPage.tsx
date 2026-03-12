@@ -25,6 +25,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { replyTemplateApi, type ReplyTemplate } from "@/api/adminPerformance";
+import { useToast } from "@/components/ui/toast";
 
 // ---- Template form dialog ----
 
@@ -151,7 +152,7 @@ function TemplateDialog({ open, editing, onClose, onSaved }: TemplateDialogProps
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || !title.trim() || !content.trim()}>
+          <Button onClick={() => { void handleSave(); }} disabled={saving || !title.trim() || !content.trim()}>
             {saving ? (
               <>
                 <RefreshCw size={14} className="mr-1.5 animate-spin" />
@@ -245,6 +246,7 @@ function TemplateCard({ template, onEdit, onDelete, deleting }: TemplateCardProp
 // ---- Main page ----
 
 export function ReplyTemplatesPage() {
+  const toast = useToast();
   const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
   const [displayTemplates, setDisplayTemplates] = useState<ReplyTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -333,7 +335,7 @@ export function ReplyTemplatesPage() {
       setTemplates((prev) => prev.filter((t) => t.id !== id));
       setDisplayTemplates((prev) => prev.filter((t) => t.id !== id));
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
       setDeletingId(null);
     }
@@ -467,7 +469,7 @@ export function ReplyTemplatesPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={handleDeleteConfirm}
+              onClick={() => { void handleDeleteConfirm(); }}
             >
               Delete
             </AlertDialogAction>

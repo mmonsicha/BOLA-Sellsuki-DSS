@@ -6,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ClipboardList, Plus, Trash2, ToggleLeft, ToggleRight, RefreshCw, FileText } from "lucide-react";
 import type { RegistrationForm, LineOA } from "@/types";
 import { registrationFormApi } from "@/api/registrationForm";
@@ -32,6 +36,7 @@ export function RegistrationFormsPage() {
   // Toggle / delete in-progress tracking
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RegistrationForm | null>(null);
 
   // Load LINE OAs on mount
   useEffect(() => {
@@ -100,8 +105,14 @@ export function RegistrationFormsPage() {
     }
   };
 
-  const handleDelete = async (form: RegistrationForm) => {
-    if (!confirm(`Delete "${form.name}"? This cannot be undone.`)) return;
+  const handleDelete = (form: RegistrationForm) => {
+    setDeleteTarget(form);
+  };
+
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return;
+    const form = deleteTarget;
+    setDeleteTarget(null);
     setDeletingId(form.id);
     try {
       await registrationFormApi.delete(form.id);
@@ -218,7 +229,7 @@ export function RegistrationFormsPage() {
                       variant="outline"
                       size="sm"
                       disabled={togglingId === form.id}
-                      onClick={() => handleToggle(form)}
+                      onClick={() => { void handleToggle(form); }}
                       className={
                         form.is_active
                           ? "text-gray-600 hover:bg-gray-50"
@@ -255,6 +266,25 @@ export function RegistrationFormsPage() {
         )}
       </div>
 
+      {/* Delete Confirm Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleConfirmedDelete(); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Create Form Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="sm:max-w-md">
@@ -270,7 +300,7 @@ export function RegistrationFormsPage() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="e.g. Customer Registration, Lead Capture"
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                onKeyDown={(e) => { if (e.key === "Enter") void handleCreate(); }}
                 autoFocus
               />
             </div>
@@ -298,7 +328,7 @@ export function RegistrationFormsPage() {
               Cancel
             </Button>
             <Button
-              onClick={handleCreate}
+              onClick={() => { void handleCreate(); }}
               disabled={!newName.trim() || !selectedOA || creating}
               className="bg-green-600 hover:bg-green-700"
             >

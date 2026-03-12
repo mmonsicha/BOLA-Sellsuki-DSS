@@ -7,6 +7,11 @@ import { useState, useEffect } from "react";
 import { webhookSettingApi } from "@/api/webhookSetting";
 import type { WebhookSetting } from "@/types";
 import { AddWebhookDialog } from "./AddWebhookDialog";
+import { useToast } from "@/components/ui/toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -18,7 +23,7 @@ const webhookTypeMeta = {
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
-    navigator.clipboard.writeText(text).then(() => {
+    void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -35,11 +40,13 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export function WebhookPage() {
+  const toast = useToast();
   const [settings, setSettings] = useState<WebhookSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const loadSettings = () => {
     setLoading(true);
@@ -61,20 +68,26 @@ export function WebhookPage() {
       const updated = await webhookSettingApi.toggle(ws.id);
       setSettings((prev) => prev.map((s) => (s.id === ws.id ? updated : s)));
     } catch {
-      alert("Failed to toggle webhook setting");
+      toast.error("Failed to toggle webhook setting");
     } finally {
       setTogglingId(null);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this webhook setting?")) return;
+  const handleDelete = (id: string) => {
+    setDeleteTarget(id);
+  };
+
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
     setDeletingId(id);
     try {
       await webhookSettingApi.delete(id);
       setSettings((prev) => prev.filter((s) => s.id !== id));
     } catch {
-      alert("Failed to delete webhook setting");
+      toast.error("Failed to delete webhook setting");
     } finally {
       setDeletingId(null);
     }
@@ -181,7 +194,7 @@ export function WebhookPage() {
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
-                        onClick={() => handleToggle(ws)}
+                        onClick={() => { void handleToggle(ws); }}
                         disabled={togglingId === ws.id}
                         className="text-muted-foreground hover:text-foreground transition-colors"
                         title={isActive ? "Deactivate" : "Activate"}
@@ -220,6 +233,24 @@ export function WebhookPage() {
         onClose={() => setAddOpen(false)}
         onCreated={handleWebhookCreated}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete webhook setting?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleConfirmedDelete(); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

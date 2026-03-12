@@ -20,6 +20,11 @@ import {
 import { useState, useEffect } from "react";
 import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
+import { useToast } from "@/components/ui/toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusVariant = {
   active: "success" as const,
@@ -119,7 +124,7 @@ function SecretInput({
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -147,6 +152,7 @@ function CopyButton({ text }: { text: string }) {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export function LineOADetailPage() {
+  const toast = useToast();
   const id = window.location.pathname.split("/")[2];
 
   const [oa, setOa] = useState<LineOA | null>(null);
@@ -175,6 +181,7 @@ export function LineOADetailPage() {
 
   // Danger zone
   const [deleting, setDeleting] = useState(false);
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -207,7 +214,7 @@ export function LineOADetailPage() {
       setSavedGeneral(true);
       setTimeout(() => setSavedGeneral(false), 2000);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save settings.");
+      toast.error(err instanceof Error ? err.message : "Failed to save settings.");
     } finally {
       setSavingGeneral(false);
     }
@@ -254,18 +261,19 @@ export function LineOADetailPage() {
     }
   };
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = () => {
+    setShowDisconnectDialog(true);
+  };
+
+  const handleConfirmedDisconnect = async () => {
     if (!oa) return;
-    const confirmed = confirm(
-      `Disconnect "${oa.name}"?\n\nThis will remove the LINE OA and stop all associated auto replies, webhooks, and broadcasts. This cannot be undone.`
-    );
-    if (!confirmed) return;
+    setShowDisconnectDialog(false);
     setDeleting(true);
     try {
       await lineOAApi.delete(oa.id);
       window.location.pathname = "/line-oa";
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to disconnect LINE OA.");
+      toast.error(err instanceof Error ? err.message : "Failed to disconnect LINE OA.");
       setDeleting(false);
     }
   };
@@ -503,7 +511,7 @@ export function LineOADetailPage() {
                   )}
                   <div className="flex justify-end">
                     <Button
-                      onClick={handleSaveLiff}
+                      onClick={() => { void handleSaveLiff(); }}
                       disabled={savingLiff}
                       size="sm"
                       variant="outline"
@@ -568,7 +576,7 @@ export function LineOADetailPage() {
 
             <div className="flex justify-end pt-2">
               <Button
-                onClick={handleSaveGeneral}
+                onClick={() => { void handleSaveGeneral(); }}
                 disabled={savingGeneral}
                 className="gap-2 min-w-[130px]"
               >
@@ -630,7 +638,7 @@ export function LineOADetailPage() {
 
             <div className="flex justify-end pt-2">
               <Button
-                onClick={handleSaveCredentials}
+                onClick={() => { void handleSaveCredentials(); }}
                 disabled={savingCreds}
                 variant="outline"
                 className="gap-2 min-w-[160px]"
@@ -680,6 +688,26 @@ export function LineOADetailPage() {
         </Card>
 
       </div>
+
+      <AlertDialog open={showDisconnectDialog} onOpenChange={(open) => !open && setShowDisconnectDialog(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect "{oa?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the LINE OA and stop all associated auto replies, webhooks, and broadcasts. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleConfirmedDisconnect(); }}
+            >
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

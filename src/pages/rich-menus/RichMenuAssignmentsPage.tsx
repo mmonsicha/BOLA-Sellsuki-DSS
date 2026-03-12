@@ -7,6 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, RefreshCw, ChevronLeft, TestTube } from "lucide-react";
 import type { RichMenu, RichMenuAssignment, AssignmentRule, LineOA } from "@/types";
@@ -259,7 +263,7 @@ function AssignmentDialog({ open, lineOAId, menus, editing, onClose, onSaved }: 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
-            onClick={handleSave}
+            onClick={() => { void handleSave(); }}
             disabled={!name.trim() || !richMenuId || saving}
             className="min-w-[100px]"
           >
@@ -330,15 +334,15 @@ function TestPanel({ assignment, lineOAId, menus }: TestPanelProps) {
           value={followerID}
           onChange={(e) => setFollowerID(e.target.value)}
           placeholder="Follower ID or LINE user ID"
-          onKeyDown={(e) => e.key === "Enter" && handleTest()}
+          onKeyDown={(e) => { if (e.key === "Enter") void handleTest(); }}
         />
-        <Button size="sm" className="h-7 text-xs" onClick={handleTest} disabled={testing || !followerID.trim()}>
+        <Button size="sm" className="h-7 text-xs" onClick={() => { void handleTest(); }} disabled={testing || !followerID.trim()}>
           {testing ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Evaluate"}
         </Button>
         <Button
           size="sm"
           className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
-          onClick={handleApply}
+          onClick={() => { void handleApply(); }}
           disabled={applying || !followerID.trim()}
           title="Evaluate rules and immediately apply rich menu via LINE API"
         >
@@ -370,6 +374,7 @@ export function RichMenuAssignmentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<RichMenuAssignment | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
     lineOAApi.list({ workspace_id: WORKSPACE_ID })
@@ -397,8 +402,14 @@ export function RichMenuAssignmentsPage() {
       .finally(() => setLoading(false));
   }, [selectedOA]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this assignment rule?")) return;
+  const handleDelete = (id: string) => {
+    setDeleteTarget(id);
+  };
+
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
     try {
       await richMenuAssignmentApi.delete(id);
       setAssignments((prev) => prev.filter((a) => a.id !== id));
@@ -583,6 +594,24 @@ export function RichMenuAssignmentsPage() {
         onClose={() => { setDialogOpen(false); setEditingAssignment(null); }}
         onSaved={handleSaved}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete assignment rule?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleConfirmedDelete(); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
