@@ -1,3 +1,6 @@
+import { LoginPage } from "@/pages/auth/LoginPage";
+import { AcceptInvitePage } from "@/pages/auth/AcceptInvitePage";
+import { isAuthenticated } from "@/lib/auth";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { LineOAPage } from "@/pages/line-oa/LineOAPage";
 import { LineOADetailPage } from "@/pages/line-oa/LineOADetailPage";
@@ -40,6 +43,7 @@ import { AnalyticsDashboardPage } from "@/pages/analytics/AnalyticsDashboardPage
 import { UserManualPage } from "@/pages/user-manual/UserManualPage";
 import { AdminPerformancePage } from "@/pages/admin-performance/AdminPerformancePage";
 import { ReplyTemplatesPage } from "@/pages/admin-performance/ReplyTemplatesPage";
+import { AdminsPage } from "@/pages/admins/AdminsPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { ToastProvider } from "@/components/ui/toast";
@@ -48,6 +52,18 @@ import { ToastProvider } from "@/components/ui/toast";
 function Router() {
   const path = window.location.pathname;
   const segments = path.split("/").filter(Boolean); // e.g. ["line-oa", "abc-123"]
+
+  // ── Public routes (no auth needed) ───────────────────────────────────────
+  if (path === "/login") return <LoginPage />;
+  if (path === "/accept-invite") return <AcceptInvitePage />;
+  // LON public subscribe page is also public (accessed via QR code from LINE)
+  if (path.startsWith("/lon/subscribe/")) return <LONPublicSubscribePage />;
+
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  if (!isAuthenticated()) {
+    window.location.replace("/login");
+    return null;
+  }
 
   if (path === "/" || path === "/dashboard") return <DashboardPage />;
 
@@ -117,9 +133,6 @@ function Router() {
   // Quick Replies
   if (path.startsWith("/quick-replies")) return <QuickRepliesPage />;
 
-  // LON — public subscribe page (unauthenticated, accessed via QR code)
-  if (path.startsWith("/lon/subscribe/")) return <LONPublicSubscribePage />;
-
   // LON — authenticated pages
   if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
   if (path.startsWith("/lon-delivery-logs")) return <LONDeliveryLogsPage />;
@@ -141,6 +154,9 @@ function Router() {
 
   // User Manual
   if (path.startsWith("/user-manual")) return <UserManualPage />;
+
+  // Team members (admins)
+  if (path.startsWith("/admins")) return <AdminsPage />;
 
   // 404
   return (
