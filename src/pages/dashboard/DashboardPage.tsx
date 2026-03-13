@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import {
   Users, Radio, MessageCircle, Tag, Bot, Bell, ClipboardList,
   Webhook, Image, Layers, LayoutTemplate, MessageCircleDashed,
-  ChevronRight, RefreshCw, ArrowRight, ScrollText, Inbox,
+  ChevronRight, RefreshCw, ArrowRight, ScrollText, Inbox, ShieldAlert,
 } from "lucide-react";
 import { lineOAApi } from "@/api/lineOA";
 import { followerApi } from "@/api/follower";
 import { broadcastApi } from "@/api/broadcast";
 import { segmentApi } from "@/api/segment";
+import { authApi } from "@/api/auth";
+import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import type { LineOA, Broadcast } from "@/types";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
@@ -63,7 +65,17 @@ const broadcastStatusVariant: Record<string, "success" | "default" | "secondary"
   cancelled: "secondary",
 };
 
+const WARNING_MESSAGES: Record<string, string> = {
+  default_jwt_secret:
+    "AUTH_LOCAL_JWT_SECRET is still the factory default. Set a strong secret before going to production.",
+  default_admin_credentials:
+    "You are logged in as admin@bola.local. Change the default admin email and password.",
+};
+
 export function DashboardPage() {
+  const { currentAdmin } = useCurrentAdmin();
+  const [securityWarnings, setSecurityWarnings] = useState<string[]>([]);
+
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [followerTotal, setFollowerTotal] = useState<number | null>(null);
   const [broadcastTotal, setBroadcastTotal] = useState<number | null>(null);
@@ -72,7 +84,14 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.allSettled([
+    if (currentAdmin?.role !== "super_admin") return;
+    void authApi.getSystemStatus(WORKSPACE_ID)
+      .then(({ warnings }) => setSecurityWarnings(warnings))
+      .catch(() => { /* silently ignore — non-super_admin or backend unavailable */ });
+  }, [currentAdmin]);
+
+  useEffect(() => {
+    void Promise.allSettled([
       lineOAApi.list({ workspace_id: WORKSPACE_ID, page_size: 10 }),
       followerApi.list({ workspace_id: WORKSPACE_ID, page_size: 1 }),
       broadcastApi.list({ workspace_id: WORKSPACE_ID, page_size: 5 }),
@@ -99,6 +118,27 @@ export function DashboardPage() {
   return (
     <AppLayout title="Dashboard">
       <div className="space-y-6">
+
+        {/* ── Security warnings (super_admin only) ── */}
+        {securityWarnings.length > 0 && (
+          <div className="rounded-lg border border-red-300 bg-red-50 p-4 dark:border-red-700 dark:bg-red-950/30">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
+              <div>
+                <p className="font-semibold text-red-800 dark:text-red-300">
+                  Security warnings
+                </p>
+                <ul className="mt-1 space-y-1">
+                  {securityWarnings.map((key) => (
+                    <li key={key} className="text-sm text-red-700 dark:text-red-400">
+                      {WARNING_MESSAGES[key] ?? key}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Stat cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
