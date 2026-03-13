@@ -12,10 +12,12 @@ import { authApi, type AdminResponse } from "@/api/auth";
 import { getWorkspaceId } from "@/lib/auth";
 import { KeyRound, Users } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 
 export function AdminsPage() {
   const workspaceId = getWorkspaceId() ?? "";
   const { addToast } = useToast();
+  const { currentAdmin } = useCurrentAdmin();
 
   const [admins, setAdmins] = useState<AdminResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,16 +35,13 @@ export function AdminsPage() {
     authApi.listAdmins(workspaceId)
       .then(({ data }) => {
         setAdmins(data);
-        // Determine current user (they have a token, we find their stored ID if available)
-        // For now, we show all admin actions to anyone with super_admin role
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [workspaceId]);
 
-  // Detect current admin role from the list (by checking stored workspace)
-  // In a real app you'd decode the JWT. For now we allow any super_admin to see Reset buttons.
-  const isSuperAdmin = admins.some((a) => a.role === "super_admin");
+  // Only show Reset password controls when the current user is a super_admin.
+  const isSuperAdmin = currentAdmin?.role === "super_admin";
 
   function openResetDialog(admin: AdminResponse) {
     setResetTarget(admin);

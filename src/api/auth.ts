@@ -36,7 +36,20 @@ export const authApi = {
   /** Admin invites */
   listAdmins: (workspaceId: string) =>
     api.get<{ data: AdminResponse[] }>(`/v1/workspaces/${workspaceId}/admins`),
+
+  /** Fetch the currently authenticated admin's profile. */
+  getCurrentAdmin: (workspaceId: string) =>
+    api.get<AdminProfile>(`/v1/workspaces/${workspaceId}/auth/me`),
 };
+
+export interface AdminProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  workspace_id: string;
+}
 
 export interface AdminResponse {
   id: string;
