@@ -16,6 +16,19 @@ export interface LoginResponse {
   expires_at: string;
 }
 
+export interface AdminProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  workspace_id: string;
+}
+
+export interface SystemStatus {
+  warnings: string[];
+}
+
 export const authApi = {
   /** Global login — finds all workspaces matching these credentials. */
   globalLogin: (email: string, password: string) =>
@@ -29,6 +42,13 @@ export const authApi = {
   acceptInvite: (workspaceId: string, email: string, password: string) =>
     api.post<LoginResponse>(`/v1/workspaces/${workspaceId}/auth/accept-invite`, { email, password }),
 
+  /** Self-service password change — requires current password. */
+  changePassword: (workspaceId: string, currentPassword: string, newPassword: string) =>
+    api.post<void>(`/v1/workspaces/${workspaceId}/auth/set-password`, {
+      current_password: currentPassword,
+      password: newPassword,
+    }),
+
   /** Super-admin resets another admin's password. */
   resetAdminPassword: (workspaceId: string, adminId: string, newPassword: string) =>
     api.post<void>(`/v1/workspaces/${workspaceId}/admins/${adminId}/reset-password`, { new_password: newPassword }),
@@ -40,16 +60,11 @@ export const authApi = {
   /** Fetch the currently authenticated admin's profile. */
   getCurrentAdmin: (workspaceId: string) =>
     api.get<AdminProfile>(`/v1/workspaces/${workspaceId}/auth/me`),
-};
 
-export interface AdminProfile {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  status: string;
-  workspace_id: string;
-}
+  /** Fetch system security warnings (super_admin only). */
+  getSystemStatus: (workspaceId: string) =>
+    api.get<SystemStatus>(`/v1/workspaces/${workspaceId}/auth/system-status`),
+};
 
 export interface AdminResponse {
   id: string;
