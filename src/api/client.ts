@@ -9,7 +9,7 @@ class ApiClient {
   private baseURL: string;
 
   constructor(baseURL: string) {
-    this.baseURL = baseURL;
+    this.baseURL = baseURL.replace(/\/$/, "");
   }
 
   private async request<T>(
