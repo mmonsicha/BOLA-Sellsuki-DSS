@@ -7,7 +7,7 @@ include:
 variables:
   # Unit tests — run Vitest
   UNIT_TEST_IMAGE_NAME: 'registry.fountain.sellsuki.com/dockerhub/library/node:20'
-  UNIT_TEST_BEFORE_SCRIPT: 'npm cache clean --force && npm ci'
+  UNIT_TEST_BEFORE_SCRIPT: 'sh -c "rm -rf ~/.cache/esbuild && npm ci"'
   UNIT_TEST_SCRIPT: 'npm run test:run'
 
   # Integration tests — skip for now
