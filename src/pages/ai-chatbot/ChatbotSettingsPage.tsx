@@ -11,10 +11,10 @@ import { Bot, Save, Wifi } from "lucide-react";
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 const LLM_PROVIDERS = [
-  { value: "openai", label: "OpenAI" },
-  { value: "anthropic", label: "Anthropic (Claude)" },
-  { value: "google", label: "Google (Gemini)" },
-  { value: "custom", label: "Custom (OpenAI-compatible)" },
+  { value: "openai", label: "OpenAI", description: "GPT-4o, GPT-4o-mini and other OpenAI models. Requires an OpenAI API key." },
+  { value: "anthropic", label: "Anthropic (Claude)", description: "Claude Sonnet, Opus, and Haiku models. Requires an Anthropic API key." },
+  { value: "google", label: "Google (Gemini)", description: "Gemini 2.0 Flash and Gemini 1.5 Pro/Flash models. Requires a Google AI Studio API key." },
+  { value: "custom", label: "Custom (OpenAI-compatible)", description: "Any self-hosted or third-party LLM with an OpenAI-compatible API (e.g. Ollama, LM Studio)." },
 ];
 
 const LLM_MODELS: Record<string, string[]> = {
@@ -182,10 +182,10 @@ export function ChatbotSettingsPage() {
               size="sm"
               onClick={handleTestConnection}
               disabled={testing || !selectedOAId}
-              title="ทดสอบการเชื่อมต่อโดยใช้ค่าที่กรอกไว้ในฟอร์ม"
+              title="Test connection using the current form values (not yet saved)"
             >
               <Wifi size={14} className="mr-1" />
-              {testing ? "กำลังทดสอบ..." : "ทดสอบการเชื่อมต่อ"}
+              {testing ? "Testing…" : "Test Connection"}
             </Button>
 
             {testResult && (
@@ -245,6 +245,12 @@ export function ChatbotSettingsPage() {
                       <option key={p.value} value={p.value}>{p.label}</option>
                     ))}
                   </select>
+                  {(() => {
+                    const provider = LLM_PROVIDERS.find((p) => p.value === form.llm_provider);
+                    return provider ? (
+                      <p className="text-xs text-muted-foreground mt-1">{provider.description}</p>
+                    ) : null;
+                  })()}
                 </div>
 
                 <div>
@@ -283,7 +289,7 @@ export function ChatbotSettingsPage() {
                     placeholder={config ? "Leave blank to keep existing key" : "Enter API key"}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    API Key จะถูกทดสอบทันทีหลังกด "ทดสอบการเชื่อมต่อ" โดยใช้ค่าที่กรอกไว้ (ใช้ค่าที่กรอกไว้)
+                    Leave blank to keep the saved key. "Test Connection" always uses the current form values.
                   </p>
                 </div>
 
@@ -343,11 +349,13 @@ export function ChatbotSettingsPage() {
                     onChange={(e) => update("confidence_threshold", parseFloat(e.target.value))}
                   />
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>Low (0)</span>
-                    <span>High (1)</span>
+                    <span>Low (0) — answers everything</span>
+                    <span>High (1) — escalates always</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    AI escalates to human when confidence falls below this threshold.
+                    When the AI's confidence falls below this value, the message is escalated to a human agent.{" "}
+                    <span className="font-medium text-foreground">Recommended: 0.70–0.80.</span>{" "}
+                    Too low → AI may answer incorrectly. Too high → most messages escalate to humans.
                   </p>
                 </div>
 

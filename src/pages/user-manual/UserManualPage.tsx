@@ -33,9 +33,30 @@ interface ManualSection {
   faqs?: ManualFaq[];
   nextAction?: string;
   videoPlanned?: boolean;
+  infographic?: boolean;
 }
 
 const manualSections: ManualSection[] = [
+  {
+    id: "connect-line-oa",
+    title: "วิธีเชื่อมต่อ LINE OA",
+    icon: "🔌",
+    summary: "คู่มือภาพแบบขั้นตอน — เชื่อมต่อ LINE OA เข้ากับ BOLA ใน 5 นาที",
+    estimatedTime: "5 นาที",
+    infographic: true,
+    steps: [],
+    faqs: [
+      {
+        q: "ต้องสร้าง LINE Official Account ใหม่ไหม?",
+        a: "ไม่ต้อง ใช้ OA ที่มีอยู่แล้วได้เลย เพียงแค่นำ credentials มากรอกใน BOLA",
+      },
+      {
+        q: "Access Token หมดอายุแล้วทำอย่างไร?",
+        a: "ไปที่ LINE Developers Console → Messaging API → Issue new token แล้วอัปเดตใน BOLA",
+      },
+    ],
+    nextAction: "ตั้งค่า Auto-Reply rule แรกของคุณ → /auto-reply",
+  },
   {
     id: "getting-started",
     title: "เริ่มต้นใช้งาน BOLA",
@@ -358,6 +379,181 @@ const manualSections: ManualSection[] = [
   },
 ];
 
+// ─── Cartoon Infographic: Connect LINE OA ───────────────────────────────────
+
+const infographicSteps = [
+  {
+    num: 1,
+    emoji: "🌐",
+    title: "เปิด LINE Developers Console",
+    desc: "ไปที่ developers.line.biz แล้วล็อกอินด้วยบัญชี LINE ของคุณ",
+    tip: "ใช้บัญชี LINE เดียวกับที่สร้าง Official Account",
+    bg: "from-sky-100 to-blue-100",
+    border: "border-sky-200",
+    num_bg: "bg-sky-500",
+    tip_bg: "bg-sky-50 border-sky-200 text-sky-700",
+  },
+  {
+    num: 2,
+    emoji: "🔑",
+    title: "หา 3 Credentials สำคัญ",
+    desc: "Basic settings tab: Channel ID และ Channel Secret\nMessaging API tab: Channel Access Token (Long-lived)",
+    tip: "ถ้ายังไม่มี Access Token ให้กด 'Issue' เพื่อสร้างใหม่",
+    bg: "from-violet-100 to-purple-100",
+    border: "border-violet-200",
+    num_bg: "bg-violet-500",
+    tip_bg: "bg-violet-50 border-violet-200 text-violet-700",
+  },
+  {
+    num: 3,
+    emoji: "🖱️",
+    title: 'คลิก "+ Connect LINE OA" ใน BOLA',
+    desc: 'เมนูซ้าย → LINE OA → ปุ่ม "+ Connect LINE OA" มุมขวาบน',
+    bg: "from-emerald-100 to-green-100",
+    border: "border-emerald-200",
+    num_bg: "bg-emerald-500",
+    tip_bg: "",
+  },
+  {
+    num: 4,
+    emoji: "📝",
+    title: "กรอก Credentials ในฟอร์ม",
+    desc: "ตั้งชื่อ OA แล้วใส่ Channel ID + Channel Secret + Access Token จากนั้นกด Connect",
+    tip: 'ชื่อใช้แค่ใน BOLA เช่น "ร้านกาแฟ ABC" — ตั้งชื่ออะไรก็ได้',
+    bg: "from-orange-100 to-amber-100",
+    border: "border-orange-200",
+    num_bg: "bg-orange-500",
+    tip_bg: "bg-orange-50 border-orange-200 text-orange-700",
+  },
+  {
+    num: 5,
+    emoji: "✅",
+    title: "Bot ID ปรากฏอัตโนมัติ!",
+    desc: "BOLA จะดึง @botid ของคุณมาแสดงเป็น badge สีเขียวข้างชื่อ OA",
+    tip: "ถ้าไม่เห็น badge สีเขียว = credentials ผิด — ลองตรวจสอบอีกครั้ง",
+    bg: "from-teal-100 to-cyan-100",
+    border: "border-teal-200",
+    num_bg: "bg-teal-500",
+    tip_bg: "bg-teal-50 border-teal-200 text-teal-700",
+  },
+  {
+    num: 6,
+    emoji: "🔗",
+    title: "วาง Webhook URL ใน LINE Console",
+    desc: "คัดลอก Webhook URL จาก BOLA → LINE Developers Console → Messaging API → ช่อง Webhook URL → กด Verify",
+    tip: 'อย่าลืมเปิด "Use webhook" ด้วย มิฉะนั้นข้อความจะไม่ส่งมาที่ BOLA',
+    bg: "from-pink-100 to-rose-100",
+    border: "border-pink-200",
+    num_bg: "bg-pink-500",
+    tip_bg: "bg-pink-50 border-pink-200 text-pink-700",
+  },
+];
+
+const infographicTroubleshooting = [
+  { problem: "Bot ID ไม่ขึ้น", fix: "ตรวจสอบ Channel ID และ Channel Secret ให้ถูกต้อง" },
+  { problem: "Webhook Verify ไม่ผ่าน", fix: "ตรวจสอบว่า server กำลังทำงาน และ URL ถูกต้อง" },
+  { problem: "ข้อความไม่มาใน Chat Inbox", fix: 'เปิด "Use webhook" ใน LINE Console แล้วกด Verify อีกครั้ง' },
+  { problem: "Access Token หมดอายุ", fix: "สร้าง Long-lived token ใหม่ใน LINE Developers Console" },
+];
+
+function ConnectLineOAInfographic() {
+  return (
+    <div className="space-y-0">
+      {/* Hero banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#06C755]/15 to-emerald-50 border-2 border-[#06C755]/30 p-5 flex items-center gap-4 mb-5">
+        <div className="text-5xl select-none">🤝</div>
+        <div className="flex-1">
+          <p className="font-black text-lg text-gray-800">เชื่อมต่อ LINE OA เข้ากับ BOLA</p>
+          <p className="text-sm text-gray-600 mt-0.5">ทำตาม 6 ขั้นตอนง่ายๆ เสร็จใน 5 นาที!</p>
+        </div>
+        <div className="text-3xl hidden sm:block select-none">⚡</div>
+      </div>
+
+      {/* Steps */}
+      {infographicSteps.map((step, i) => (
+        <div key={step.num}>
+          {/* Step card */}
+          <div className={`rounded-2xl bg-gradient-to-br ${step.bg} border-2 ${step.border} p-4 sm:p-5`}>
+            <div className="flex items-start gap-4">
+              {/* Step number */}
+              <div className={`w-10 h-10 rounded-full ${step.num_bg} text-white font-black text-lg flex items-center justify-center shadow-md flex-shrink-0 mt-0.5`}>
+                {step.num}
+              </div>
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-2xl select-none">{step.emoji}</span>
+                  <p className="font-bold text-gray-800 text-base leading-tight">{step.title}</p>
+                </div>
+                <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{step.desc}</p>
+                {step.tip && (
+                  <div className={`mt-2.5 flex items-start gap-1.5 text-xs px-3 py-2 rounded-xl border ${step.tip_bg}`}>
+                    <span className="flex-shrink-0 select-none mt-0.5">💡</span>
+                    <span>{step.tip}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Connector arrow */}
+          {i < infographicSteps.length - 1 && (
+            <div className="flex justify-center py-0.5">
+              <div className="flex flex-col items-center">
+                <div className="w-0.5 h-3 bg-gray-300" />
+                <div className="text-gray-400 text-base leading-none select-none">▼</div>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Arrow into celebration */}
+      <div className="flex justify-center py-0.5">
+        <div className="flex flex-col items-center">
+          <div className="w-0.5 h-3 bg-gray-300" />
+          <div className="text-gray-400 text-base leading-none select-none">▼</div>
+        </div>
+      </div>
+
+      {/* Celebration card */}
+      <div className="rounded-2xl bg-gradient-to-br from-yellow-100 to-amber-100 border-2 border-yellow-300 p-5 text-center">
+        <div className="text-4xl mb-2 select-none">🎉</div>
+        <p className="font-black text-xl text-gray-800">เชื่อมต่อสำเร็จแล้ว!</p>
+        <p className="text-sm text-gray-600 mt-1">
+          ส่งข้อความทดสอบไปยัง LINE OA ของคุณ<br />
+          ข้อความจะปรากฏใน <strong>Chat Inbox</strong> ภายใน 2–3 วินาที
+        </p>
+        <div className="mt-3 flex justify-center gap-2 flex-wrap">
+          {["✓ Webhook connected", "✓ Bot ID verified", "✓ Messages flowing"].map((tag) => (
+            <span key={tag} className="bg-white border border-yellow-300 rounded-full px-3 py-1 text-xs text-yellow-700 font-medium">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Troubleshooting quick ref */}
+      <div className="mt-4 rounded-xl bg-gray-50 border border-gray-200 p-4">
+        <p className="text-sm font-semibold text-gray-700 mb-3">🔧 ปัญหาที่พบบ่อย</p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {infographicTroubleshooting.map((item, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs bg-white rounded-lg border border-gray-100 p-2.5">
+              <span className="text-red-400 flex-shrink-0 mt-0.5 select-none">❌</span>
+              <div>
+                <p className="font-semibold text-gray-700">{item.problem}</p>
+                <p className="text-gray-500 mt-0.5">→ {item.fix}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const HELPFUL_KEY = "bola_manual_helpful";
 
 function getHelpfulState(sectionId: string): "up" | "down" | null {
@@ -380,7 +576,11 @@ function saveHelpfulState(sectionId: string, value: "up" | "down") {
 }
 
 export function UserManualPage() {
-  const [activeId, setActiveId] = useState("getting-started");
+  const [activeId, setActiveId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get("section");
+    return s && manualSections.find((m) => m.id === s) ? s : "connect-line-oa";
+  });
   const [search, setSearch] = useState("");
   const [helpfulVotes, setHelpfulVotes] = useState<Record<string, "up" | "down" | null>>(() => {
     const result: Record<string, "up" | "down" | null> = {};
@@ -521,23 +721,29 @@ export function UserManualPage() {
                 </div>
               )}
 
-              {/* Steps */}
-              <div className="mb-6">
-                <h2 className="text-base font-semibold text-gray-800 mb-4">ขั้นตอน</h2>
-                <ol className="space-y-4">
-                  {activeSection.steps.map((step, i) => (
-                    <li key={i} className="flex gap-4">
-                      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-line text-white text-sm font-bold flex items-center justify-center">
-                        {i + 1}
-                      </div>
-                      <div className="pt-0.5">
-                        <p className="text-sm font-medium text-gray-800">{step.title}</p>
-                        <p className="text-sm text-gray-600 mt-0.5">{step.content}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
+              {/* Steps or Infographic */}
+              {activeSection.infographic ? (
+                <div className="mb-6">
+                  <ConnectLineOAInfographic />
+                </div>
+              ) : (
+                <div className="mb-6">
+                  <h2 className="text-base font-semibold text-gray-800 mb-4">ขั้นตอน</h2>
+                  <ol className="space-y-4">
+                    {activeSection.steps.map((step, i) => (
+                      <li key={i} className="flex gap-4">
+                        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-line text-white text-sm font-bold flex items-center justify-center">
+                          {i + 1}
+                        </div>
+                        <div className="pt-0.5">
+                          <p className="text-sm font-medium text-gray-800">{step.title}</p>
+                          <p className="text-sm text-gray-600 mt-0.5">{step.content}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
 
               {/* Common mistakes */}
               {activeSection.commonMistakes && activeSection.commonMistakes.length > 0 && (

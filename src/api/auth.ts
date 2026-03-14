@@ -53,6 +53,18 @@ export const authApi = {
   resetAdminPassword: (workspaceId: string, adminId: string, newPassword: string) =>
     api.post<void>(`/v1/workspaces/${workspaceId}/admins/${adminId}/reset-password`, { new_password: newPassword }),
 
+  /** Request a forgot-password reset token (local_jwt mode only). */
+  forgotPassword: (email: string) =>
+    api.post<ForgotPasswordResponse>("/v1/auth/forgot-password", { email }),
+
+  /** Redeem a reset token and set a new password. */
+  resetPassword: (token: string, password: string) =>
+    api.post<void>("/v1/auth/reset-password", { token, password }),
+
+  /** Invite a new admin to a workspace (super_admin only). */
+  inviteAdmin: (workspaceId: string, email: string, name: string, role: string) =>
+    api.post<AdminResponse>(`/v1/workspaces/${workspaceId}/admins`, { email, name, role }),
+
   /** Admin invites */
   listAdmins: (workspaceId: string) =>
     api.get<{ data: AdminResponse[] }>(`/v1/workspaces/${workspaceId}/admins`),
@@ -64,7 +76,29 @@ export const authApi = {
   /** Fetch system security warnings (super_admin only). */
   getSystemStatus: (workspaceId: string) =>
     api.get<SystemStatus>(`/v1/workspaces/${workspaceId}/auth/system-status`),
+
+  /** Update an admin's name and/or role. */
+  updateAdmin: (workspaceId: string, adminId: string, data: { name?: string; role?: string }) =>
+    api.put<AdminResponse>(`/v1/workspaces/${workspaceId}/admins/${adminId}`, data),
+
+  /** Remove an admin from a workspace. */
+  removeAdmin: (workspaceId: string, adminId: string) =>
+    api.delete<void>(`/v1/workspaces/${workspaceId}/admins/${adminId}`),
+
+  /** Activate (or reactivate) an admin. */
+  activateAdmin: (workspaceId: string, adminId: string) =>
+    api.post<AdminResponse>(`/v1/workspaces/${workspaceId}/admins/${adminId}/activate`),
+
+  /** Deactivate an admin. */
+  deactivateAdmin: (workspaceId: string, adminId: string) =>
+    api.post<AdminResponse>(`/v1/workspaces/${workspaceId}/admins/${adminId}/deactivate`),
 };
+
+export interface ForgotPasswordResponse {
+  message: string;
+  reset_token?: string;
+  expires_at: string;
+}
 
 export interface AdminResponse {
   id: string;

@@ -5,6 +5,7 @@ import {
   Users,
   Tag,
   Radio,
+  Zap,
   Webhook,
   Image,
   Settings,
@@ -28,15 +29,18 @@ import {
   FileText,
   LogOut,
   X,
+  Lightbulb,
 } from "lucide-react";
 import { useState } from "react";
 import { logout } from "@/lib/auth";
+import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
   badge?: string;
+  tutorialId?: string;
 }
 
 interface NavSection {
@@ -44,16 +48,16 @@ interface NavSection {
   items: NavItem[];
 }
 
-const navSections: NavSection[] = [
+const BASE_NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { label: "Dashboard", href: "/", icon: LayoutDashboard },
-      { label: "LINE OA", href: "/line-oa", icon: MessageCircle },
+      { label: "LINE OA", href: "/line-oa", icon: MessageCircle, tutorialId: "connect-line-oa" },
       { label: "Followers", href: "/followers", icon: Users },
-      { label: "Segments", href: "/segments", icon: Tag },
-      { label: "Broadcasts", href: "/broadcasts", icon: Radio },
-      { label: "Auto Reply", href: "/auto-reply", icon: ChevronRight },
-      { label: "Auto Push Messages", href: "/auto-push-messages", icon: Radio },
+      { label: "Segments", href: "/segments", icon: Tag, tutorialId: "segments" },
+      { label: "Broadcasts", href: "/broadcasts", icon: Radio, tutorialId: "broadcasts" },
+      { label: "Auto Reply", href: "/auto-reply", icon: ChevronRight, tutorialId: "auto-reply" },
+      { label: "Auto Push Messages", href: "/auto-push-messages", icon: Zap },
       { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
       { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
       { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
@@ -64,7 +68,7 @@ const navSections: NavSection[] = [
   {
     title: "AI Chatbot",
     items: [
-      { label: "Chatbot Settings", href: "/chatbot-settings", icon: Bot },
+      { label: "Chatbot Settings", href: "/chatbot-settings", icon: Bot, tutorialId: "ai-chatbot" },
       { label: "Chat Inbox", href: "/chat-inbox", icon: Inbox },
       { label: "Chat Sessions", href: "/chat-sessions", icon: MessagesSquare },
       { label: "Knowledge Base", href: "/knowledge-base", icon: Database },
@@ -88,15 +92,6 @@ const navSections: NavSection[] = [
       { label: "Quick Replies", href: "/quick-replies", icon: MessageCircleDashed },
     ],
   },
-  {
-    items: [
-      { label: "Team Members", href: "/admins", icon: Users },
-      { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
-      { label: "Settings", href: "/settings", icon: Settings },
-      { label: "Integration Guide", href: "/integration", icon: BookOpen },
-      { label: "User Manual", href: "/user-manual", icon: BookMarked },
-    ],
-  },
 ];
 
 interface SidebarProps {
@@ -108,6 +103,22 @@ interface SidebarProps {
 export function Sidebar({ className, mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const currentPath = window.location.pathname;
+  const { isAdminOrAbove } = useCurrentAdmin();
+
+  // Build the Team section dynamically so Audit Logs is only visible to admin+
+  const teamSection: NavSection = {
+    items: [
+      { label: "Team Members", href: "/admins", icon: Users },
+      ...(isAdminOrAbove ? [{ label: "Audit Logs", href: "/audit-logs", icon: ClipboardList }] : []),
+      { label: "Webhook Settings", href: "/webhook-settings", icon: Webhook },
+      { label: "Settings", href: "/settings", icon: Settings },
+      { label: "Integration Guide", href: "/integration", icon: BookOpen },
+      { label: "User Manual", href: "/user-manual", icon: BookMarked },
+      { label: "Use Case Templates", href: "/use-cases", icon: Lightbulb },
+    ],
+  };
+
+  const navSections: NavSection[] = [...BASE_NAV_SECTIONS, teamSection];
 
   return (
     <>
@@ -164,8 +175,11 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 overflow-y-auto">
-          <div className="space-y-4 px-2">
+        <nav className={cn(
+          "flex-1 py-4 overflow-y-auto",
+          collapsed && "[&::-webkit-scrollbar]:w-0 [scrollbar-width:none]"
+        )}>
+          <div className={cn("space-y-4", collapsed ? "px-0" : "px-2")}>
             {navSections.map((section, sIdx) => (
               <div key={sIdx}>
                 {!collapsed && section.title && (
@@ -185,7 +199,7 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
                           href={item.href}
                           onClick={onMobileClose}
                           className={cn(
-                            "flex items-center rounded-lg text-sm transition-colors",
+                            "group flex items-center rounded-lg text-sm transition-colors w-full",
                             collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5",
                             isActive
                               ? "bg-line text-white"
@@ -194,10 +208,32 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
                         >
                           <Icon size={18} className="flex-shrink-0" />
                           {!collapsed && <span>{item.label}</span>}
-                          {!collapsed && item.badge && (
-                            <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
-                              {item.badge}
-                            </span>
+                          {!collapsed && (item.badge || item.tutorialId) && (
+                            <div className="ml-auto flex items-center gap-1.5">
+                              {item.badge && (
+                                <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                                  {item.badge}
+                                </span>
+                              )}
+                              {item.tutorialId && (
+                                <div className="relative">
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      window.location.href = `/user-manual?section=${item.tutorialId}`;
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity hover:bg-white/10"
+                                    aria-label="ดูคู่มือการใช้งาน"
+                                  >
+                                    <BookOpen size={12} className="text-gray-400 hover:text-gray-200" />
+                                  </button>
+                                  <span className="pointer-events-none absolute right-full mr-2 top-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-gray-700 px-2 py-1 text-xs text-gray-100 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                                    ดูคู่มือ
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </a>
                       </li>
@@ -210,10 +246,13 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
         </nav>
 
         {/* Footer */}
-        <div className="px-2 py-3 border-t border-gray-700">
+        <div className={cn("py-3 border-t border-gray-700", collapsed ? "px-0" : "px-2")}>
           <button
             onClick={logout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors w-full"
+            className={cn(
+              "flex items-center rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors w-full",
+              collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5"
+            )}
           >
             <LogOut size={18} className="flex-shrink-0" />
             {!collapsed && <span>Sign out</span>}

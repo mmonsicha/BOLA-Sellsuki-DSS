@@ -851,19 +851,42 @@ export function LONSubscribersPage() {
             {subscribers.map((s) => (
               <Card key={s.id}>
                 <CardContent className="py-3 flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-mono truncate">{s.line_user_id}</span>
-                      <Badge variant={statusVariant[s.status] ?? "secondary"}>
-                        {s.status}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground capitalize">{s.source}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      Consented: {new Date(s.consent_at).toLocaleString()}
-                      {s.revoked_at && (
-                        <> &middot; Revoked: {new Date(s.revoked_at).toLocaleString()}</>
-                      )}
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Avatar */}
+                    {s.picture_url ? (
+                      <img
+                        src={s.picture_url}
+                        alt={s.display_name ?? s.line_user_id}
+                        className="w-8 h-8 rounded-full shrink-0 object-cover"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <Bell size={14} className="text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium truncate">
+                          {s.display_name ?? (
+                            <span className="font-mono text-muted-foreground">{s.line_user_id}</span>
+                          )}
+                        </span>
+                        <Badge variant={statusVariant[s.status] ?? "secondary"}>
+                          {s.status}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground capitalize">{s.source}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 flex-wrap">
+                        {s.display_name && (
+                          <span className="font-mono">{s.line_user_id}</span>
+                        )}
+                        {s.display_name && <span>&middot;</span>}
+                        <span>Consented: {new Date(s.consent_at).toLocaleString()}</span>
+                        {s.revoked_at && (
+                          <> &middot; Revoked: {new Date(s.revoked_at).toLocaleString()}</>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {s.status === "active" && (

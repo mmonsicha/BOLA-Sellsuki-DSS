@@ -5,6 +5,7 @@ import { Plus, X, ImageIcon, Film, Type, Code2, Layers, Sticker, AlertTriangle }
 import { autoReplyApi } from "@/api/autoReply";
 import { quickReplyApi } from "@/api/richMenu";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
+import { FlexMessagePicker } from "@/components/common/FlexMessagePicker";
 import type { AutoReply, QuickReply, TriggerType, MatchMode, Media } from "@/types";
 import { MediaPickerDialog } from "@/pages/chat-inbox/MediaPickerDialog";
 import { toDisplayUrl } from "@/lib/mediaUtils";
@@ -241,16 +242,11 @@ function FlexEditor({ payload, onChange, flexMessages }: {
 }) {
   return (
     <div className="space-y-2">
-      <select
-        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500 bg-background"
+      <FlexMessagePicker
         value={payload.flex_message_id}
-        onChange={(e) => onChange({ ...payload, flex_message_id: e.target.value })}
-      >
-        <option value="">— Select a Flex Message template —</option>
-        {flexMessages.map((fm) => (
-          <option key={fm.id} value={fm.id}>{fm.name}</option>
-        ))}
-      </select>
+        onChange={(id) => onChange({ ...payload, flex_message_id: id })}
+        flexMessages={flexMessages}
+      />
       <input
         className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
         placeholder="Alt text (shown in notification / unsupported clients)"

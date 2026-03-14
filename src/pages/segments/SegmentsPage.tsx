@@ -6,6 +6,7 @@ import { Plus, RefreshCw, Users, Zap, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { segmentApi } from "@/api/segment";
 import type { Segment } from "@/types";
+import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +23,7 @@ const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 export function SegmentsPage() {
   const toast = useToast();
+  const { isEditorOrAbove } = useCurrentAdmin();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -58,10 +60,12 @@ export function SegmentsPage() {
           <p className="text-sm text-muted-foreground">
             Group your followers into segments for targeted broadcasts.
           </p>
-          <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={() => { window.location.href = "/segments/new"; }}>
-            <Plus size={16} />
-            New Segment
-          </Button>
+          {isEditorOrAbove && (
+            <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={() => { window.location.href = "/segments/new"; }}>
+              <Plus size={16} />
+              New Segment
+            </Button>
+          )}
         </div>
 
         {/* Loading */}
@@ -81,10 +85,12 @@ export function SegmentsPage() {
               <p className="text-sm text-muted-foreground mt-1">
                 Create a segment to group followers by behaviour or attributes.
               </p>
-              <Button className="mt-4 gap-2" onClick={() => { window.location.href = "/segments/new"; }}>
-                <Plus size={16} />
-                New Segment
-              </Button>
+              {isEditorOrAbove && (
+                <Button className="mt-4 gap-2" onClick={() => { window.location.href = "/segments/new"; }}>
+                  <Plus size={16} />
+                  New Segment
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}

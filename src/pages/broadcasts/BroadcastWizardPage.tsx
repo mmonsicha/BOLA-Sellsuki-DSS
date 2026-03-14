@@ -10,6 +10,7 @@ import { segmentApi } from "@/api/segment";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { broadcastApi, type BroadcastMessageInput } from "@/api/broadcast";
 import { FlexCardPreview } from "@/components/FlexCardPreview";
+import { FlexMessagePicker } from "@/components/common/FlexMessagePicker";
 import type { LineOA, Segment } from "@/types";
 
 // ─── Step indicator ────────────────────────────────────────────────────────
@@ -510,7 +511,7 @@ export function BroadcastWizardPage() {
                       { value: "all", label: "All Followers", description: "Send to everyone following your OA" },
                       { value: "segment", label: "Segment", description: "Target followers matching a saved segment" },
                       { value: "manual", label: "Custom List", description: "Paste specific LINE user IDs" },
-                      { value: "lon_subscribers", label: "LON Subscribers", description: "Send to users who opted in via LINE Notification Messaging" },
+                      { value: "lon_subscribers", label: "LINE Notification Subscribers (LON)", description: "Send to users who enrolled via LINE Notification Messaging (LON) — requires LON service to be active on this OA" },
                     ] as const
                   ).map((option) => (
                     <label
@@ -663,29 +664,18 @@ export function BroadcastWizardPage() {
                       {/* Flex message picker */}
                       {msg.type === "flex" && (
                         <div className="space-y-3">
-                          {flexMessages.length === 0 ? (
+                          <FlexMessagePicker
+                            value={msg.flexMessageId}
+                            onChange={(id) => updateMessage(msg.id, { flexMessageId: id })}
+                            flexMessages={flexMessages}
+                          />
+                          {flexMessages.length === 0 && (
                             <p className="text-sm text-muted-foreground">
                               No Flex Message templates available.{" "}
-                              <a
-                                href="/flex-messages"
-                                className="underline text-primary"
-                              >
+                              <a href="/flex-messages" className="underline text-primary">
                                 Create one first.
                               </a>
                             </p>
-                          ) : (
-                            <select
-                              className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                              value={msg.flexMessageId}
-                              onChange={(e) => updateMessage(msg.id, { flexMessageId: e.target.value })}
-                            >
-                              <option value="">-- Select a Flex Message template --</option>
-                              {flexMessages.map((fm) => (
-                                <option key={fm.id} value={fm.id}>
-                                  {fm.name}
-                                </option>
-                              ))}
-                            </select>
                           )}
 
                           {/* Show preview when flex message is selected */}
