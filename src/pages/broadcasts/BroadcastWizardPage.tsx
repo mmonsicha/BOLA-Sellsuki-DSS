@@ -11,6 +11,7 @@ import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { broadcastApi, type BroadcastMessageInput } from "@/api/broadcast";
 import { FlexCardPreview } from "@/components/FlexCardPreview";
 import { FlexMessagePicker } from "@/components/common/FlexMessagePicker";
+import { useToast } from "@/components/ui/toast";
 import type { LineOA, Segment } from "@/types";
 
 // ─── Step indicator ────────────────────────────────────────────────────────
@@ -163,6 +164,7 @@ function PhonePreview({ messages, flexMessages }: PhonePreviewProps) {
 // ─── Main wizard ───────────────────────────────────────────────────────────
 
 export function BroadcastWizardPage() {
+  const toast = useToast();
   const [step, setStep] = useState(1);
 
   // Data loaded on mount
@@ -364,6 +366,22 @@ export function BroadcastWizardPage() {
           }
         }
         setSubmitSuccess(true);
+        // Toast: next-step suggestion
+        if (sendMode === "now") {
+          toast.toast({
+            variant: "success",
+            title: "Broadcast sent!",
+            description: "Track opens & clicks in Analytics",
+            duration: 6000,
+          });
+        } else {
+          toast.toast({
+            variant: "success",
+            title: "Campaign scheduled",
+            description: "Preview what recipients will see",
+            duration: 6000,
+          });
+        }
         setTimeout(() => { window.location.href = `/broadcasts/${broadcastId}`; }, 800);
       } else {
         const campaignRes = await broadcastApi.createCampaign({
@@ -383,6 +401,22 @@ export function BroadcastWizardPage() {
           );
         }
         setSubmitSuccess(true);
+        // Toast: next-step suggestion
+        if (sendMode === "now") {
+          toast.toast({
+            variant: "success",
+            title: "Broadcasts sent!",
+            description: "Track opens & clicks in Analytics",
+            duration: 6000,
+          });
+        } else {
+          toast.toast({
+            variant: "success",
+            title: "Campaigns scheduled",
+            description: "Preview what recipients will see",
+            duration: 6000,
+          });
+        }
         setTimeout(() => { window.location.href = "/broadcasts"; }, 800);
       }
     } catch (err) {

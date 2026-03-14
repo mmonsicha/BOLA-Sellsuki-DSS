@@ -127,10 +127,13 @@ export function AutoReplyPage() {
       return updated.slice().sort((a, b) => a.priority - b.priority);
     });
     setDialogOpen(false);
-    toast.success(
-      "Auto reply saved",
-      "Test it by sending the trigger keyword to your LINE OA. Go to LINE OA → open chat to verify.",
-    );
+    // Toast: next-step suggestion
+    toast.toast({
+      variant: "success",
+      title: "Auto-reply rule saved",
+      description: "Add AI chatbot for queries outside your rules",
+      duration: 6000,
+    });
   };
 
   // ---- drag-to-reorder handlers ----

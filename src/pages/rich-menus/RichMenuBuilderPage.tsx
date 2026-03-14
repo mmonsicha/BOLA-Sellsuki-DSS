@@ -707,7 +707,13 @@ export function RichMenuBuilderPage() {
       }
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
-      toast.success("Saved", "Menu settings and areas have been saved.");
+      // Toast: next-step suggestion
+      toast.toast({
+        variant: "success",
+        title: "Rich Menu uploaded",
+        description: "Map tap zones to assign actions",
+        duration: 6000,
+      });
     } catch (e: unknown) {
       toast.error("Save failed", e instanceof Error ? e.message : "An unexpected error occurred.");
     } finally {

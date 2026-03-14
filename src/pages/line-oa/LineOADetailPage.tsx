@@ -237,6 +237,13 @@ export function LineOADetailPage() {
       setChannelAccessToken("");
       setSavedCreds(true);
       setTimeout(() => setSavedCreds(false), 2000);
+      // Toast: next-step suggestion
+      toast.toast({
+        variant: "success",
+        title: "LINE OA connected!",
+        description: "Import followers to start segmenting",
+        duration: 6000,
+      });
     } catch (err) {
       setCredsError(err instanceof Error ? err.message : "Failed to update credentials.");
     } finally {
