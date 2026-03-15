@@ -115,7 +115,7 @@ async function saveFeedback(payload: {
   const token = getToken();
   if (!workspaceId || !token) return;
 
-  await fetch(`/api/v1/workspaces/${workspaceId}/feedback`, {
+  await fetch(`/v1/workspaces/${workspaceId}/feedback`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -139,15 +139,24 @@ function ElementPickerOverlay({
   const [hovered, setHovered] = useState<Element | null>(null);
 
   useEffect(() => {
+    // Helper: hide overlay so elementFromPoint reaches the real page element
+    const peekThrough = (x: number, y: number): Element | null => {
+      const overlay = document.getElementById("feedback-picker-overlay");
+      if (overlay) overlay.style.visibility = "hidden";
+      const el = document.elementFromPoint(x, y);
+      if (overlay) overlay.style.visibility = "";
+      return el;
+    };
+
     const handleMove = (e: MouseEvent) => {
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      if (el && el.id !== "feedback-picker-overlay") setHovered(el);
+      const el = peekThrough(e.clientX, e.clientY);
+      if (el) setHovered(el);
     };
     const handleClick = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      if (el && el.id !== "feedback-picker-overlay") {
+      const el = peekThrough(e.clientX, e.clientY);
+      if (el) {
         onPick(elementBreadcrumb(el));
       }
     };
