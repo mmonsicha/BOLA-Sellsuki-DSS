@@ -13,10 +13,10 @@ import { outboundEventApi } from "@/api/outboundEvent";
 import { authApi } from "@/api/auth";
 import type { Workspace, OutboundWebhookConfig, OutboundDeliveryLog } from "@/types";
 import { useToast } from "@/components/ui/toast";
-
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+import { getWorkspaceId } from "@/lib/auth";
 
 export function SettingsPage() {
+  const workspaceId = getWorkspaceId() ?? "";
   const toast = useToast();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +48,7 @@ export function SettingsPage() {
   const [logsPage, setLogsPage] = useState(1);
 
   useEffect(() => {
-    workspaceApi.get(WORKSPACE_ID)
+    workspaceApi.get(workspaceId)
       .then((ws) => {
         setWorkspace(ws);
         setName(ws.name);
@@ -58,7 +58,7 @@ export function SettingsPage() {
       .finally(() => setLoading(false));
 
     // Load outbound webhook config
-    workspaceApi.getOutboundWebhook(WORKSPACE_ID)
+    workspaceApi.getOutboundWebhook(workspaceId)
       .then((cfg) => {
         setWebhookConfig(cfg);
         setWebhookURL(cfg.webhook_url ?? "");
@@ -71,7 +71,7 @@ export function SettingsPage() {
   const loadLogs = (page = 1) => {
     setLogsLoading(true);
     setLogsPage(page);
-    outboundEventApi.listLogs({ workspace_id: WORKSPACE_ID, page, page_size: 20 })
+    outboundEventApi.listLogs({ workspace_id: workspaceId, page, page_size: 20 })
       .then((res) => setLogs(res.data ?? []))
       .catch(console.error)
       .finally(() => setLogsLoading(false));
@@ -111,7 +111,7 @@ export function SettingsPage() {
     }
     setSavingPassword(true);
     try {
-      await authApi.changePassword(WORKSPACE_ID, currentPassword, newPassword);
+      await authApi.changePassword(workspaceId, currentPassword, newPassword);
       toast.success("Password changed successfully");
       setCurrentPassword("");
       setNewPassword("");
@@ -126,7 +126,7 @@ export function SettingsPage() {
   const handleSaveWebhook = async () => {
     setSavingWebhook(true);
     try {
-      const cfg = await workspaceApi.updateOutboundWebhook(WORKSPACE_ID, {
+      const cfg = await workspaceApi.updateOutboundWebhook(workspaceId, {
         webhook_url: webhookURL,
         secret: webhookSecret || undefined,
       });

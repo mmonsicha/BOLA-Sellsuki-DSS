@@ -281,6 +281,13 @@ export function RichMenusPage() {
       .finally(() => setLoading(false));
   }, [selectedOA]);
 
+  // Pre-fill LINE OA from the current filter when the create dialog opens
+  useEffect(() => {
+    if (showNewDialog && selectedOA) {
+      setNewLineOAId((prev) => prev || selectedOA);
+    }
+  }, [showNewDialog, selectedOA]);
+
   // Pre-fill settings form when user picks a preset
   useEffect(() => {
     if (selectedPreset) {
@@ -569,20 +576,20 @@ export function RichMenusPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
+            <AlertDialogTitle>Delete Rich Menu</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget?.isPublished
-                ? `Rich Menu นี้กำลังใช้งานอยู่ การลบจะทำให้ผู้ติดตามไม่เห็น Rich Menu ทันที คุณต้องการลบ "${deleteTarget?.name}" ใช่หรือไม่?`
-                : `คุณต้องการลบ "${deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`}
+                ? `"${deleteTarget?.name}" is currently live — deleting it will immediately hide the menu from all followers and cannot be undone.`
+                : `Delete "${deleteTarget?.name}"? This action cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               onClick={() => { void handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
             >
-              ลบ
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -719,10 +726,15 @@ export function RichMenusPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="large">Large (2500×1686)</SelectItem>
-                      <SelectItem value="compact">Compact (2500×843)</SelectItem>
+                      <SelectItem value="large">Large (2500×1686 px)</SelectItem>
+                      <SelectItem value="compact">Compact (2500×843 px)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {newSizeType === "large"
+                      ? "Full-height menu occupying more screen space — ideal for menus with many areas."
+                      : "Half-height menu that takes less space — best for 2–3 simple actions."}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -736,6 +748,11 @@ export function RichMenusPage() {
                       <SelectItem value="dynamic">Dynamic</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {newMenuType === "static"
+                      ? "Same menu shown to all followers. Simplest setup."
+                      : "Menu varies per follower based on tags or segments. Requires API integration."}
+                  </p>
                 </div>
               </div>
             </div>

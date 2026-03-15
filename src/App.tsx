@@ -1,5 +1,8 @@
+import React from "react";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { AcceptInvitePage } from "@/pages/auth/AcceptInvitePage";
+import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
+import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { isAuthenticated } from "@/lib/auth";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { LineOAPage } from "@/pages/line-oa/LineOAPage";
@@ -41,30 +44,17 @@ import { RegistrationFormBuilderPage } from "@/pages/registration-forms/Registra
 import { RegistrationSubmissionsPage } from "@/pages/registration-forms/RegistrationSubmissionsPage";
 import { AnalyticsDashboardPage } from "@/pages/analytics/AnalyticsDashboardPage";
 import { UserManualPage } from "@/pages/user-manual/UserManualPage";
+import { UseCasesPage } from "@/pages/use-cases/UseCasesPage";
 import { AdminPerformancePage } from "@/pages/admin-performance/AdminPerformancePage";
 import { ReplyTemplatesPage } from "@/pages/admin-performance/ReplyTemplatesPage";
 import { AdminsPage } from "@/pages/admins/AdminsPage";
+import { AuditLogsPage } from "@/pages/audit-logs/AuditLogsPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { ToastProvider } from "@/components/ui/toast";
+import { TokenExpiryGuard } from "@/components/auth/TokenExpiryGuard";
 
-// Simple path-based routing (no react-router dependency needed for v1)
-function Router() {
-  const path = window.location.pathname;
-  const segments = path.split("/").filter(Boolean); // e.g. ["line-oa", "abc-123"]
-
-  // ── Public routes (no auth needed) ───────────────────────────────────────
-  if (path === "/login") return <LoginPage />;
-  if (path === "/accept-invite") return <AcceptInvitePage />;
-  // LON public subscribe page is also public (accessed via QR code from LINE)
-  if (path.startsWith("/lon/subscribe/")) return <LONPublicSubscribePage />;
-
-  // ── Auth guard ────────────────────────────────────────────────────────────
-  if (!isAuthenticated()) {
-    window.location.replace("/login");
-    return null;
-  }
-
+function resolveProtectedRoute(path: string, segments: string[]): React.ReactElement {
   if (path === "/" || path === "/dashboard") return <DashboardPage />;
 
   // LINE OA: list vs. detail
@@ -155,14 +145,47 @@ function Router() {
   // User Manual
   if (path.startsWith("/user-manual")) return <UserManualPage />;
 
+  // Use Cases
+  if (path.startsWith("/use-cases")) return <UseCasesPage />;
+
   // Team members (admins)
   if (path.startsWith("/admins")) return <AdminsPage />;
+
+  // Audit logs
+  if (path.startsWith("/audit-logs")) return <AuditLogsPage />;
 
   // 404
   return (
     <AppLayout title="Not Found">
       <Card><CardContent className="py-12 text-center text-muted-foreground">Page not found</CardContent></Card>
     </AppLayout>
+  );
+}
+
+// Simple path-based routing (no react-router dependency needed for v1)
+function Router() {
+  const path = window.location.pathname;
+  const segments = path.split("/").filter(Boolean); // e.g. ["line-oa", "abc-123"]
+
+  // ── Public routes (no auth needed) ───────────────────────────────────────
+  if (path === "/login") return <LoginPage />;
+  if (path === "/accept-invite") return <AcceptInvitePage />;
+  if (path === "/forgot-password") return <ForgotPasswordPage />;
+  if (path === "/reset-password") return <ResetPasswordPage />;
+  // LON public subscribe page is also public (accessed via QR code from LINE)
+  if (path.startsWith("/lon/subscribe/")) return <LONPublicSubscribePage />;
+
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  if (!isAuthenticated()) {
+    window.location.replace("/login");
+    return null;
+  }
+
+  return (
+    <>
+      <TokenExpiryGuard />
+      {resolveProtectedRoute(path, segments)}
+    </>
   );
 }
 

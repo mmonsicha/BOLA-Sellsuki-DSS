@@ -9,6 +9,7 @@ import { lineOAApi } from "@/api/lineOA";
 import { broadcastApi } from "@/api/broadcast";
 import type { Broadcast, BroadcastStatus, LineOA } from "@/types";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
+import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 
 // ─── Status filter tabs ──────────────────────────────────────────────────────
 
@@ -151,6 +152,7 @@ function CampaignGroup({ campaignId, broadcasts }: CampaignGroupProps) {
 // ─── Main page ──────────────────────────────────────────────────────────────
 
 export function BroadcastsPage() {
+  const { isEditorOrAbove } = useCurrentAdmin();
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [selectedLineOAId, setSelectedLineOAId] = useState<string>("");
@@ -230,13 +232,15 @@ export function BroadcastsPage() {
           <p className="text-sm text-muted-foreground">
             Send messages to all followers or specific segments.
           </p>
-          <Button
-            className="gap-2 self-start sm:self-auto flex-shrink-0"
-            onClick={() => { window.location.href = "/broadcasts/new"; }}
-          >
-            <Plus size={16} />
-            New Broadcast
-          </Button>
+          {isEditorOrAbove && (
+            <Button
+              className="gap-2 self-start sm:self-auto flex-shrink-0"
+              onClick={() => { window.location.href = "/broadcasts/new"; }}
+            >
+              <Plus size={16} />
+              New Broadcast
+            </Button>
+          )}
         </div>
 
         {/* LINE OA Filter */}

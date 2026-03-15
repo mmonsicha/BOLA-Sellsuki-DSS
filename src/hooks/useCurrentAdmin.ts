@@ -6,9 +6,21 @@ import { getWorkspaceId } from "@/lib/auth";
 let cachedAdmin: AdminProfile | null = null;
 let cacheWorkspaceId: string | null = null;
 
+const ROLE_ORDER: Record<string, number> = {
+  viewer: 1,
+  editor: 2,
+  admin: 3,
+  super_admin: 4,
+};
+
 interface UseCurrentAdminResult {
   currentAdmin: AdminProfile | null;
   loading: boolean;
+  isViewer: boolean;
+  isEditorOrAbove: boolean;
+  isAdminOrAbove: boolean;
+  isSuperAdmin: boolean;
+  refetch: () => void;
 }
 
 /**
@@ -26,15 +38,8 @@ export function useCurrentAdmin(): UseCurrentAdminResult {
     !(cachedAdmin && cacheWorkspaceId === workspaceId)
   );
 
-  useEffect(() => {
+  const fetchAdmin = () => {
     if (!workspaceId) {
-      setLoading(false);
-      return;
-    }
-
-    // Return cached value immediately if available for this workspace.
-    if (cachedAdmin && cacheWorkspaceId === workspaceId) {
-      setCurrentAdmin(cachedAdmin);
       setLoading(false);
       return;
     }
@@ -59,9 +64,41 @@ export function useCurrentAdmin(): UseCurrentAdminResult {
     return () => {
       cancelled = true;
     };
+  };
+
+  useEffect(() => {
+    if (!workspaceId) {
+      setLoading(false);
+      return;
+    }
+
+    // Return cached value immediately if available for this workspace.
+    if (cachedAdmin && cacheWorkspaceId === workspaceId) {
+      setCurrentAdmin(cachedAdmin);
+      setLoading(false);
+      return;
+    }
+
+    return fetchAdmin();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
 
-  return { currentAdmin, loading };
+  const rank = ROLE_ORDER[currentAdmin?.role ?? "viewer"] ?? 1;
+
+  return {
+    currentAdmin,
+    loading,
+    isViewer: rank === 1,
+    isEditorOrAbove: rank >= 2,
+    isAdminOrAbove: rank >= 3,
+    isSuperAdmin: rank >= 4,
+    refetch: () => {
+      cachedAdmin = null;
+      cacheWorkspaceId = null;
+      setLoading(true);
+      fetchAdmin();
+    },
+  };
 }
 
 /** Clears the module-level cache. Call on logout. */

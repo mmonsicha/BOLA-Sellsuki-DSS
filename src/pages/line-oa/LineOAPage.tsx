@@ -8,6 +8,7 @@ import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
 import { ConnectLineOADialog } from "./ConnectLineOADialog";
 import { useToast } from "@/components/ui/toast";
+import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -18,6 +19,7 @@ const statusVariant = {
 };
 
 export function LineOAPage() {
+  const { isAdminOrAbove } = useCurrentAdmin();
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectOpen, setConnectOpen] = useState(false);
@@ -37,11 +39,15 @@ export function LineOAPage() {
 
   const handleCreated = (oa: LineOA) => {
     setLineOAs((prev) => [oa, ...prev]);
+    if (oa.webhook_url) {
+      void navigator.clipboard.writeText(oa.webhook_url);
+    }
     toast({
       variant: "success",
-      title: "เชื่อมต่อ LINE OA สำเร็จ",
-      description:
-        "ตั้งค่า Rich Menu เพื่อให้ผู้ติดตามเห็นเมนูเมื่อเปิด Chat → ไปที่ Rich Menus",
+      title: "LINE OA connected",
+      description: oa.webhook_url
+        ? `Webhook URL copied! Paste it into LINE Developers Console → Messaging API → Webhook URL. Then enable "Use webhook".`
+        : "Go to LINE Developers Console → Messaging API → Webhook URL and paste your webhook URL.",
       duration: 0,
     });
   };
@@ -66,10 +72,12 @@ export function LineOAPage() {
           <p className="text-sm text-muted-foreground">
             Connect your LINE Official Accounts to manage customers and send messages.
           </p>
-          <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={() => setConnectOpen(true)}>
-            <Plus size={16} />
-            Connect LINE OA
-          </Button>
+          {isAdminOrAbove && (
+            <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={() => setConnectOpen(true)}>
+              <Plus size={16} />
+              Connect LINE OA
+            </Button>
+          )}
         </div>
 
         {/* Loading */}

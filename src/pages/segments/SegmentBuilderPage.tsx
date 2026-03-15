@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, X, RefreshCw, AlertCircle, CheckCircle } from "lucide-
 import { segmentApi } from "@/api/segment";
 import { lineOAApi } from "@/api/lineOA";
 import { workspaceApi } from "@/api/workspace";
+import { useToast } from "@/components/ui/toast";
 import type { LineOA, Segment } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -234,6 +235,7 @@ interface SegmentBuilderPageProps {
 }
 
 export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps) {
+  const toast = useToast();
   const [workspaceId, setWorkspaceId] = useState<string>("");
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [selectedLineOAId, setSelectedLineOAId] = useState<string>("");
@@ -400,6 +402,15 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
         });
       }
       setSaveSuccess(true);
+      // Toast: next-step suggestion for new segments
+      if (mode === "create") {
+        toast.toast({
+          variant: "success",
+          title: "Segment ready",
+          description: "Launch a campaign to this audience?",
+          duration: 6000,
+        });
+      }
       setTimeout(() => { window.location.href = "/segments"; }, 800);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save segment.");

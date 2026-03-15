@@ -461,6 +461,9 @@ export interface LONSubscriber {
   revoked_at?: string | null;
   created_at: string;
   updated_at: string;
+  // Enriched from followers table (null/undefined if subscriber is not an OA follower)
+  display_name?: string | null;
+  picture_url?: string | null;
 }
 
 export interface LONSubscriberStats {

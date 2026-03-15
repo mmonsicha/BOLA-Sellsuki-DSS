@@ -68,18 +68,18 @@ function HowItWorksInfographic() {
               <div className="space-y-2">
                 {[
                   {
-                    n: "①",
+                    n: "1",
                     icon: "📱",
                     text: "User scans QR code or opens LIFF link",
                   },
-                  { n: "②", icon: "✅", text: "User consents in LINE app" },
+                  { n: "2", icon: "✅", text: "User consents in LINE app" },
                   {
-                    n: "③",
+                    n: "3",
                     icon: "💾",
                     text: "Consent token stored in BOLA",
                   },
                   {
-                    n: "④",
+                    n: "4",
                     icon: "📨",
                     text: "Send any time using stored token",
                   },
@@ -131,18 +131,18 @@ function HowItWorksInfographic() {
               <div className="space-y-2">
                 {[
                   {
-                    n: "①",
+                    n: "1",
                     icon: "📋",
                     text: "You have customer's phone number",
                   },
-                  { n: "②", icon: "🔒", text: "BOLA hashes phone (SHA256)" },
+                  { n: "2", icon: "🔒", text: "BOLA hashes phone (SHA256)" },
                   {
-                    n: "③",
+                    n: "3",
                     icon: "🚀",
                     text: "Message sent directly via LINE API",
                   },
                   {
-                    n: "④",
+                    n: "4",
                     icon: "💬",
                     text: "LINE shows consent prompt to user automatically",
                   },

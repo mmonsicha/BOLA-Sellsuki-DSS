@@ -1,9 +1,7 @@
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { RefreshCw, ChevronDown } from "lucide-react";
-import { useState, useEffect } from "react";
+import { RefreshCw, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { autoPushMessageApi } from "@/api/autoPushMessage";
 import type { AutoPushMessage } from "@/api/autoPushMessage";
 import { webhookSettingApi } from "@/api/webhookSetting";
@@ -11,8 +9,10 @@ import { segmentApi } from "@/api/segment";
 import { lineOAApi } from "@/api/lineOA";
 import { flexMessageApi } from "@/api/flexMessage";
 import type { FlexMessage } from "@/api/flexMessage";
-import type { Segment, LineOA } from "@/types";
+import { followerApi } from "@/api/follower";
+import type { Segment, LineOA, Follower } from "@/types";
 import { MessageTemplateEditor } from "./MessageTemplateEditor";
+import { FlexMessagePicker } from "@/components/common/FlexMessagePicker";
 
 interface WebhookSetting {
   id: string;
@@ -140,8 +140,14 @@ export function CreateAutoPushDialog({
   const [loadingData, setLoadingData] = useState(false);
   const [loadingLineOAs, setLoadingLineOAs] = useState(false);
   const [flexMessages, setFlexMessages] = useState<FlexMessage[]>([]);
-  const [flexSelectorOpen, setFlexSelectorOpen] = useState(false);
-  const [flexSearch, setFlexSearch] = useState("");
+
+  // Follower search state (for target_type="follower")
+  const [followerSearch, setFollowerSearch] = useState("");
+  const [followerResults, setFollowerResults] = useState<Follower[]>([]);
+  const [followerSearchOpen, setFollowerSearchOpen] = useState(false);
+  const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [selectedFollowers, setSelectedFollowers] = useState<Follower[]>([]);
+  const followerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load LINE OAs on mount
   useEffect(() => {
@@ -197,7 +203,53 @@ export function CreateAutoPushDialog({
   const handleLineOAChange = (newLineOAId: string) => {
     setLineOAId(newLineOAId);
     // Reset webhook and segment selections when LINE OA changes
-    setForm((prev) => ({ ...prev, webhook_setting_id: "", target_segment_id: "" }));
+    setForm((prev) => ({ ...prev, webhook_setting_id: "", target_segment_id: "", target_follower_ids: [] }));
+    setSelectedFollowers([]);
+    setFollowerSearch("");
+  };
+
+  const handleFollowerSearchChange = (q: string) => {
+    setFollowerSearch(q);
+    if (followerSearchTimer.current) clearTimeout(followerSearchTimer.current);
+    if (!q.trim()) {
+      setFollowerResults([]);
+      setFollowerSearchOpen(false);
+      return;
+    }
+    followerSearchTimer.current = setTimeout(async () => {
+      setLoadingFollowers(true);
+      try {
+        const res = await followerApi.list({
+          workspace_id: "00000000-0000-0000-0000-000000000001",
+          line_oa_id: lineOAId,
+          search: q.trim(),
+          page: 1,
+          page_size: 10,
+        });
+        setFollowerResults(res.data ?? []);
+        setFollowerSearchOpen(true);
+      } catch {
+        setFollowerResults([]);
+      } finally {
+        setLoadingFollowers(false);
+      }
+    }, 300);
+  };
+
+  const handleSelectFollower = (follower: Follower) => {
+    if (selectedFollowers.find((f) => f.id === follower.id)) return;
+    const updated = [...selectedFollowers, follower];
+    setSelectedFollowers(updated);
+    setForm((prev) => ({ ...prev, target_follower_ids: updated.map((f) => f.id) }));
+    setFollowerSearch("");
+    setFollowerResults([]);
+    setFollowerSearchOpen(false);
+  };
+
+  const handleRemoveFollower = (id: string) => {
+    const updated = selectedFollowers.filter((f) => f.id !== id);
+    setSelectedFollowers(updated);
+    setForm((prev) => ({ ...prev, target_follower_ids: updated.map((f) => f.id) }));
   };
 
   const handleWebhookChange = (webhookId: string) => {
@@ -212,6 +264,9 @@ export function CreateAutoPushDialog({
     setForm(initialForm);
     setError("");
     setLineOAId(propLineOAId);
+    setSelectedFollowers([]);
+    setFollowerSearch("");
+    setFollowerResults([]);
     onClose();
   };
 
@@ -237,6 +292,10 @@ export function CreateAutoPushDialog({
     }
     if (form.target_type === "segment" && !form.target_segment_id.trim()) {
       setError("Please select a target segment.");
+      return;
+    }
+    if (form.target_type === "follower" && form.target_follower_ids.length === 0) {
+      setError("Please select at least one follower.");
       return;
     }
 
@@ -275,21 +334,6 @@ export function CreateAutoPushDialog({
       setSaving(false);
     }
   };
-
-  // Derived: selected flex message template
-  const selectedFlex = flexMessages.find((fm) => fm.id === form.flex_message_id);
-
-  // Helper: parse bubble/carousel type from Flex Message JSON content
-  const getFlexType = (content: string) => {
-    try { return (JSON.parse(content) as { type?: string })?.type ?? "bubble"; } catch { return "bubble"; }
-  };
-
-  // Filtered list for the flex selector search
-  const filteredFlexMessages = flexMessages.filter(
-    (fm) =>
-      fm.name.toLowerCase().includes(flexSearch.toLowerCase()) ||
-      fm.description.toLowerCase().includes(flexSearch.toLowerCase())
-  );
 
   return (
     <Dialog
@@ -401,95 +445,13 @@ export function CreateAutoPushDialog({
         {/* Flex Message Picker */}
         {form.message_type === "flex" && (
           <Field label="Flex Message Template" required hint="Select a pre-designed Flex Message template to use">
-            <div className="relative">
-              {/* Trigger button */}
-              <button
-                type="button"
-                className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-background text-left disabled:bg-muted disabled:cursor-not-allowed"
-                onClick={() => setFlexSelectorOpen((o) => !o)}
-                disabled={saving || loadingData}
-              >
-                {selectedFlex ? (
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="truncate font-medium">{selectedFlex.name}</span>
-                    <span className="font-mono text-muted-foreground text-xs flex-shrink-0">
-                      #{selectedFlex.id.slice(-8)}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">
-                    {loadingData ? "Loading templates..." : "Select a Flex Message template..."}
-                  </span>
-                )}
-                <ChevronDown size={14} className="flex-shrink-0 text-muted-foreground ml-2" />
-              </button>
-
-              {/* Dropdown panel */}
-              {flexSelectorOpen && (
-                <>
-                  {/* Click-outside overlay */}
-                  <div className="fixed inset-0 z-10" onClick={() => setFlexSelectorOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-background border rounded-md shadow-lg max-h-72 overflow-y-auto">
-                    {/* Search */}
-                    <div className="p-2 border-b sticky top-0 bg-background">
-                      <input
-                        className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                        placeholder="Search by name or description..."
-                        value={flexSearch}
-                        onChange={(e) => setFlexSearch(e.target.value)}
-                        autoFocus
-                      />
-                    </div>
-
-                    {/* Template items */}
-                    {filteredFlexMessages.map((fm) => (
-                      <button
-                        key={fm.id}
-                        type="button"
-                        className={cn(
-                          "w-full text-left px-3 py-2 hover:bg-muted text-sm flex items-start gap-2 border-b last:border-b-0",
-                          form.flex_message_id === fm.id && "bg-muted"
-                        )}
-                        onClick={() => {
-                          set("flex_message_id")(fm.id);
-                          setFlexSelectorOpen(false);
-                          setFlexSearch("");
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-medium">{fm.name}</span>
-                            <span className="font-mono text-muted-foreground text-xs">
-                              #{fm.id.slice(-8)}
-                            </span>
-                          </div>
-                          {fm.description && (
-                            <p className="text-xs text-muted-foreground truncate">{fm.description}</p>
-                          )}
-                        </div>
-                        <div className="flex flex-col items-end gap-1 flex-shrink-0 pt-0.5">
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {getFlexType(fm.content)}
-                          </Badge>
-                          {fm.variables.length > 0 && (
-                            <span className="text-xs text-muted-foreground">
-                              {fm.variables.length} var{fm.variables.length > 1 ? "s" : ""}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-
-                    {filteredFlexMessages.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        {flexSearch ? "No templates match your search." : "No Flex Message templates found."}
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-
+            <FlexMessagePicker
+              value={form.flex_message_id}
+              onChange={set("flex_message_id")}
+              flexMessages={flexMessages}
+              disabled={saving}
+              loading={loadingData}
+            />
             {flexMessages.length === 0 && !loadingData && (
               <p className="text-xs text-muted-foreground mt-1">
                 No Flex Message templates found.{" "}
@@ -547,6 +509,75 @@ export function CreateAutoPushDialog({
                 </option>
               ))}
             </select>
+          </Field>
+        )}
+
+        {/* Target Follower Search */}
+        {form.target_type === "follower" && (
+          <Field label="Search Followers" required hint="Type a name, phone, or email to search">
+            {/* Selected chips */}
+            {selectedFollowers.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {selectedFollowers.map((f) => (
+                  <span
+                    key={f.id}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
+                  >
+                    {f.display_name || f.line_user_id}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFollower(f.id)}
+                      className="hover:text-destructive"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="relative">
+              <input
+                type="text"
+                className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Search by name, phone, or email..."
+                value={followerSearch}
+                onChange={(e) => handleFollowerSearchChange(e.target.value)}
+                onFocus={() => followerResults.length > 0 && setFollowerSearchOpen(true)}
+                disabled={saving || !lineOAId}
+              />
+              {loadingFollowers && (
+                <RefreshCw size={12} className="absolute right-2.5 top-2.5 animate-spin text-muted-foreground" />
+              )}
+              {followerSearchOpen && followerResults.length > 0 && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setFollowerSearchOpen(false)} />
+                  <div className="absolute z-20 mt-1 w-full bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {followerResults.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-muted text-sm border-b last:border-b-0 flex items-center gap-2"
+                        onClick={() => handleSelectFollower(f)}
+                      >
+                        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {f.picture_url
+                            ? <img src={f.picture_url} alt="" className="w-full h-full object-cover" />
+                            : <span className="text-xs text-muted-foreground">{(f.display_name || "?")[0]}</span>
+                          }
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{f.display_name || f.line_user_id}</div>
+                          {f.phone && <div className="text-xs text-muted-foreground">{f.phone}</div>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            {!lineOAId && (
+              <p className="text-xs text-muted-foreground mt-1">Select a LINE OA first to search followers.</p>
+            )}
           </Field>
         )}
 

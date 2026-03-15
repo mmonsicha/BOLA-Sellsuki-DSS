@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { autoReplyApi } from "@/api/autoReply";
 import { lineOAApi } from "@/api/lineOA";
 import type { AutoReply, LineOA, TriggerType } from "@/types";
+import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import { AutoReplyDialog } from "./AutoReplyDialog";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 import {
@@ -41,6 +42,7 @@ const triggerVariant: Record<TriggerType, "default" | "secondary" | "success" | 
 
 export function AutoReplyPage() {
   const toast = useToast();
+  const { isEditorOrAbove } = useCurrentAdmin();
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [selectedOA, setSelectedOA] = useState("");
   const [autoReplies, setAutoReplies] = useState<AutoReply[]>([]);
@@ -125,6 +127,13 @@ export function AutoReplyPage() {
       return updated.slice().sort((a, b) => a.priority - b.priority);
     });
     setDialogOpen(false);
+    // Toast: next-step suggestion
+    toast.toast({
+      variant: "success",
+      title: "Auto-reply rule saved",
+      description: "Add AI chatbot for queries outside your rules",
+      duration: 6000,
+    });
   };
 
   // ---- drag-to-reorder handlers ----
@@ -175,10 +184,12 @@ export function AutoReplyPage() {
           <p className="text-sm text-muted-foreground">
             Automatically reply to messages based on triggers.
           </p>
-          <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={openCreate} disabled={!selectedOA}>
-            <Plus size={16} />
-            New Auto Reply
-          </Button>
+          {isEditorOrAbove && (
+            <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={openCreate} disabled={!selectedOA}>
+              <Plus size={16} />
+              New Auto Reply
+            </Button>
+          )}
         </div>
 
         {/* LINE OA Filter */}
@@ -215,10 +226,12 @@ export function AutoReplyPage() {
               <p className="text-sm text-muted-foreground mt-1">
                 Set up automated replies for follows, keywords, and more.
               </p>
-              <Button className="mt-4 gap-2" onClick={openCreate}>
-                <Plus size={16} />
-                New Auto Reply
-              </Button>
+              {isEditorOrAbove && (
+                <Button className="mt-4 gap-2" onClick={openCreate}>
+                  <Plus size={16} />
+                  New Auto Reply
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
@@ -338,18 +351,18 @@ export function AutoReplyPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
+            <AlertDialogTitle>Delete Auto Reply</AlertDialogTitle>
             <AlertDialogDescription>
-              คุณต้องการลบ "{deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+              Delete "{deleteTarget?.name}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
             >
-              ลบ
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

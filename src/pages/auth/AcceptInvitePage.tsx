@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authApi } from "@/api/auth";
-import { setToken, setWorkspaceId } from "@/lib/auth";
+import { setToken, setWorkspaceId, setTokenExpiry } from "@/lib/auth";
 import { KeyRound } from "lucide-react";
 
 export function AcceptInvitePage() {
@@ -34,6 +34,7 @@ export function AcceptInvitePage() {
       const result = await authApi.acceptInvite(workspaceId, email, password);
       setToken(result.token);
       setWorkspaceId(workspaceId);
+      setTokenExpiry(result.expires_at);
       window.location.href = "/";
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to set password";

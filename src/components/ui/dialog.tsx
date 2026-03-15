@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,17 +23,19 @@ interface DialogProps {
 }
 
 export function Dialog({ open, onClose, onOpenChange, title, description, children, className }: DialogProps) {
-  const handleClose = onClose ?? (() => onOpenChange?.(false));
+  // Use a ref so the escape handler never becomes stale without causing effect re-runs
+  const handleCloseRef = useRef<() => void>(() => {});
+  handleCloseRef.current = onClose ?? (() => onOpenChange?.(false));
 
-  // Close on Escape key
+  // Close on Escape key — only depends on `open`, not on the close callback
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape") handleCloseRef.current();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [open, handleClose]);
+  }, [open]);
 
   // Prevent body scroll when open
   useEffect(() => {

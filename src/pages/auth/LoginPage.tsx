@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authApi, type WorkspaceEntry } from "@/api/auth";
-import { setToken, setWorkspaceId } from "@/lib/auth";
+import { setToken, setWorkspaceId, setTokenExpiry } from "@/lib/auth";
 import { Building2, LogIn, ChevronRight } from "lucide-react";
 
 type Step = "credentials" | "workspace-picker";
@@ -28,6 +28,7 @@ export function LoginPage() {
         const ws = result.workspaces[0];
         setToken(ws.token);
         setWorkspaceId(ws.id);
+        setTokenExpiry(ws.expires_at);
         window.location.href = "/";
       } else {
         setWorkspaces(result.workspaces);
@@ -48,6 +49,7 @@ export function LoginPage() {
   function handleSelectWorkspace(ws: WorkspaceEntry) {
     setToken(ws.token);
     setWorkspaceId(ws.id);
+    setTokenExpiry(ws.expires_at);
     window.location.href = "/";
   }
 
@@ -100,9 +102,14 @@ export function LoginPage() {
                   {loading ? "Signing in…" : "Sign in"}
                 </Button>
               </form>
-              <p className="mt-4 text-xs text-center text-gray-400">
-                Contact your workspace admin if you need access.
-              </p>
+              <div className="mt-4 flex flex-col items-center gap-1">
+                <a href="/forgot-password" className="text-xs text-gray-400 hover:text-gray-600 hover:underline">
+                  Forgot password?
+                </a>
+                <p className="text-xs text-gray-400">
+                  Contact your workspace admin if you need access.
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
