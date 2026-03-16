@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Layers, Trash2, Edit, AlertCircle, ArrowLeft } from "lucide-react";
+import { Plus, Layers, Trash2, Edit, AlertCircle, ArrowLeft, Info } from "lucide-react";
 import { useState, useEffect } from "react";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { workspaceApi } from "@/api/workspace";
@@ -261,6 +261,16 @@ export function FlexMessagesPage() {
       )}
 
       <div className="space-y-6">
+        {/* Workspace-scope notice */}
+        <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <Info size={16} className="mt-0.5 shrink-0 text-blue-500" />
+          <p>
+            <span className="font-semibold">Workspace-wide templates:</span> Flex Message templates are shared across{" "}
+            <span className="font-semibold">all LINE OAs</span> in this workspace. Any template you create here can be used
+            in broadcasts or auto-push messages for any OA.
+          </p>
+        </div>
+
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <p className="text-sm text-muted-foreground sm:max-w-lg">

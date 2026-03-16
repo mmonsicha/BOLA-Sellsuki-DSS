@@ -11,6 +11,7 @@ export interface LineOA {
   liff_id: string;
   status: "active" | "inactive" | "error";
   is_default: boolean;
+  follower_count: number;
   created_at: string;
   updated_at: string;
 }

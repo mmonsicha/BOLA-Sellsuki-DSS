@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Eye, EyeOff } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, HelpCircle } from "lucide-react";
 import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
 
@@ -166,7 +166,7 @@ export function ConnectLineOADialog({ open, onClose, onCreated }: ConnectLineOAD
       title="Connect LINE Official Account"
       description="Enter your LINE Developer Console credentials to link your OA."
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
         {/* Name */}
         <Field label="Display Name" required>
           <TextInput
@@ -263,6 +263,12 @@ export function ConnectLineOADialog({ open, onClose, onCreated }: ConnectLineOAD
           <label htmlFor="is_default" className="text-sm cursor-pointer select-none">
             Set as default LINE OA
           </label>
+          <span className="relative group">
+            <HelpCircle size={13} className="text-muted-foreground cursor-help" />
+            <span className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 w-64 rounded bg-gray-800 px-2.5 py-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50">
+              The default LINE OA is used when no specific OA is selected in broadcasts and auto-replies.
+            </span>
+          </span>
         </div>
 
         {/* Error */}

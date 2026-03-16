@@ -66,6 +66,7 @@ export function SettingsPage() {
       .catch(() => {
         // Not configured yet — ignore
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadLogs = (page = 1) => {
@@ -175,7 +176,7 @@ export function SettingsPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Slug</label>
+              <label className="text-sm font-medium">URL Identifier (Slug)</label>
               <div className="mt-1 flex items-center gap-2">
                 <input
                   type="text"

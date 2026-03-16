@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Copy } from "lucide-react";
+import { Plus, RefreshCw, Copy, Users } from "lucide-react";
 import { useState, useEffect } from "react";
 import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
@@ -54,7 +54,7 @@ export function LineOAPage() {
 
   const copyWebhookURL = (oa: LineOA) => {
     if (!oa.webhook_url) return;
-    navigator.clipboard.writeText(oa.webhook_url);
+    void navigator.clipboard.writeText(oa.webhook_url);
     setCopiedId(oa.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -148,6 +148,10 @@ export function LineOAPage() {
                       {oa.is_default && (
                         <Badge variant="outline" className="text-xs">Default</Badge>
                       )}
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Users size={12} />
+                        {(oa.follower_count ?? 0).toLocaleString()}
+                      </span>
                     </div>
 
                     {/* Description */}
