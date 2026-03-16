@@ -19,20 +19,24 @@ export default defineConfig({
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
     proxy: {
+      "/auth": {
+        target: "http://localhost:8081",
+        changeOrigin: true,
+      },
       "/v1": {
-        target: "http://localhost:8080",
+        target: "http://localhost:8081",
         changeOrigin: true,
       },
       "/webhook/": {
-        target: "http://localhost:8080",
+        target: "http://localhost:8081",
         changeOrigin: true,
       },
       "/uploads/": {
-        target: "http://localhost:8080",
+        target: "http://localhost:8081",
         changeOrigin: true,
       },
       "/media/": {
-        target: "http://localhost:8080",
+        target: "http://localhost:8081",
         changeOrigin: true,
       },
     },

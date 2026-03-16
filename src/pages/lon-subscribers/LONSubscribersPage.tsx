@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081";
 
 const statusVariant = {
   active: "success" as const,
