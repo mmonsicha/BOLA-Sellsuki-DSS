@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { FeedbackWidget } from "@/components/common/FeedbackWidget";
+import { DatabaseAlert } from "@/components/common/DatabaseAlert";
+import { useHealthCheck } from "@/hooks/useHealthCheck";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,6 +13,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const { dbOk } = useHealthCheck();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -42,6 +45,9 @@ export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
             </div>
           </div>
         </header>
+
+        {/* Database health alert — shown when backend DB is unreachable */}
+        <DatabaseAlert visible={!dbOk} />
 
         {/* Main content */}
         <main className={fullHeight ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto p-4 sm:p-6"}>
