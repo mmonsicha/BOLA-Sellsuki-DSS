@@ -162,8 +162,9 @@ export function AddWebhookDialog({
   // Load LINE OAs when dialog opens
   useEffect(() => {
     if (open) {
-      loadLineOAs();
+      void loadLineOAs();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const loadLineOAs = async () => {
@@ -243,7 +244,7 @@ export function AddWebhookDialog({
       title="Add Webhook"
       description="Create a new webhook to receive events from external systems"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
         {/* Error */}
         {error && (
           <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
@@ -281,7 +282,7 @@ export function AddWebhookDialog({
         </Field>
 
         {/* Webhook Type */}
-        <Field label="Webhook Type">
+        <Field label="Webhook Type" hint="External Hook (HOOK): your own server calls BOLA when an event occurs. LINE Platform (LINE-HOOK): auto-created per OA to receive LINE events — cannot be created manually.">
           <select
             className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
             value={form.webhook_type}
@@ -335,6 +336,19 @@ export function AddWebhookDialog({
             placeholder="What is this webhook for? Who manages it?"
             disabled={saving}
             rows={2}
+          />
+        </Field>
+
+        {/* Security Token */}
+        <Field
+          label="Security Token"
+          hint="Optional. When set, BOLA verifies incoming requests using HMAC-SHA256 — only requests signed with this token are accepted. Leave blank to skip verification (not recommended for production)."
+        >
+          <SecretInput
+            value={form.security_token}
+            onChange={set("security_token")}
+            placeholder="Shared secret (leave blank to skip)"
+            disabled={saving}
           />
         </Field>
 

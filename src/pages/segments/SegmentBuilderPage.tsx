@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, X, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
+import { ArrowLeft, Plus, X, RefreshCw, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
 import { segmentApi } from "@/api/segment";
 import { lineOAApi } from "@/api/lineOA";
 import { workspaceApi } from "@/api/workspace";
@@ -295,7 +295,7 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
         setLoadingPage(false);
       }
     };
-    load();
+    void load();
   }, [mode, segmentId]);
 
   // Debounced preview count
@@ -501,7 +501,16 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
 
               {/* Dynamic toggle */}
               <div className="space-y-1">
-                <label className="text-sm font-medium">Dynamic</label>
+                <label className="flex items-center gap-1.5 text-sm font-medium">
+                  Dynamic
+                  <span className="relative group inline-flex items-center">
+                    <HelpCircle size={13} className="text-muted-foreground cursor-help" />
+                    <span className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 w-72 rounded bg-gray-800 px-2.5 py-1.5 text-xs text-white font-normal opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 leading-relaxed">
+                      <strong>Dynamic:</strong> audience is re-calculated at send time — always uses the freshest follower data. Use for recurring broadcasts.{"\n"}
+                      <strong>Static:</strong> audience is a fixed snapshot taken when the segment is saved. Useful when you need a precise, unchanging list.
+                    </span>
+                  </span>
+                </label>
                 <div className="flex items-center gap-3 py-2">
                   <button
                     type="button"
@@ -685,7 +694,7 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
           </Button>
           <Button
             type="button"
-            onClick={handleSave}
+            onClick={() => { void handleSave(); }}
             disabled={saving || !name.trim() || !selectedLineOAId}
           >
             {saving ? (

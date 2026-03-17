@@ -41,7 +41,7 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   uri: "Open URL",
   message: "Send Message",
   postback: "Postback",
-  richmenuswitch: "Switch Page",
+  richmenuswitch: "Switch Menu Page",
   none: "No Action",
 };
 
@@ -491,7 +491,11 @@ function AreaEditor({ area, pageCount, onChange, onDelete }: AreaEditorProps) {
               value={area.action_data}
               onChange={(e) => onChange({ action_data: e.target.value })}
               placeholder="action=buy&item=1"
+              maxLength={300}
             />
+            <p className="text-xs text-muted-foreground">
+              Max 300 chars. This value is sent to BOLA Auto-Reply when the user taps — configure a matching Postback rule in Auto Reply to respond.
+            </p>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Display Text (optional)</Label>

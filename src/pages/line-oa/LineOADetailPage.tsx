@@ -242,6 +242,20 @@ export function LineOADetailPage() {
     }
   };
 
+  const handleToggleDefault = async () => {
+    if (!oa) return;
+    const newValue = !isDefault;
+    setIsDefault(newValue);
+    try {
+      const updated = await lineOAApi.update(oa.id, { is_default: newValue });
+      setOa(updated);
+      setIsDefault(updated.is_default);
+    } catch (err) {
+      setIsDefault(!newValue); // revert on error
+      toast.error(err instanceof Error ? err.message : "Failed to update.");
+    }
+  };
+
   // Danger zone
   const [deleting, setDeleting] = useState(false);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
@@ -268,7 +282,6 @@ export function LineOADetailPage() {
       const updated = await lineOAApi.update(oa.id, {
         name: name.trim(),
         description: description.trim() || undefined,
-        is_default: isDefault,
       });
       setOa(updated);
       setName(updated.name);
@@ -410,6 +423,16 @@ export function LineOADetailPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-lg">{oa.name}</span>
               <Badge variant={statusVariant[oa.status]}>{oa.status}</Badge>
+              {oa.basic_id && (
+                <a
+                  href={`https://line.me/R/ti/p/${oa.basic_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-line/10 text-line hover:bg-line/20 transition-colors border border-line/20"
+                >
+                  {oa.basic_id}
+                </a>
+              )}
               {oa.is_default && (
                 <Badge variant="outline" className="text-xs">Default</Badge>
               )}
@@ -421,6 +444,18 @@ export function LineOADetailPage() {
               Connected {new Date(oa.created_at).toLocaleDateString()}
             </p>
           </div>
+          <button
+            onClick={() => { void handleToggleDefault(); }}
+            title={isDefault ? "Default OA — click to unset" : "Set as default OA"}
+            className={`flex-shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
+              isDefault
+                ? "bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
+                : "text-muted-foreground border-border hover:border-primary/30 hover:text-primary"
+            }`}
+          >
+            <CheckCircle2 size={13} className={isDefault ? "text-primary" : "text-muted-foreground"} />
+            {isDefault ? "Default" : "Set default"}
+          </button>
         </div>
 
         {/* ── Card 1: Webhook Integration ───────────────────────────────────── */}
@@ -572,23 +607,37 @@ export function LineOADetailPage() {
               </div>
             )}
 
-            {syncStatus && syncStatus.status === "failed" && (
-              <div className="space-y-3">
-                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
-                  Sync failed: {syncStatus.error_message || "Unknown error"}
+            {syncStatus && syncStatus.status === "failed" && (() => {
+              const is403 = syncStatus.error_message?.includes("403") || syncStatus.error_message?.includes("Access to this API is not available");
+              return (
+                <div className="space-y-3">
+                  <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2 space-y-1">
+                    {is403 ? (
+                      <>
+                        <p className="font-medium">Follower sync is not available for this LINE OA plan.</p>
+                        <p className="text-xs text-destructive/80">
+                          The LINE Followers API requires a <strong>Verified</strong> or <strong>Premium</strong> LINE Official Account.
+                          Free accounts cannot list follower IDs via API.
+                          New followers will still be added automatically when they message you via webhook.
+                        </p>
+                      </>
+                    ) : (
+                      <p>Sync failed: {syncStatus.error_message || "Unknown error"}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { void handleStartSync(); }}
+                    disabled={startingSync}
+                    className="gap-2"
+                  >
+                    <RefreshCw size={13} />
+                    Retry
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { void handleStartSync(); }}
-                  disabled={startingSync}
-                  className="gap-2"
-                >
-                  <RefreshCw size={13} />
-                  Retry
-                </Button>
-              </div>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
 
@@ -605,6 +654,12 @@ export function LineOADetailPage() {
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Bell size={16} />
                   LINE Notification Messaging (LON)
+                  <span className="relative group inline-flex items-center">
+                    <HelpCircle size={14} className="text-muted-foreground cursor-help" />
+                    <span className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 w-72 rounded bg-gray-800 px-2.5 py-1.5 text-xs text-white font-normal opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 leading-relaxed">
+                      LON lets you send LINE notifications to users without a prior follow. Unlike Broadcasts, users see a consent prompt the first time. Requires LINE Partner approval and is available in Thailand, Japan, and Taiwan only.
+                    </span>
+                  </span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -630,7 +685,7 @@ export function LineOADetailPage() {
                       <CopyButton text={consentURL} />
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      LINE calls this URL when a user grants LON consent.
+                      LINE calls this URL when a user grants LON consent. BOLA registers the subscriber automatically. Copy this URL into the LINE Developers Console → Messaging API → LINE Notification Messaging.
                     </p>
                   </div>
 
@@ -641,7 +696,7 @@ export function LineOADetailPage() {
                       <CopyButton text={revokeURL} />
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      LINE calls this URL when a user revokes LON consent.
+                      LINE calls this URL when a user revokes LON consent. BOLA removes the subscriber automatically. Copy this URL into the LINE Developers Console alongside the Consent Callback URL.
                     </p>
                   </div>
                 </div>
@@ -745,26 +800,6 @@ export function LineOADetailPage() {
                 disabled={savingGeneral}
               />
             </Field>
-
-            <div className="flex items-center gap-2">
-              <input
-                id="is_default_edit"
-                type="checkbox"
-                className="rounded border-gray-300 text-primary focus:ring-ring"
-                checked={isDefault}
-                onChange={(e) => setIsDefault(e.target.checked)}
-                disabled={savingGeneral}
-              />
-              <label htmlFor="is_default_edit" className="text-sm cursor-pointer select-none">
-                Set as default LINE OA
-              </label>
-              <span className="relative group">
-                <HelpCircle size={13} className="text-muted-foreground cursor-help" />
-                <span className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 w-64 rounded bg-gray-800 px-2.5 py-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50">
-                  The default LINE OA is used when no specific OA is selected in broadcasts and auto-replies.
-                </span>
-              </span>
-            </div>
 
             <div className="flex justify-end pt-2">
               <Button

@@ -22,6 +22,7 @@ interface FeedbackContext {
   visibleHeadings: string[];
   activeField?: string;
   screenshot?: string; // base64 JPEG, max 800px wide
+  environment: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -270,6 +271,7 @@ export function FeedbackWidget() {
       visibleHeadings: getVisibleHeadings(),
       activeField: (document.activeElement as HTMLElement)?.getAttribute("name") ?? undefined,
       screenshot: screenshotDataUrl,
+      environment: import.meta.env.VITE_APP_ENV ?? import.meta.env.MODE ?? "development",
     };
 
     // Strip screenshot from context JSON if it's huge — keep it as a separate field
@@ -290,6 +292,13 @@ export function FeedbackWidget() {
   }
 
   const displayRating = hoverRating || rating;
+  const appEnv = import.meta.env.VITE_APP_ENV ?? import.meta.env.MODE ?? "development";
+  const envBadgeColor =
+    appEnv === "production"
+      ? "bg-red-100 text-red-700"
+      : appEnv === "staging"
+        ? "bg-yellow-100 text-yellow-700"
+        : "bg-gray-100 text-gray-500";
 
   return (
     <div id="feedback-widget-root">
@@ -325,7 +334,12 @@ export function FeedbackWidget() {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
-            <span className="text-sm font-semibold text-gray-800">ส่งความคิดเห็น</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-800">ส่งความคิดเห็น</span>
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${envBadgeColor}`}>
+                {appEnv}
+              </span>
+            </div>
             <button
               onClick={handleClose}
               aria-label="ปิด"

@@ -39,6 +39,7 @@ import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
 import { LONDeliveryLogsPage } from "@/pages/lon-delivery-logs/LONDeliveryLogsPage";
 import { LONByPhonePage } from "@/pages/lon-by-phone/LONByPhonePage";
 import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscribePage";
+import { RGBConsentPage } from "@/pages/lon/RGBConsentPage";
 import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFormsPage";
 import { RegistrationFormBuilderPage } from "@/pages/registration-forms/RegistrationFormBuilderPage";
 import { RegistrationSubmissionsPage } from "@/pages/registration-forms/RegistrationSubmissionsPage";
@@ -174,6 +175,8 @@ function Router() {
   if (path === "/reset-password") return <ResetPasswordPage />;
   // LON public subscribe page is also public (accessed via QR code from LINE)
   if (path.startsWith("/lon/subscribe/")) return <LONPublicSubscribePage />;
+  // RGB LIFF consent page — opened inside LINE via LIFF link
+  if (path === "/lon/rgb-consent") return <RGBConsentPage />;
 
   // ── Auth guard ────────────────────────────────────────────────────────────
   if (!isAuthenticated()) {

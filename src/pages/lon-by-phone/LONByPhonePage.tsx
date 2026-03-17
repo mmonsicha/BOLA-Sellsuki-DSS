@@ -226,8 +226,23 @@ export function LONByPhonePage() {
   const [sendError, setSendError] = useState("");
   const [sendSuccess, setSendSuccess] = useState(false);
 
-  // Map from truncated phone_hash prefix → original phone for display in logs
-  const [sentPhoneMap, setSentPhoneMap] = useState<Record<string, string>>({});
+  // Map from phone_hash → masked phone for display in logs. Persisted to localStorage
+  // so it survives page reloads. Key: "bola_lon_phone_map".
+  const [sentPhoneMap, setSentPhoneMapState] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("bola_lon_phone_map") ?? "{}") as Record<string, string>;
+    } catch {
+      return {};
+    }
+  });
+
+  function setSentPhoneMap(updater: (prev: Record<string, string>) => Record<string, string>) {
+    setSentPhoneMapState((prev) => {
+      const next = updater(prev);
+      try { localStorage.setItem("bola_lon_phone_map", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   // Load OAs
   useEffect(() => {
@@ -317,11 +332,11 @@ export function LONByPhonePage() {
         page_size: PAGE_SIZE,
       });
       const newLogs = res.data ?? [];
-      // Store phone mapping: match the first log after send (most recent)
+      // Store masked phone mapping so it survives page reloads
       if (newLogs.length > 0) {
         setSentPhoneMap((prev) => ({
           ...prev,
-          [newLogs[0].phone_hash]: trimmedPhone,
+          [newLogs[0].phone_hash]: maskPhone(trimmedPhone),
         }));
       }
       setLogs(newLogs);
@@ -527,22 +542,22 @@ export function LONByPhonePage() {
           ) : (
             <>
               {logs.map((log) => {
-                const originalPhone = sentPhoneMap[log.phone_hash];
+                const maskedPhone = sentPhoneMap[log.phone_hash];
                 return (
                 <Card key={log.id}>
                   <CardContent className="py-3 flex items-center justify-between gap-4">
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2 flex-wrap">
-                        {originalPhone ? (
+                        {maskedPhone ? (
                           <span className="text-xs font-mono text-foreground font-medium">
-                            {maskPhone(originalPhone)}
+                            {maskedPhone}
                           </span>
                         ) : (
                           <span
                             className="text-xs font-mono text-muted-foreground truncate max-w-[200px]"
                             title={log.phone_hash}
                           >
-                            {log.phone_hash.slice(0, 16)}…
+                            {log.phone_hash.slice(0, 8)}…
                           </span>
                         )}
                         <Badge
