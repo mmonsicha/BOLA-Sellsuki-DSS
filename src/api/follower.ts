@@ -18,6 +18,19 @@ export interface UpdateFollowerBody {
   custom_fields?: Record<string, string>;
 }
 
+export interface FollowerSyncStatus {
+  status: "idle" | "fetching_ids" | "syncing_profiles" | "completed" | "failed";
+  total_ids: number;
+  synced_count: number;
+  new_count: number;
+  updated_count: number;
+  skipped_count: number;
+  failed_count: number;
+  error_message?: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
 export const followerApi = {
   list: (params: ListFollowersParams) =>
     api.get<PaginatedResponse<Follower>>("/v1/followers", params),
@@ -27,4 +40,10 @@ export const followerApi = {
 
   update: (id: string, body: UpdateFollowerBody) =>
     api.put<Follower>(`/v1/followers/${id}`, body),
+
+  startSync: (lineOAId: string) =>
+    api.post<FollowerSyncStatus>(`/v1/followers/sync?line_oa_id=${lineOAId}`, {}),
+
+  getSyncStatus: (lineOAId: string) =>
+    api.get<FollowerSyncStatus>(`/v1/followers/sync/status`, { line_oa_id: lineOAId }),
 };

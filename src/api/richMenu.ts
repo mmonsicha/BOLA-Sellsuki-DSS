@@ -3,7 +3,12 @@ import type { RichMenu, RichMenuPage, RichMenuPageArea, RichMenuAssignment, Quic
 const BASE = "/v1";
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options);
+  const token = localStorage.getItem("bola_token");
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...authHeaders, ...(options?.headers as Record<string, string>) },
+  });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || json.message || `Request failed: ${res.status}`);
   return json;

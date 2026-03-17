@@ -26,6 +26,7 @@ export function Dialog({ open, onClose, onOpenChange, title, description, childr
   // Use a ref so the escape handler never becomes stale without causing effect re-runs
   const handleCloseRef = useRef<() => void>(() => {});
   handleCloseRef.current = onClose ?? (() => onOpenChange?.(false));
+  const handleClose = () => handleCloseRef.current();
 
   // Close on Escape key — only depends on `open`, not on the close callback
   useEffect(() => {

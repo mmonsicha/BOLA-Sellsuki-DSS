@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { QRCodeSVG } from "qrcode.react";
 import {
   RefreshCw, Bell, Phone, X, CheckCircle2,
-  Upload, QrCode, Copy, ChevronDown, ChevronUp, Info, Send,
+  Upload, QrCode, Copy, ChevronDown, ChevronUp, Info, Send, Download,
 } from "lucide-react";
 import type { LONSubscriber, LONSubscriberStats, LineOA } from "@/types";
 import { lonApi, type BulkSubscribeByPhoneResult, type SendConsentRequestResult } from "@/api/lon";
@@ -202,10 +202,35 @@ function BulkImportModal({ lineOAId, onClose, onDone }: BulkImportModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t flex justify-end gap-2">
+        <div className="px-5 py-3 border-t flex justify-end gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={onClose}>
             {result ? "Close" : "Cancel"}
           </Button>
+          {result && result.failed.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => {
+                const rows = [
+                  "phone_number,error_reason",
+                  ...result.failed.map((f) =>
+                    `"${f.phone_number}","${f.error.replace(/"/g, '""')}"`
+                  ),
+                ].join("\n");
+                const blob = new Blob([rows], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "bulk_import_errors.csv";
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download size={13} />
+              Download Error Report ({result.failed.length})
+            </Button>
+          )}
           {!result && (
             <Button
               size="sm"
@@ -665,7 +690,7 @@ export function LONSubscribersPage() {
   }
 
   return (
-    <AppLayout title="LON Subscribers">
+    <AppLayout title="LINE Notification Subscribers">
       <div className="space-y-4">
         {/* Header */}
         <div className="flex flex-col gap-3">
