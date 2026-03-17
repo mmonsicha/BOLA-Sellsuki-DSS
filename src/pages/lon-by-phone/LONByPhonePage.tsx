@@ -219,11 +219,15 @@ export function LONByPhonePage() {
 
   // Send form state
   const [phone, setPhone] = useState("");
+  const [phoneValidationError, setPhoneValidationError] = useState("");
   const [templateKey, setTemplateKey] = useState("");
   const [bodyJson, setBodyJson] = useState('{\n  "items": []\n}');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
   const [sendSuccess, setSendSuccess] = useState(false);
+
+  // Map from truncated phone_hash prefix → original phone for display in logs
+  const [sentPhoneMap, setSentPhoneMap] = useState<Record<string, string>>({});
 
   // Load OAs
   useEffect(() => {
@@ -252,17 +256,47 @@ export function LONByPhonePage() {
       .finally(() => setLogsLoading(false));
   }, [selectedLineOAId, page]);
 
+  function maskPhone(p: string): string {
+    // Show first 3 chars (e.g. "+66") and last 3 digits, mask the rest
+    const trimmed = p.trim();
+    if (trimmed.length <= 6) return trimmed;
+    const prefix = trimmed.slice(0, 3);
+    const suffix = trimmed.slice(-3);
+    const masked = "*".repeat(Math.max(0, trimmed.length - 6));
+    return `${prefix}${masked}${suffix}`;
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedLineOAId || !phone.trim() || !templateKey.trim()) return;
     setSendError("");
     setSendSuccess(false);
+    setPhoneValidationError("");
+
+    const trimmedPhone = phone.trim();
+    const trimmedKey = templateKey.trim();
+
+    if (!trimmedPhone) {
+      setPhoneValidationError("Phone number is required.");
+      return;
+    }
+    if (!trimmedPhone.startsWith("+") || trimmedPhone.length < 8) {
+      setPhoneValidationError("Phone number must be in E.164 format (e.g. +66812345678).");
+      return;
+    }
+    if (!trimmedKey) {
+      setSendError("Template key is required.");
+      return;
+    }
+    if (!selectedLineOAId) {
+      setSendError("Please select a LINE OA.");
+      return;
+    }
 
     let body: Record<string, unknown>;
     try {
       body = JSON.parse(bodyJson);
     } catch {
-      setSendError("Body must be valid JSON");
+      setSendError("Message body must be valid JSON.");
       return;
     }
 
@@ -270,8 +304,8 @@ export function LONByPhonePage() {
     try {
       await lonApi.sendLONByPhone({
         line_oa_id: selectedLineOAId,
-        phone_number: phone.trim(),
-        template_key: templateKey.trim(),
+        phone_number: trimmedPhone,
+        template_key: trimmedKey,
         body,
       });
       setSendSuccess(true);
@@ -282,11 +316,19 @@ export function LONByPhonePage() {
         page: 1,
         page_size: PAGE_SIZE,
       });
-      setLogs(res.data ?? []);
+      const newLogs = res.data ?? [];
+      // Store phone mapping: match the first log after send (most recent)
+      if (newLogs.length > 0) {
+        setSentPhoneMap((prev) => ({
+          ...prev,
+          [newLogs[0].phone_hash]: trimmedPhone,
+        }));
+      }
+      setLogs(newLogs);
       setPage(1);
       setTimeout(() => setSendSuccess(false), 4000);
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : "Failed to send");
+      setSendError(err instanceof Error ? err.message : "Failed to send notification. Please check your inputs and try again.");
     } finally {
       setSending(false);
     }
@@ -361,7 +403,7 @@ export function LONByPhonePage() {
                 Send Notification by Phone
               </span>
             </div>
-            <form onSubmit={handleSend} className="space-y-4">
+            <form onSubmit={(e) => void handleSend(e)} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Phone Number */}
                 <div className="space-y-1">
@@ -371,14 +413,21 @@ export function LONByPhonePage() {
                   <input
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setPhoneValidationError("");
+                    }}
                     placeholder="+66812345678"
                     disabled={sending}
-                    className="w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+                    className={`w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 ${phoneValidationError ? "border-destructive focus:ring-destructive/50" : ""}`}
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    E.164 format. Will be SHA256-hashed before sending.
-                  </p>
+                  {phoneValidationError ? (
+                    <p className="text-[11px] text-destructive font-medium">{phoneValidationError}</p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      E.164 format (e.g. +66812345678). Will be SHA256-hashed before sending.
+                    </p>
+                  )}
                 </div>
 
                 {/* Template Key */}
@@ -477,17 +526,25 @@ export function LONByPhonePage() {
             </Card>
           ) : (
             <>
-              {logs.map((log) => (
+              {logs.map((log) => {
+                const originalPhone = sentPhoneMap[log.phone_hash];
+                return (
                 <Card key={log.id}>
                   <CardContent className="py-3 flex items-center justify-between gap-4">
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className="text-xs font-mono text-muted-foreground truncate max-w-[200px]"
-                          title={log.phone_hash}
-                        >
-                          {log.phone_hash.slice(0, 16)}…
-                        </span>
+                        {originalPhone ? (
+                          <span className="text-xs font-mono text-foreground font-medium">
+                            {maskPhone(originalPhone)}
+                          </span>
+                        ) : (
+                          <span
+                            className="text-xs font-mono text-muted-foreground truncate max-w-[200px]"
+                            title={log.phone_hash}
+                          >
+                            {log.phone_hash.slice(0, 16)}…
+                          </span>
+                        )}
                         <Badge
                           variant={
                             log.status === "success" ? "success" : "destructive"
@@ -515,7 +572,8 @@ export function LONByPhonePage() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
               {/* Pagination */}
               <div className="flex items-center gap-2 justify-end">
                 <Button

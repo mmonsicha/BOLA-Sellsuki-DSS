@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Users, Zap, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Users, Zap, Trash2, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { segmentApi } from "@/api/segment";
 import type { Segment } from "@/types";
@@ -165,15 +165,24 @@ export function SegmentsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
-            <AlertDialogDescription>
-              คุณต้องการลบ "{deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>คุณต้องการลบ "{deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  <p>
+                    If this segment is used by any active broadcasts or auto-push messages, deleting it may affect
+                    scheduled sends. Please verify before proceeding.
+                  </p>
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+              onClick={() => { void handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
             >
               ลบ
             </AlertDialogAction>

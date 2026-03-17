@@ -16,9 +16,13 @@ import {
   EyeOff,
   CheckCircle2,
   Bell,
+  HelpCircle,
+  Users,
+  Download,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { lineOAApi } from "@/api/lineOA";
+import { followerApi, type FollowerSyncStatus } from "@/api/follower";
 import type { LineOA } from "@/types";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -178,6 +182,65 @@ export function LineOADetailPage() {
   const [savingLiff, setSavingLiff] = useState(false);
   const [savedLiff, setSavedLiff] = useState(false);
   const [liffError, setLiffError] = useState("");
+
+  // Follower sync
+  const [syncStatus, setSyncStatus] = useState<FollowerSyncStatus | null>(null);
+  const [startingSync, setStartingSync] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const pollSyncStatus = useCallback((oaId: string) => {
+    stopPolling();
+    const poll = () => {
+      followerApi.getSyncStatus(oaId).then((status) => {
+        setSyncStatus(status);
+        if (status.status === "completed" || status.status === "failed" || status.status === "idle") {
+          stopPolling();
+        }
+      }).catch(() => {
+        stopPolling();
+      });
+    };
+    poll(); // immediate first check
+    pollRef.current = setInterval(poll, 2000);
+  }, [stopPolling]);
+
+  // Fetch initial sync status on mount
+  useEffect(() => {
+    if (!id) return;
+    followerApi.getSyncStatus(id).then(setSyncStatus).catch(() => {});
+  }, [id]);
+
+  // Start polling if sync is in progress
+  const syncStatusValue = syncStatus?.status;
+  useEffect(() => {
+    if (syncStatusValue === "fetching_ids" || syncStatusValue === "syncing_profiles") {
+      if (!pollRef.current && id) {
+        pollSyncStatus(id);
+      }
+    }
+    return () => { stopPolling(); };
+  }, [syncStatusValue, id, pollSyncStatus, stopPolling]);
+
+  const handleStartSync = async () => {
+    if (!oa) return;
+    setStartingSync(true);
+    try {
+      const status = await followerApi.startSync(oa.id);
+      setSyncStatus(status);
+      pollSyncStatus(oa.id);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to start sync.");
+    } finally {
+      setStartingSync(false);
+    }
+  };
 
   // Danger zone
   const [deleting, setDeleting] = useState(false);
@@ -413,7 +476,123 @@ export function LineOADetailPage() {
           </CardContent>
         </Card>
 
-        {/* ── Card 2: LON Settings ─────────────────────────────────────────── */}
+        {/* ── Card 2: Sync Followers ─────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users size={16} />
+              Sync Followers
+              {oa.follower_count > 0 && (
+                <span className="text-sm font-normal text-muted-foreground ml-auto">
+                  {oa.follower_count.toLocaleString()} followers in BOLA
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(!syncStatus || syncStatus.status === "idle") && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Import existing followers from LINE into BOLA. This fetches all follower profiles
+                  (display name, picture, status message) from the LINE API. New followers from webhooks
+                  are imported automatically — use this to backfill existing ones.
+                </p>
+                <Button
+                  onClick={() => { void handleStartSync(); }}
+                  disabled={startingSync}
+                  className="gap-2"
+                >
+                  {startingSync ? (
+                    <RefreshCw size={14} className="animate-spin" />
+                  ) : (
+                    <Download size={14} />
+                  )}
+                  {startingSync ? "Starting..." : "Sync Followers from LINE"}
+                </Button>
+              </>
+            )}
+
+            {syncStatus && syncStatus.status === "fetching_ids" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <RefreshCw size={14} className="animate-spin text-primary" />
+                  <span>Fetching follower IDs from LINE...</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                  <div className="bg-primary h-full rounded-full animate-pulse w-1/3" />
+                </div>
+              </div>
+            )}
+
+            {syncStatus && syncStatus.status === "syncing_profiles" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <RefreshCw size={14} className="animate-spin text-primary" />
+                  <span>
+                    Syncing profiles: {syncStatus.synced_count.toLocaleString()} / {syncStatus.total_ids.toLocaleString()}
+                  </span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-primary h-full rounded-full transition-all duration-500"
+                    style={{ width: `${syncStatus.total_ids > 0 ? (syncStatus.synced_count / syncStatus.total_ids) * 100 : 0}%` }}
+                  />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
+                  <div>New: <span className="font-medium text-foreground">{syncStatus.new_count}</span></div>
+                  <div>Updated: <span className="font-medium text-foreground">{syncStatus.updated_count}</span></div>
+                  <div>Skipped: <span className="font-medium text-foreground">{syncStatus.skipped_count}</span></div>
+                  <div>Failed: <span className="font-medium text-foreground">{syncStatus.failed_count}</span></div>
+                </div>
+              </div>
+            )}
+
+            {syncStatus && syncStatus.status === "completed" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <CheckCircle2 size={14} />
+                  <span>Sync completed!</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
+                  <div>Total: <span className="font-medium text-foreground">{syncStatus.total_ids.toLocaleString()}</span></div>
+                  <div>New: <span className="font-medium text-foreground">{syncStatus.new_count}</span></div>
+                  <div>Updated: <span className="font-medium text-foreground">{syncStatus.updated_count}</span></div>
+                  <div>Skipped: <span className="font-medium text-foreground">{syncStatus.skipped_count}</span></div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { void handleStartSync(); }}
+                  disabled={startingSync}
+                  className="gap-2"
+                >
+                  <RefreshCw size={13} />
+                  Sync Again
+                </Button>
+              </div>
+            )}
+
+            {syncStatus && syncStatus.status === "failed" && (
+              <div className="space-y-3">
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                  Sync failed: {syncStatus.error_message || "Unknown error"}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { void handleStartSync(); }}
+                  disabled={startingSync}
+                  className="gap-2"
+                >
+                  <RefreshCw size={13} />
+                  Retry
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Card 3: LON Settings ─────────────────────────────────────────── */}
         {(() => {
           const backendOrigin = oa.webhook_url
             ? new URL(oa.webhook_url).origin
@@ -579,6 +758,12 @@ export function LineOADetailPage() {
               <label htmlFor="is_default_edit" className="text-sm cursor-pointer select-none">
                 Set as default LINE OA
               </label>
+              <span className="relative group">
+                <HelpCircle size={13} className="text-muted-foreground cursor-help" />
+                <span className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 w-64 rounded bg-gray-800 px-2.5 py-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50">
+                  The default LINE OA is used when no specific OA is selected in broadcasts and auto-replies.
+                </span>
+              </span>
             </div>
 
             <div className="flex justify-end pt-2">
