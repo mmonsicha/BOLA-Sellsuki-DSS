@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { chatSessionApi } from "@/api/aiChatbot";
 import { lineOAApi } from "@/api/lineOA";
-import type { ChatSession, ChatMessage, Media, LineOA } from "@/types";
+import { followerApi } from "@/api/follower";
+import type { ChatSession, ChatMessage, Media, LineOA, Follower } from "@/types";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { ChevronLeft, ImageIcon, X } from "lucide-react";
+import { ChevronLeft, ImageIcon, X, User } from "lucide-react";
 import { MediaPickerDialog } from "./MediaPickerDialog";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 import { toDisplayUrl } from "@/lib/mediaUtils";
@@ -74,6 +75,9 @@ export function ChatInboxPage() {
     catch { return {}; }
   });
 
+  // Follower profile cache: lineUserId → { display_name, picture_url, id }
+  const [followerCache, setFollowerCache] = useState<Record<string, { name: string; pic: string; id: string }>>({});
+
   // Media attachment
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -103,6 +107,32 @@ export function ChatInboxPage() {
     const t = setInterval(fetchSessions, 5000);
     return () => clearInterval(t);
   }, [fetchSessions]);
+
+  // ── Auto-enrich follower profile when display name is missing ────────────
+  useEffect(() => {
+    if (!selectedSession) return;
+    if (selectedSession.follower_display_name) return; // already have name
+    const lineUserId = selectedSession.line_chat_id;
+    const lineOAId = selectedSession.line_oa_id;
+    if (!lineUserId || !lineOAId) return;
+    if (followerCache[lineUserId]) return; // already fetched
+    followerApi.get(lineUserId, { line_oa_id: lineOAId })
+      .then((f: Follower | { data: Follower }) => {
+        const follower = ('data' in f ? f.data : f) as Follower;
+        if (follower?.id) {
+          setFollowerCache((prev) => ({
+            ...prev,
+            [lineUserId]: {
+              name: follower.display_name || lineUserId,
+              pic: follower.picture_url || "",
+              id: follower.id,
+            },
+          }));
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSession?.id]);
 
   // ── Messages polling ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -230,9 +260,11 @@ export function ChatInboxPage() {
     setMobileShowChat(true);
   };
 
-  // Derive display name and picture URL directly from denormalized session fields
-  const selectedName = selectedSession?.follower_display_name || selectedSession?.line_chat_id || "";
-  const selectedPicUrl = selectedSession?.follower_picture_url || "";
+  // Derive display name and picture URL — prefer session fields, fall back to follower cache
+  const cachedFollower = selectedSession ? followerCache[selectedSession.line_chat_id] : undefined;
+  const selectedName = selectedSession?.follower_display_name || cachedFollower?.name || selectedSession?.line_chat_id || "";
+  const selectedPicUrl = selectedSession?.follower_picture_url || cachedFollower?.pic || "";
+  const selectedFollowerId = cachedFollower?.id || "";
 
   return (
     <AppLayout title="Chat Inbox" fullHeight>
@@ -322,6 +354,15 @@ export function ChatInboxPage() {
                   <div className="font-semibold text-sm text-gray-900 truncate">{selectedName}</div>
                   {(selectedSession.chat_type === "group" || selectedSession.chat_type === "room") && (
                     <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium flex-shrink-0">Group</span>
+                  )}
+                  {selectedFollowerId && (
+                    <a
+                      href={`/followers/${selectedFollowerId}`}
+                      title="View follower profile"
+                      className="flex-shrink-0 p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <User size={13} />
+                    </a>
                   )}
                 </div>
                 <div className="hidden md:flex text-xs text-gray-400 items-center gap-1.5">
