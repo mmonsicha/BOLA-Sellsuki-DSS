@@ -88,11 +88,11 @@ export function AlertDialogTitle({ className, children }: React.HTMLAttributes<H
   );
 }
 
-export function AlertDialogDescription({ className, children }: React.HTMLAttributes<HTMLParagraphElement>) {
+export function AlertDialogDescription({ className, children }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <p className={cn("text-sm text-muted-foreground", className)}>
+    <div className={cn("text-sm text-muted-foreground", className)}>
       {children}
-    </p>
+    </div>
   );
 }
 

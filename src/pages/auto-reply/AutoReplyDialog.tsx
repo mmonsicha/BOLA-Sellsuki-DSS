@@ -613,7 +613,7 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
         </div>
 
         {/* ── Body ────────────────────────────────────────────────── */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <form onSubmit={(e) => { void handleSubmit(e); }} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
           {/* Name + Enabled toggle — side by side */}
           <div className="flex gap-3 items-end">
@@ -709,20 +709,47 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
                     </button>
                   ))}
                 </div>
+                {form.match_mode === "regex" && (
+                  <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong>Regex is for developers only.</strong> Invalid patterns will silently fail — the rule won&apos;t match anything.
+                      If you&apos;re not comfortable with regular expressions, use <strong>Contains</strong> instead.
+                    </span>
+                  </div>
+                )}
               </Field>
             </div>
           )}
 
           {/* Postback-specific field */}
           {form.trigger === "postback" && (
-            <div className="pl-3 border-l-2 border-blue-200">
-              <Field label="Postback data" required hint="Exact postback data string from the button action.">
-                <input
-                  className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="e.g. action=buy&item=123"
-                  value={form.postback_data}
-                  onChange={(e) => set("postback_data", e.target.value)}
-                />
+            <div className="space-y-3 pl-3 border-l-2 border-blue-200">
+              <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                <span className="mt-0.5 flex-shrink-0">🔘</span>
+                <span>
+                  <strong>Postback triggers</strong> fire when a user taps a button in a Flex Message or Rich Menu.
+                  The data is invisible to users — it&apos;s a string you define on the button action.
+                  The value here must match the button&apos;s <code className="bg-blue-100 px-0.5 rounded">data</code> field <em>exactly</em>.
+                </span>
+              </div>
+              <Field
+                label="Postback data"
+                required
+                hint="Case-sensitive exact match. Max 300 characters. Must equal the data field on the Flex Message or Rich Menu button."
+              >
+                <div className="relative">
+                  <input
+                    className="w-full border rounded-lg px-3 py-2 pr-16 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="e.g. action=buy&item=123"
+                    value={form.postback_data}
+                    onChange={(e) => set("postback_data", e.target.value)}
+                    maxLength={300}
+                  />
+                  <span className="absolute right-2 bottom-2 text-xs text-muted-foreground">
+                    {form.postback_data.length}/300
+                  </span>
+                </div>
               </Field>
             </div>
           )}
@@ -776,7 +803,7 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
               Cancel
             </Button>
             <Button
-              onClick={() => handleSubmit()}
+              onClick={() => { void handleSubmit(); }}
               disabled={saving}
               className="bg-green-600 hover:bg-green-700 text-white min-w-[100px]"
             >

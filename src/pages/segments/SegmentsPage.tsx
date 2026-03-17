@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, RefreshCw, Users, Zap, Trash2, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { segmentApi } from "@/api/segment";
-import type { Segment } from "@/types";
+import { broadcastApi } from "@/api/broadcast";
+import type { Segment, Broadcast } from "@/types";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import {
   AlertDialog,
@@ -28,6 +29,8 @@ export function SegmentsPage() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [affectedBroadcasts, setAffectedBroadcasts] = useState<Broadcast[]>([]);
+  const [checkingUsage, setCheckingUsage] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -147,8 +150,24 @@ export function SegmentsPage() {
                       variant="ghost"
                       size="icon"
                       className="text-destructive hover:text-destructive h-8 w-8"
-                      disabled={deletingId === seg.id}
-                      onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: seg.id, name: seg.name }); }}
+                      disabled={deletingId === seg.id || checkingUsage}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void (async () => {
+                          setCheckingUsage(true);
+                          setAffectedBroadcasts([]);
+                          try {
+                            const res = await broadcastApi.list({ workspace_id: WORKSPACE_ID, page_size: 100 });
+                            const active = (res.data ?? []).filter(
+                              (b) => b.target_segment_id === seg.id &&
+                                (b.status === "scheduled" || b.status === "sending" || b.status === "draft")
+                            );
+                            setAffectedBroadcasts(active);
+                          } catch { /* ignore — show generic warning */ }
+                          finally { setCheckingUsage(false); }
+                          setDeleteTarget({ id: seg.id, name: seg.name });
+                        })();
+                      }}
                     >
                       <Trash2 size={14} />
                     </Button>
@@ -161,20 +180,40 @@ export function SegmentsPage() {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setAffectedBroadcasts([]); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
-            <AlertDialogDescription asChild>
+            <AlertDialogTitle>ยืนยันการลบ Segment</AlertDialogTitle>
+            <AlertDialogDescription>
               <div className="space-y-3">
-                <p>คุณต้องการลบ "{deleteTarget?.name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
-                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                  <p>
-                    If this segment is used by any active broadcasts or auto-push messages, deleting it may affect
-                    scheduled sends. Please verify before proceeding.
-                  </p>
-                </div>
+                <p>คุณต้องการลบ <strong>"{deleteTarget?.name}"</strong> ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+                {affectedBroadcasts.length > 0 ? (
+                  <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="font-semibold">
+                        Segment นี้ถูกใช้ใน {affectedBroadcasts.length} broadcast ที่ยังไม่ส่ง:
+                      </p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {affectedBroadcasts.slice(0, 5).map((b) => (
+                          <li key={b.id} className="text-xs">
+                            {b.name || b.campaign_name || `#${b.id.slice(-8)}`}{" "}
+                            <span className="opacity-70">({b.status})</span>
+                          </li>
+                        ))}
+                        {affectedBroadcasts.length > 5 && (
+                          <li className="text-xs opacity-70">และอีก {affectedBroadcasts.length - 5} รายการ</li>
+                        )}
+                      </ul>
+                      <p className="text-xs">การลบ segment นี้จะทำให้ broadcast เหล่านี้ส่งไม่ได้</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <p>การกระทำนี้ไม่สามารถย้อนกลับได้ หาก segment นี้ถูกใช้ใน broadcast ที่ scheduled ไว้จะได้รับผลกระทบ</p>
+                  </div>
+                )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -182,9 +221,9 @@ export function SegmentsPage() {
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => { void handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+              onClick={() => { void handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); setAffectedBroadcasts([]); }}
             >
-              ลบ
+              {affectedBroadcasts.length > 0 ? "ลบแม้มี broadcast ที่ใช้อยู่" : "ลบ"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

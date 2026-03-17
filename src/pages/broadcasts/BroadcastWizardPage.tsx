@@ -228,7 +228,7 @@ export function BroadcastWizardPage() {
         setLoadingData(false);
       }
     };
-    load();
+    void load();
   }, []);
 
   // ── Step validation ────────────────────────────────────────────────────
@@ -790,7 +790,11 @@ export function BroadcastWizardPage() {
                         className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                         value={scheduledAt}
                         onChange={(e) => setScheduledAt(e.target.value)}
+                        min={new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16)}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Time is in your browser's local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}). Schedule at least 10 minutes ahead for reliable delivery.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -894,7 +898,7 @@ export function BroadcastWizardPage() {
               <span className="ml-1.5">→</span>
             </Button>
           ) : (
-            <Button type="button" onClick={handleSubmit} disabled={submitting}>
+            <Button type="button" onClick={() => { void handleSubmit(); }} disabled={submitting}>
               {submitting ? (
                 <>
                   <RefreshCw size={14} className="mr-2 animate-spin" />

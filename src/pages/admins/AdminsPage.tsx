@@ -359,10 +359,10 @@ export function AdminsPage() {
           <DialogHeader>
             <DialogTitle>Reset password</DialogTitle>
           </DialogHeader>
-          <div className="text-sm text-muted-foreground mb-4">
-            Set a new password for <strong>{resetTarget?.name || resetTarget?.email}</strong>.
-          </div>
-          <div className="space-y-4">
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Set a new password for <strong>{resetTarget?.name || resetTarget?.email}</strong>.
+            </p>
             <div className="space-y-1.5">
               <Label htmlFor="new-password">New password</Label>
               <Input
@@ -387,7 +387,7 @@ export function AdminsPage() {
             </div>
             {resetError && <p className="text-sm text-red-600">{resetError}</p>}
           </div>
-          <DialogFooter className="mt-4">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setResetTarget(null)} disabled={resetting}>
               Cancel
             </Button>
@@ -405,7 +405,7 @@ export function AdminsPage() {
           <DialogHeader>
             <DialogTitle>Edit team member</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="edit-name">Name</Label>
               <Input
@@ -433,7 +433,7 @@ export function AdminsPage() {
             </div>
             {editError && <p className="text-sm text-red-600">{editError}</p>}
           </div>
-          <DialogFooter className="mt-4">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setEditTarget(null)} disabled={editing}>
               Cancel
             </Button>
@@ -502,7 +502,7 @@ export function AdminsPage() {
           </DialogHeader>
 
           {inviteUrl ? (
-            <div className="space-y-4">
+            <div className="px-6 py-5 space-y-4">
               <p className="text-sm text-muted-foreground">
                 Invitation created. Share this link with the new team member so they can set their password.
               </p>
@@ -515,12 +515,9 @@ export function AdminsPage() {
               <p className="text-xs text-muted-foreground">
                 The link is valid until they set their password. You can reset it later if needed.
               </p>
-              <DialogFooter>
-                <Button onClick={() => { setInviteOpen(false); setInviteUrl(""); }}>Done</Button>
-              </DialogFooter>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="px-6 py-5 space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="invite-email">Email <span className="text-red-500">*</span></Label>
                 <Input
@@ -558,16 +555,23 @@ export function AdminsPage() {
                 </select>
               </div>
               {inviteError && <p className="text-sm text-red-600">{inviteError}</p>}
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setInviteOpen(false)} disabled={inviting}>
-                  Cancel
-                </Button>
-                <Button onClick={() => { void handleInvite(); }} disabled={inviting}>
-                  <UserPlus size={14} className="mr-1.5" />
-                  {inviting ? "Sending…" : "Send invite"}
-                </Button>
-              </DialogFooter>
             </div>
+          )}
+
+          {inviteUrl ? (
+            <DialogFooter>
+              <Button onClick={() => { setInviteOpen(false); setInviteUrl(""); }}>Done</Button>
+            </DialogFooter>
+          ) : (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setInviteOpen(false)} disabled={inviting}>
+                Cancel
+              </Button>
+              <Button onClick={() => { void handleInvite(); }} disabled={inviting}>
+                <UserPlus size={14} className="mr-1.5" />
+                {inviting ? "Sending…" : "Send invite"}
+              </Button>
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>

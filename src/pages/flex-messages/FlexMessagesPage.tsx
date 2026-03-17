@@ -325,6 +325,10 @@ export function FlexMessagesPage() {
                         <Badge variant="outline" className="text-xs capitalize">
                           {type}
                         </Badge>
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <Info size={9} />
+                          Shared
+                        </Badge>
                         {fm.variables.length > 0 && (
                           <Badge variant="secondary" className="text-xs">
                             {fm.variables.length} var{fm.variables.length > 1 ? 's' : ''}

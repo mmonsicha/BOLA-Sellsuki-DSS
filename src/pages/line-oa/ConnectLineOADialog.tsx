@@ -197,7 +197,7 @@ export function ConnectLineOADialog({ open, onClose, onCreated }: ConnectLineOAD
             <Field
               label="Channel ID"
               required
-              hint="Found in LINE Developers Console → Basic settings"
+              hint="10-digit number identifying your Messaging API channel. Found in LINE Developers Console → Basic settings."
             >
               <TextInput
                 value={form.channel_id}
@@ -211,7 +211,7 @@ export function ConnectLineOADialog({ open, onClose, onCreated }: ConnectLineOAD
             <Field
               label="Channel Secret"
               required
-              hint="Found in LINE Developers Console → Basic settings"
+              hint="Used to verify LINE webhook signatures. Never share or commit to source code — treat it like a private key."
             >
               <SecretInput
                 value={form.channel_secret}
@@ -225,7 +225,7 @@ export function ConnectLineOADialog({ open, onClose, onCreated }: ConnectLineOAD
             <Field
               label="Channel Access Token"
               required
-              hint="Found in LINE Developers Console → Messaging API settings"
+              hint="Authorises BOLA to send messages on behalf of your OA. Found in LINE Developers Console → Messaging API → Issue. Treat it like a password — do not share publicly."
             >
               <SecretInput
                 value={form.channel_access_token}

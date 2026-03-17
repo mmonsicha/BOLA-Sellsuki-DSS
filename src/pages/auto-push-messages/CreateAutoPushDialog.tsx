@@ -152,15 +152,17 @@ export function CreateAutoPushDialog({
   // Load LINE OAs on mount
   useEffect(() => {
     if (open) {
-      loadLineOAs();
+      void loadLineOAs();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Load webhooks and segments when dialog opens or lineOAId changes
   useEffect(() => {
     if (open && lineOAId) {
-      loadSelectOptions();
+      void loadSelectOptions();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, lineOAId]);
 
   const loadLineOAs = async () => {
@@ -342,7 +344,7 @@ export function CreateAutoPushDialog({
       title="Create Auto Push Message"
       description="Create a new message template triggered by webhook events"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
         {/* Error */}
         {error && (
           <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
@@ -380,7 +382,7 @@ export function CreateAutoPushDialog({
         </Field>
 
         {/* Webhook Setting */}
-        <Field label="Webhook Setting" required hint="Which webhook configuration to use for field definitions">
+        <Field label="Webhook Setting" required hint="Webhooks let external systems (CRM, order management, etc.) trigger this message and inject data via template variables. Select the webhook your external system will call.">
           <select
             className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
             value={form.webhook_setting_id}
@@ -480,7 +482,7 @@ export function CreateAutoPushDialog({
           <select
             className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
             value={form.target_type}
-            onChange={(e) => set("target_type")(e.target.value as any)}
+            onChange={(e) => set("target_type")(e.target.value as string)}
             disabled={saving}
           >
             <option value="all_followers">All Followers</option>
