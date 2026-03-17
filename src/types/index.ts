@@ -450,12 +450,15 @@ export interface QuickReply {
 export type LONSubscriberStatus = "active" | "revoked" | "expired";
 export type LONDeliveryStatus = "success" | "failed" | "pending";
 
+export type LONIdentityStatus = "unmapped" | "complete" | "purged";
+
 export interface LONSubscriber {
   id: string;
   workspace_id: string;
   line_oa_id: string;
   follower_id?: string;
   line_user_id: string;
+  phone_number?: string | null;
   status: LONSubscriberStatus;
   source: string;
   consent_at: string;
@@ -465,6 +468,9 @@ export interface LONSubscriber {
   // Enriched from followers table (null/undefined if subscriber is not an OA follower)
   display_name?: string | null;
   picture_url?: string | null;
+  // RGB identity fields
+  identity_status?: LONIdentityStatus | null;
+  is_friend?: boolean | null;
 }
 
 export interface LONSubscriberStats {

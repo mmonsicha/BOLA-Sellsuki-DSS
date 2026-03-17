@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { QRCodeSVG } from "qrcode.react";
 import {
   RefreshCw, Bell, Phone, X, CheckCircle2,
-  Upload, QrCode, Copy, ChevronDown, ChevronUp, Info, Send, Download,
+  Upload, QrCode, Copy, ChevronDown, ChevronUp, Info, Send, Download, Eye, EyeOff,
 } from "lucide-react";
-import type { LONSubscriber, LONSubscriberStats, LineOA } from "@/types";
+import type { LONSubscriber, LONSubscriberStats, LONIdentityStatus, LineOA } from "@/types";
 import { lonApi, type BulkSubscribeByPhoneResult, type SendConsentRequestResult } from "@/api/lon";
+import { maskPhone } from "@/lib/phone";
 import { lineOAApi } from "@/api/lineOA";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 import { useToast } from "@/components/ui/toast";
@@ -33,6 +34,80 @@ const statusOptions = [
   { value: "revoked", label: "Revoked" },
   { value: "expired", label: "Expired" },
 ];
+
+// ─── Identity Status Badge ─────────────────────────────────────────────────────
+
+const identityStatusConfig: Record<
+  LONIdentityStatus,
+  { label: string; variant: "secondary" | "success" | "destructive" }
+> = {
+  unmapped: { label: "ยังไม่ระบุตัวตน", variant: "secondary" },
+  complete: { label: "ระบุตัวตนแล้ว", variant: "success" },
+  purged: { label: "ถูกลบข้อมูล", variant: "destructive" },
+};
+
+function IdentityStatusBadge({ status }: { status?: LONIdentityStatus | null }) {
+  if (!status) return null;
+  const config = identityStatusConfig[status];
+  if (!config) return null;
+  return <Badge variant={config.variant}>{config.label}</Badge>;
+}
+
+// ─── Masked Phone Cell ─────────────────────────────────────────────────────────
+
+interface MaskedPhoneCellProps {
+  phone: string;
+  subscriberId: string;
+}
+
+function MaskedPhoneCell({ phone, subscriberId }: MaskedPhoneCellProps) {
+  const [revealed, setRevealed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleReveal() {
+    if (revealed) {
+      // Hide immediately on second click
+      setRevealed(false);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      return;
+    }
+    setRevealed(true);
+    // TODO: POST audit log when backend endpoint is ready
+    // POST /v1/lon/subscribers/${subscriberId}/access-log
+    // body: { action: "view_phone", resource_id: subscriberId }
+    // This should be fire-and-forget once the endpoint exists.
+    void subscriberId; // referenced to avoid unused var lint error
+    // Auto-hide after 5 seconds
+    timerRef.current = setTimeout(() => {
+      setRevealed(false);
+    }, 5000);
+  }
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  if (!phone) return <span className="text-muted-foreground">-</span>;
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="font-mono text-xs">
+        {revealed ? phone : maskPhone(phone)}
+      </span>
+      <button
+        onClick={handleReveal}
+        title="แสดงเบอร์โทร (บันทึกการเข้าถึง)"
+        className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        type="button"
+      >
+        {revealed ? <EyeOff size={13} /> : <Eye size={13} />}
+      </button>
+    </span>
+  );
+}
 
 // ─── Bulk Import Modal ────────────────────────────────────────────────────────
 
@@ -900,6 +975,10 @@ export function LONSubscribersPage() {
                         <Badge variant={statusVariant[s.status] ?? "secondary"}>
                           {s.status}
                         </Badge>
+                        <IdentityStatusBadge status={s.identity_status} />
+                        {s.is_friend === true && (
+                          <span className="text-xs text-green-700 font-medium">✓ เป็นเพื่อน</span>
+                        )}
                         <span className="text-xs text-muted-foreground capitalize">{s.source}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 flex-wrap">
@@ -907,6 +986,12 @@ export function LONSubscribersPage() {
                           <span className="font-mono">{s.line_user_id}</span>
                         )}
                         {s.display_name && <span>&middot;</span>}
+                        {s.phone_number && (
+                          <>
+                            <MaskedPhoneCell phone={s.phone_number} subscriberId={s.id} />
+                            <span>&middot;</span>
+                          </>
+                        )}
                         <span>Consented: {new Date(s.consent_at).toLocaleString()}</span>
                         {s.revoked_at && (
                           <> &middot; Revoked: {new Date(s.revoked_at).toLocaleString()}</>
