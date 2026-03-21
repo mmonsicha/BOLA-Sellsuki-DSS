@@ -50,7 +50,13 @@ class ApiClient {
       localStorage.removeItem("bola_token");
       localStorage.removeItem("bola_workspace");
       const authMode = import.meta.env.VITE_AUTH_MODE;
-      window.location.href = authMode === "kratos" ? "/choose-workspace" : "/login";
+      if (authMode === "kratos") {
+        // No valid Kratos session — send user to the Sellsuki login page.
+        const kratosLoginUrl = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
+        window.location.href = kratosLoginUrl;
+      } else {
+        window.location.href = "/login";
+      }
       return undefined as T;
     }
 
