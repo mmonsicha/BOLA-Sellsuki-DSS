@@ -52,8 +52,9 @@ class ApiClient {
       const authMode = import.meta.env.VITE_AUTH_MODE;
       if (authMode === "kratos") {
         // No valid Kratos session — send user to the Sellsuki login page.
+        // Include return_to so Kratos redirects back to BOLA after login.
         const kratosLoginUrl = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
-        window.location.href = kratosLoginUrl;
+        window.location.href = `${kratosLoginUrl}?return_to=${encodeURIComponent(window.location.href)}`;
       } else {
         window.location.href = "/login";
       }

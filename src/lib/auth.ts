@@ -69,10 +69,10 @@ export function logout(): void {
   clearWorkspaceId();
   clearTokenExpiry();
   if (getAuthMode() === "kratos") {
-    // Clear BOLA state and send the user back to the Sellsuki portal.
-    // The Kratos session belongs to the portal — the user can sign out of
-    // the whole Sellsuki ecosystem from there if needed.
-    window.location.href = "https://accounts.sellsuki.local";
+    // Initiate Kratos logout and redirect back to BOLA's choose-workspace
+    // page after the Kratos session is destroyed.
+    const accountsBase = (import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login").replace(/\/login$/, "");
+    window.location.href = `${accountsBase}/logout?return_to=${encodeURIComponent(window.location.origin + "/choose-workspace")}`;
   } else {
     window.location.href = "/login";
   }
