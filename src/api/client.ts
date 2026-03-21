@@ -11,7 +11,10 @@ const PUBLIC_PATHS = ["/v1/auth/login", "/auth/accept-invite"];
 
 function redirectToLogin() {
   if (KRATOS_LOGIN_URL) {
-    const returnTo = encodeURIComponent(window.location.href);
+    // Use clean origin+pathname only — exclude query params to prevent
+    // return_to accumulation loop (e.g. ?error=&return_to=... growing each cycle)
+    const cleanUrl = window.location.origin + window.location.pathname;
+    const returnTo = encodeURIComponent(cleanUrl);
     window.location.href = `${KRATOS_LOGIN_URL}?return_to=${returnTo}`;
   } else {
     localStorage.removeItem("bola_token");
