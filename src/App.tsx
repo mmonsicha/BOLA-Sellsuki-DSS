@@ -179,7 +179,10 @@ function Router() {
   if (path === "/lon/rgb-consent") return <RGBConsentPage />;
 
   // ── Auth guard ────────────────────────────────────────────────────────────
-  if (!isAuthenticated()) {
+  const kratosLoginUrl = import.meta.env.VITE_KRATOS_LOGIN_URL || "";
+  if (kratosLoginUrl) {
+    // Kratos mode: let API calls handle 401 → redirect to Kratos
+  } else if (!isAuthenticated()) {
     window.location.replace("/login");
     return null;
   }

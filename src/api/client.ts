@@ -2,8 +2,23 @@
 // Set VITE_API_URL only if you need to point to a remote backend directly.
 const BASE_URL = import.meta.env.VITE_API_URL || "";
 
+// When set, use Kratos for auth (sellsuki ecosystem mode).
+// Unset = local_jwt mode (standalone/selfhost).
+const KRATOS_LOGIN_URL = import.meta.env.VITE_KRATOS_LOGIN_URL || "";
+
 /** Public paths that should not trigger a redirect on 401. */
 const PUBLIC_PATHS = ["/v1/auth/login", "/auth/accept-invite"];
+
+function redirectToLogin() {
+  if (KRATOS_LOGIN_URL) {
+    const returnTo = encodeURIComponent(window.location.href);
+    window.location.href = `${KRATOS_LOGIN_URL}?return_to=${returnTo}`;
+  } else {
+    localStorage.removeItem("bola_token");
+    localStorage.removeItem("bola_workspace");
+    window.location.href = "/login";
+  }
+}
 
 class ApiClient {
   private baseURL: string;
@@ -34,22 +49,23 @@ class ApiClient {
       "Content-Type": "application/json",
     };
 
-    const token = localStorage.getItem("bola_token");
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (!KRATOS_LOGIN_URL) {
+      const token = localStorage.getItem("bola_token");
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
     }
 
     const res = await fetch(url, {
       method,
       headers,
+      credentials: "include",
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    // 401 on any protected endpoint → clear session and redirect to login
+    // 401 on any protected endpoint → redirect to login
     if (res.status === 401 && !PUBLIC_PATHS.some((p) => path.includes(p))) {
-      localStorage.removeItem("bola_token");
-      localStorage.removeItem("bola_workspace");
-      window.location.href = "/login";
+      redirectToLogin();
       return undefined as T;
     }
 
