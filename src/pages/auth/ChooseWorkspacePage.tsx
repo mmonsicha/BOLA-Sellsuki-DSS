@@ -1,61 +1,55 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authApi, type MyWorkspace } from "@/api/auth";
 import { setWorkspaceId, logout, getAuthMode } from "@/lib/auth";
-import { Building2, ChevronRight, Loader2, LogOut } from "lucide-react";
+import { Building2, ChevronRight, Loader2, LogOut, RefreshCw } from "lucide-react";
 
-/**
- * Redirect to Kratos login with return_to so we come back here after login.
- */
-function redirectToKratosLogin() {
-  const kratosLoginUrl = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
-  // Use origin + pathname only — strip query params to prevent recursive
-  // nesting of return_to (which causes the URL to grow exponentially).
-  const cleanUrl = window.location.origin + window.location.pathname;
-  window.location.href = `${kratosLoginUrl}?return_to=${encodeURIComponent(cleanUrl)}`;
+function kratosLoginUrl(): string {
+  const base = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
+  const cleanUrl = window.location.origin + "/choose-workspace";
+  return `${base}?return_to=${encodeURIComponent(cleanUrl)}`;
 }
 
 export function ChooseWorkspacePage() {
-  // "checking" = verifying Kratos session (show only spinner, no UI)
-  // "ready"    = session valid, show workspace list
-  // "error"    = non-Kratos error (local_jwt mode only)
   const [phase, setPhase] = useState<"checking" | "ready" | "error">("checking");
   const [workspaces, setWorkspaces] = useState<MyWorkspace[]>([]);
   const [error, setError] = useState("");
 
-  useEffect(() => {
+  const fetchWorkspaces = useCallback(() => {
+    setPhase("checking");
+    setError("");
     authApi
       .getMyWorkspaces()
       .then((res) => {
         if (!res || !res.workspaces) {
-          // client.ts 401 handler returned undefined — session invalid
-          if (getAuthMode() === "kratos") {
-            redirectToKratosLogin();
-            return;
-          }
+          // client.ts 401 handler already set window.location.href —
+          // just wait for the browser to navigate, don't redirect again.
+          return;
         }
         setWorkspaces(res.workspaces ?? []);
         setPhase("ready");
       })
-      .catch(() => {
-        // In Kratos mode, any API error = session invalid → login
-        if (getAuthMode() === "kratos") {
-          redirectToKratosLogin();
-          return;
-        }
-        setError("Failed to load workspaces");
+      .catch((err: unknown) => {
+        // Don't redirect to Kratos login here — the user might already
+        // be logged in but the API is unreachable (404, 500, network).
+        // Redirecting would cause an infinite loop.
+        const msg = err instanceof Error ? err.message : "Failed to load workspaces";
+        setError(msg);
         setPhase("error");
       });
   }, []);
+
+  useEffect(() => {
+    fetchWorkspaces();
+  }, [fetchWorkspaces]);
 
   function handleSelect(ws: MyWorkspace) {
     setWorkspaceId(ws.id);
     window.location.href = "/";
   }
 
-  // Phase 1: Checking session — show only a centered spinner, no page chrome.
-  // If user isn't logged in, they'll be redirected before seeing anything else.
+  // Checking session — spinner only
   if (phase === "checking") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -64,7 +58,38 @@ export function ChooseWorkspacePage() {
     );
   }
 
-  // Phase 2: Session confirmed — show workspace chooser
+  // Error state — show error with retry + login buttons
+  if (phase === "error") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-full max-w-sm px-4 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-red-100 rounded-xl mb-4">
+            <Building2 className="w-6 h-6 text-red-500" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Cannot Load Workspaces</h1>
+          <p className="text-sm text-muted-foreground mb-6">{error}</p>
+          <div className="flex flex-col gap-2">
+            <Button onClick={fetchWorkspaces} className="w-full gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Try Again
+            </Button>
+            {getAuthMode() === "kratos" && (
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => { window.location.href = kratosLoginUrl(); }}
+              >
+                <LogOut className="w-4 h-4" />
+                Go to Login
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Ready — show workspace chooser
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm px-4">
@@ -85,11 +110,7 @@ export function ChooseWorkspacePage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {error && (
-              <p className="text-sm text-destructive text-center py-4">{error}</p>
-            )}
-
-            {!error && workspaces.length === 0 && (
+            {workspaces.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p className="text-sm">No workspaces found.</p>
