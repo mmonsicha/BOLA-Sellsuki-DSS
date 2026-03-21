@@ -2,23 +2,48 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authApi, type MyWorkspace } from "@/api/auth";
-import { setWorkspaceId, logout } from "@/lib/auth";
+import { setWorkspaceId, logout, getAuthMode } from "@/lib/auth";
 import { Building2, ChevronRight, Loader2, LogOut } from "lucide-react";
 
+/**
+ * Redirect to Kratos login with return_to so we come back here after login.
+ */
+function redirectToKratosLogin() {
+  const kratosLoginUrl = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
+  window.location.href = `${kratosLoginUrl}?return_to=${encodeURIComponent(window.location.href)}`;
+}
+
 export function ChooseWorkspacePage() {
+  // "checking" = verifying Kratos session (show only spinner, no UI)
+  // "ready"    = session valid, show workspace list
+  // "error"    = non-Kratos error (local_jwt mode only)
+  const [phase, setPhase] = useState<"checking" | "ready" | "error">("checking");
   const [workspaces, setWorkspaces] = useState<MyWorkspace[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     authApi
       .getMyWorkspaces()
-      .then((res) => setWorkspaces(res.workspaces ?? []))
-      .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Failed to load workspaces";
-        setError(msg);
+      .then((res) => {
+        if (!res || !res.workspaces) {
+          // client.ts 401 handler returned undefined — session invalid
+          if (getAuthMode() === "kratos") {
+            redirectToKratosLogin();
+            return;
+          }
+        }
+        setWorkspaces(res.workspaces ?? []);
+        setPhase("ready");
       })
-      .finally(() => setLoading(false));
+      .catch(() => {
+        // In Kratos mode, any API error = session invalid → login
+        if (getAuthMode() === "kratos") {
+          redirectToKratosLogin();
+          return;
+        }
+        setError("Failed to load workspaces");
+        setPhase("error");
+      });
   }, []);
 
   function handleSelect(ws: MyWorkspace) {
@@ -26,6 +51,17 @@ export function ChooseWorkspacePage() {
     window.location.href = "/";
   }
 
+  // Phase 1: Checking session — show only a centered spinner, no page chrome.
+  // If user isn't logged in, they'll be redirected before seeing anything else.
+  if (phase === "checking") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Phase 2: Session confirmed — show workspace chooser
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm px-4">
@@ -46,18 +82,11 @@ export function ChooseWorkspacePage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {loading && (
-              <div className="flex items-center justify-center py-8 text-muted-foreground">
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                Loading...
-              </div>
-            )}
-
             {error && (
               <p className="text-sm text-destructive text-center py-4">{error}</p>
             )}
 
-            {!loading && !error && workspaces.length === 0 && (
+            {!error && workspaces.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p className="text-sm">No workspaces found.</p>
@@ -65,7 +94,7 @@ export function ChooseWorkspacePage() {
               </div>
             )}
 
-            {!loading && workspaces.length > 0 && (
+            {workspaces.length > 0 && (
               <ul className="divide-y">
                 {workspaces.map((ws) => (
                   <li key={ws.id}>
