@@ -184,9 +184,12 @@ function Router() {
 
   // ── Auth guard ────────────────────────────────────────────────────────────
   if (!isAuthenticated()) {
-    // Kratos mode: go to workspace chooser (Kratos already handled login)
     if (getAuthMode() === "kratos") {
-      window.location.replace("/choose-workspace");
+      // Redirect to Kratos login directly. If the user already has a valid
+      // session, Kratos skips the form and redirects back immediately.
+      const kratosLogin = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
+      const returnTo = encodeURIComponent(window.location.origin + "/choose-workspace");
+      window.location.replace(`${kratosLogin}?return_to=${returnTo}`);
     } else {
       window.location.replace("/login");
     }
