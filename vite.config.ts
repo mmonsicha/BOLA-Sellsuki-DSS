@@ -18,6 +18,7 @@ export default defineConfig({
   },
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
+    allowedHosts: ["bola.sellsuki.local"],
     proxy: {
       "/auth": {
         target: "http://localhost:8081",
