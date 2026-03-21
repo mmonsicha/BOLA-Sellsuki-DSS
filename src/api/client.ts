@@ -45,11 +45,12 @@ class ApiClient {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    // 401 on any protected endpoint → clear session and redirect to login
+    // 401 on any protected endpoint → clear session and redirect appropriately
     if (res.status === 401 && !PUBLIC_PATHS.some((p) => path.includes(p))) {
       localStorage.removeItem("bola_token");
       localStorage.removeItem("bola_workspace");
-      window.location.href = "/login";
+      const authMode = import.meta.env.VITE_AUTH_MODE;
+      window.location.href = authMode === "kratos" ? "/choose-workspace" : "/login";
       return undefined as T;
     }
 

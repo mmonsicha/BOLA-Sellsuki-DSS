@@ -57,15 +57,44 @@ export function getTokenExpiresIn(): number {
   return expiry.getTime() - Date.now();
 }
 
-/** Clear all auth state and redirect to login. */
+/** "kratos" | "local_jwt" — set by VITE_AUTH_MODE env var (default: local_jwt) */
+export function getAuthMode(): "kratos" | "local_jwt" {
+  const mode = import.meta.env.VITE_AUTH_MODE as string | undefined;
+  return mode === "kratos" ? "kratos" : "local_jwt";
+}
+
+/** Clear all auth state and redirect appropriately. */
 export function logout(): void {
   clearToken();
   clearWorkspaceId();
   clearTokenExpiry();
-  window.location.href = "/login";
+  if (getAuthMode() === "kratos") {
+    // Clear BOLA state and send the user back to the Sellsuki portal.
+    // The Kratos session belongs to the portal — the user can sign out of
+    // the whole Sellsuki ecosystem from there if needed.
+    window.location.href = "https://accounts.sellsuki.local";
+  } else {
+    window.location.href = "/login";
+  }
 }
 
-/** Returns true if the user has a stored JWT. */
+/**
+ * Kratos mode only — leave the current workspace but keep the Kratos session.
+ * Used for the "Switch Workspace" button in the sidebar.
+ */
+export function switchWorkspace(): void {
+  clearWorkspaceId();
+  window.location.href = "/choose-workspace";
+}
+
+/**
+ * Returns true if the user is considered authenticated.
+ * - local_jwt mode: has a stored JWT token
+ * - kratos mode: has a selected workspace (session cookie validated on each API call)
+ */
 export function isAuthenticated(): boolean {
+  if (getAuthMode() === "kratos") {
+    return Boolean(getWorkspaceId());
+  }
   return Boolean(getToken());
 }
