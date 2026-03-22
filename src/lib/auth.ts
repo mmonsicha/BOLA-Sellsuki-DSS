@@ -68,20 +68,22 @@ export function getAuthMode(): "kratos" | "local_jwt" {
  * In Kratos mode, calls the backend to destroy the Kratos session first,
  * then redirects to the Kratos login page — one click, no confirmation pages.
  */
-export function logout(): void {
+export async function logout(): Promise<void> {
   clearToken();
   clearWorkspaceId();
   clearTokenExpiry();
 
   if (getAuthMode() === "kratos") {
-    // Fire-and-forget: tell backend to revoke the Kratos session.
-    // We don't await — redirect immediately for snappy UX.
-    // If the call fails (network, session expired), that's fine.
-    fetch("/v1/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+    // Wait for the backend to revoke the Kratos session BEFORE redirecting.
+    // If we redirect too early, Kratos still sees an active session and
+    // bounces the user right back to /choose-workspace.
+    try {
+      await fetch("/v1/auth/logout", { method: "POST", credentials: "include" });
+    } catch {
+      // Network error — session might still be active, but redirect anyway.
+    }
 
-    // Redirect to Kratos login flow — /self-service/login/browser creates a
-    // fresh flow and redirects to /login?flow=xxx. Direct /login without ?flow
-    // just bounces to the welcome page.
+    // Redirect to Kratos login flow.
     const accountsBase = import.meta.env.VITE_KRATOS_ACCOUNTS_URL || "https://accounts.sellsuki.local";
     const returnTo = encodeURIComponent(window.location.origin + "/choose-workspace");
     window.location.href = `${accountsBase}/self-service/login/browser?return_to=${returnTo}`;
