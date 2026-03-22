@@ -63,16 +63,25 @@ export function getAuthMode(): "kratos" | "local_jwt" {
   return mode === "kratos" ? "kratos" : "local_jwt";
 }
 
-/** Clear all auth state and redirect appropriately. */
+/**
+ * Clear all auth state and redirect appropriately.
+ * In Kratos mode, calls the backend to destroy the Kratos session first,
+ * then redirects to the Kratos login page — one click, no confirmation pages.
+ */
 export function logout(): void {
   clearToken();
   clearWorkspaceId();
   clearTokenExpiry();
+
   if (getAuthMode() === "kratos") {
-    // Initiate Kratos logout and redirect back to BOLA's choose-workspace
-    // page after the Kratos session is destroyed.
-    const accountsBase = (import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login").replace(/\/login$/, "");
-    window.location.href = `${accountsBase}/logout?return_to=${encodeURIComponent(window.location.origin + "/choose-workspace")}`;
+    // Fire-and-forget: tell backend to revoke the Kratos session.
+    // We don't await — redirect immediately for snappy UX.
+    // If the call fails (network, session expired), that's fine.
+    fetch("/v1/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+
+    // Redirect to Kratos login page.
+    const kratosLogin = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
+    window.location.href = kratosLogin;
   } else {
     window.location.href = "/login";
   }
