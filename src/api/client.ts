@@ -19,16 +19,23 @@ class ApiClient {
     params?: Record<string, string | number | boolean>
   ): Promise<T> {
     let url = `${this.baseURL}${path}`;
+    const searchParams = new URLSearchParams();
     if (params) {
-      const searchParams = new URLSearchParams();
       for (const [k, v] of Object.entries(params)) {
         if (v !== undefined && v !== null) {
           searchParams.set(k, String(v));
         }
       }
-      const qs = searchParams.toString();
-      if (qs) url += `?${qs}`;
     }
+    // Always inject workspace_id for authenticated requests so the backend
+    // middleware can resolve the admin (especially in Kratos cookie mode
+    // where the credential doesn't embed the admin identity).
+    if (!searchParams.has("workspace_id") && !PUBLIC_PATHS.some((p) => path.includes(p))) {
+      const ws = localStorage.getItem("bola_workspace");
+      if (ws) searchParams.set("workspace_id", ws);
+    }
+    const qs = searchParams.toString();
+    if (qs) url += `?${qs}`;
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
