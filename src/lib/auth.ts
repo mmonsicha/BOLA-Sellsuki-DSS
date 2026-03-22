@@ -79,9 +79,12 @@ export function logout(): void {
     // If the call fails (network, session expired), that's fine.
     fetch("/v1/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
 
-    // Redirect to Kratos login page.
-    const kratosLogin = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
-    window.location.href = kratosLogin;
+    // Redirect to Kratos login flow — /self-service/login/browser creates a
+    // fresh flow and redirects to /login?flow=xxx. Direct /login without ?flow
+    // just bounces to the welcome page.
+    const accountsBase = import.meta.env.VITE_KRATOS_ACCOUNTS_URL || "https://accounts.sellsuki.local";
+    const returnTo = encodeURIComponent(window.location.origin + "/choose-workspace");
+    window.location.href = `${accountsBase}/self-service/login/browser?return_to=${returnTo}`;
   } else {
     window.location.href = "/login";
   }

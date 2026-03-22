@@ -185,11 +185,12 @@ function Router() {
   // ── Auth guard ────────────────────────────────────────────────────────────
   if (!isAuthenticated()) {
     if (getAuthMode() === "kratos") {
-      // Redirect to Kratos login directly. If the user already has a valid
-      // session, Kratos skips the form and redirects back immediately.
-      const kratosLogin = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
+      // Redirect to Kratos login flow — /self-service/login/browser creates
+      // a fresh flow. If the user already has a valid session, Kratos skips
+      // the form and redirects back immediately.
+      const accountsBase = import.meta.env.VITE_KRATOS_ACCOUNTS_URL || "https://accounts.sellsuki.local";
       const returnTo = encodeURIComponent(window.location.origin + "/choose-workspace");
-      window.location.replace(`${kratosLogin}?return_to=${returnTo}`);
+      window.location.replace(`${accountsBase}/self-service/login/browser?return_to=${returnTo}`);
     } else {
       window.location.replace("/login");
     }
