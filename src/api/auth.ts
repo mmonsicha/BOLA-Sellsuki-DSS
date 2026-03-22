@@ -12,6 +12,8 @@ export interface MyWorkspace {
   name: string;
   slug: string;
   is_active: boolean;
+  company_id: string;
+  company_name: string;
 }
 
 export interface MyWorkspacesResponse {

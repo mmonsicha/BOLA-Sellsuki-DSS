@@ -1,9 +1,33 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authApi, type MyWorkspace } from "@/api/auth";
 import { setWorkspaceId, logout } from "@/lib/auth";
-import { Building2, ChevronRight, Loader2, LogOut, RefreshCw } from "lucide-react";
+import { Building2, ChevronRight, FolderOpen, Loader2, LogOut, RefreshCw } from "lucide-react";
+
+/** Group workspaces by company_name. Empty company → "Personal Workspaces". */
+function groupByCompany(workspaces: MyWorkspace[]): { label: string; companyId: string; items: MyWorkspace[] }[] {
+  const groups = new Map<string, { label: string; companyId: string; items: MyWorkspace[] }>();
+
+  for (const ws of workspaces) {
+    const key = ws.company_id || "__personal__";
+    if (!groups.has(key)) {
+      groups.set(key, {
+        label: ws.company_name || "Personal Workspaces",
+        companyId: ws.company_id || "",
+        items: [],
+      });
+    }
+    groups.get(key)!.items.push(ws);
+  }
+
+  // Sort: companies first (alphabetical), personal last
+  return [...groups.values()].sort((a, b) => {
+    if (!a.companyId && b.companyId) return 1;
+    if (a.companyId && !b.companyId) return -1;
+    return a.label.localeCompare(b.label);
+  });
+}
 
 export function ChooseWorkspacePage() {
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
@@ -17,8 +41,6 @@ export function ChooseWorkspacePage() {
       .getMyWorkspaces()
       .then((res) => {
         if (!res || !res.workspaces) {
-          // client.ts 401 handler fired — browser is navigating to Kratos login.
-          // Just stay on loading spinner until navigation completes.
           return;
         }
         setWorkspaces(res.workspaces);
@@ -35,12 +57,14 @@ export function ChooseWorkspacePage() {
     fetchWorkspaces();
   }, [fetchWorkspaces]);
 
+  const groups = useMemo(() => groupByCompany(workspaces), [workspaces]);
+
   function handleSelect(ws: MyWorkspace) {
     setWorkspaceId(ws.id);
     window.location.href = "/";
   }
 
-  // Loading — spinner only, no page chrome
+  // Loading
   if (phase === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -49,7 +73,7 @@ export function ChooseWorkspacePage() {
     );
   }
 
-  // Error — show error with retry + sign out
+  // Error
   if (phase === "error") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -64,7 +88,7 @@ export function ChooseWorkspacePage() {
               <RefreshCw className="w-4 h-4" />
               Try Again
             </Button>
-            <Button variant="outline" className="w-full gap-2" onClick={logout}>
+            <Button variant="outline" className="w-full gap-2" onClick={() => void logout()}>
               <LogOut className="w-4 h-4" />
               Sign out
             </Button>
@@ -74,7 +98,7 @@ export function ChooseWorkspacePage() {
     );
   }
 
-  // Ready — workspace chooser
+  // Ready — grouped workspace chooser
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm px-4">
@@ -89,12 +113,12 @@ export function ChooseWorkspacePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base">Your Workspaces</CardTitle>
-            <Button variant="ghost" size="sm" onClick={logout} className="text-muted-foreground hover:text-foreground gap-1.5 -mr-2">
+            <Button variant="ghost" size="sm" onClick={() => void logout()} className="text-muted-foreground hover:text-foreground gap-1.5 -mr-2">
               <LogOut className="w-4 h-4" />
               Sign out
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3">
             {workspaces.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -103,30 +127,45 @@ export function ChooseWorkspacePage() {
               </div>
             )}
 
-            {workspaces.length > 0 && (
-              <ul className="divide-y">
-                {workspaces.map((ws) => (
-                  <li key={ws.id}>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-between h-auto py-3 px-2"
-                      onClick={() => handleSelect(ws)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#06C755]/10 flex items-center justify-center">
-                          <Building2 className="w-4 h-4 text-[#06C755]" />
+            {groups.map((group) => (
+              <div key={group.companyId || "__personal__"} className="mb-4 last:mb-0">
+                {/* Company header */}
+                <div className="flex items-center gap-2 px-2 py-1.5">
+                  {group.companyId ? (
+                    <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  ) : (
+                    <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {group.label}
+                  </span>
+                </div>
+
+                {/* Workspace list */}
+                <ul className="divide-y rounded-lg border bg-white">
+                  {group.items.map((ws) => (
+                    <li key={ws.id}>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-between h-auto py-3 px-3 rounded-none first:rounded-t-lg last:rounded-b-lg"
+                        onClick={() => handleSelect(ws)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[#06C755]/10 flex items-center justify-center">
+                            <Building2 className="w-4 h-4 text-[#06C755]" />
+                          </div>
+                          <div className="text-left">
+                            <p className="font-medium text-sm">{ws.name}</p>
+                            <p className="text-xs text-muted-foreground">{ws.slug}</p>
+                          </div>
                         </div>
-                        <div className="text-left">
-                          <p className="font-medium text-sm">{ws.name}</p>
-                          <p className="text-xs text-muted-foreground">{ws.slug}</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
