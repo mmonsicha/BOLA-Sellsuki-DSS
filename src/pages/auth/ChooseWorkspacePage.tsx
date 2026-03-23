@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authApi, type MyWorkspace } from "@/api/auth";
 import { setWorkspaceId, logout } from "@/lib/auth";
 import { Building2, ChevronRight, FolderOpen, Loader2, LogOut, RefreshCw } from "lucide-react";
+import { AuthStatusBar } from "@/components/auth/AuthStatusBar";
 
 /** Group workspaces by company_name. Empty company → "Personal Workspaces". */
 function groupByCompany(workspaces: MyWorkspace[]): { label: string; companyId: string; items: MyWorkspace[] }[] {
@@ -102,6 +103,7 @@ export function ChooseWorkspacePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm px-4">
+        <AuthStatusBar />
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 bg-[#06C755] rounded-xl mb-4">
             <Building2 className="w-6 h-6 text-white" />
