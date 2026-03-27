@@ -30,9 +30,11 @@ import {
   LogOut,
   X,
   Lightbulb,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useState } from "react";
-import { logout } from "@/lib/auth";
+import { SetupProgressChecklist } from "./SetupProgressChecklist";
+import { logout, switchWorkspace, getAuthMode } from "@/lib/auth";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 
 interface NavItem {
@@ -245,10 +247,25 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
           </div>
         </nav>
 
+        {/* Setup Progress Checklist */}
+        <SetupProgressChecklist collapsed={collapsed} />
+
         {/* Footer */}
         <div className={cn("py-3 border-t border-gray-700", collapsed ? "px-0" : "px-2")}>
+          {getAuthMode() === "kratos" && (
+            <button
+              onClick={switchWorkspace}
+              className={cn(
+                "flex items-center rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors w-full",
+                collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5"
+              )}
+            >
+              <ArrowLeftRight size={18} className="flex-shrink-0" />
+              {!collapsed && <span>Switch Workspace</span>}
+            </button>
+          )}
           <button
-            onClick={logout}
+            onClick={() => { void logout(); }}
             className={cn(
               "flex items-center rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors w-full",
               collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5"

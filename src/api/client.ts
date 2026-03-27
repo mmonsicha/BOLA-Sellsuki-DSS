@@ -2,26 +2,8 @@
 // Set VITE_API_URL only if you need to point to a remote backend directly.
 const BASE_URL = import.meta.env.VITE_API_URL || "";
 
-// When set, use Kratos for auth (sellsuki ecosystem mode).
-// Unset = local_jwt mode (standalone/selfhost).
-const KRATOS_LOGIN_URL = import.meta.env.VITE_KRATOS_LOGIN_URL || "";
-
 /** Public paths that should not trigger a redirect on 401. */
 const PUBLIC_PATHS = ["/v1/auth/login", "/auth/accept-invite"];
-
-function redirectToLogin() {
-  if (KRATOS_LOGIN_URL) {
-    // Use clean origin+pathname only — exclude query params to prevent
-    // return_to accumulation loop (e.g. ?error=&return_to=... growing each cycle)
-    const cleanUrl = window.location.origin + window.location.pathname;
-    const returnTo = encodeURIComponent(cleanUrl);
-    window.location.href = `${KRATOS_LOGIN_URL}?return_to=${returnTo}`;
-  } else {
-    localStorage.removeItem("bola_token");
-    localStorage.removeItem("bola_workspace");
-    window.location.href = "/login";
-  }
-}
 
 class ApiClient {
   private baseURL: string;
@@ -37,22 +19,29 @@ class ApiClient {
     params?: Record<string, string | number | boolean>
   ): Promise<T> {
     let url = `${this.baseURL}${path}`;
+    const searchParams = new URLSearchParams();
     if (params) {
-      const searchParams = new URLSearchParams();
       for (const [k, v] of Object.entries(params)) {
         if (v !== undefined && v !== null) {
           searchParams.set(k, String(v));
         }
       }
-      const qs = searchParams.toString();
-      if (qs) url += `?${qs}`;
     }
+    // Always inject workspace_id for authenticated requests so the backend
+    // middleware can resolve the admin (especially in Kratos cookie mode
+    // where the credential doesn't embed the admin identity).
+    if (!searchParams.has("workspace_id") && !PUBLIC_PATHS.some((p) => path.includes(p))) {
+      const ws = localStorage.getItem("bola_workspace");
+      if (ws) searchParams.set("workspace_id", ws);
+    }
+    const qs = searchParams.toString();
+    if (qs) url += `?${qs}`;
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
 
-    if (!KRATOS_LOGIN_URL) {
+    if (import.meta.env.VITE_AUTH_MODE !== "kratos") {
       const token = localStorage.getItem("bola_token");
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -66,9 +55,22 @@ class ApiClient {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    // 401 on any protected endpoint → redirect to login
+    // 401 on any protected endpoint → clear session and redirect appropriately
     if (res.status === 401 && !PUBLIC_PATHS.some((p) => path.includes(p))) {
-      redirectToLogin();
+      localStorage.removeItem("bola_token");
+      localStorage.removeItem("bola_workspace");
+      const authMode = import.meta.env.VITE_AUTH_MODE;
+      if (authMode === "kratos") {
+        // No valid Kratos session — send user to the Sellsuki login page.
+        // Include return_to so Kratos redirects back to BOLA after login.
+        const kratosLoginUrl = import.meta.env.VITE_KRATOS_LOGIN_URL || "https://accounts.sellsuki.local/login";
+        // Use origin + pathname only — strip query params to prevent recursive
+        // nesting of return_to when Kratos redirects back with extra params.
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.location.href = `${kratosLoginUrl}?return_to=${encodeURIComponent(cleanUrl)}`;
+      } else {
+        window.location.href = "/login";
+      }
       return undefined as T;
     }
 

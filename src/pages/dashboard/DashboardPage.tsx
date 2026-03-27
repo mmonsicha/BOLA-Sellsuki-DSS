@@ -86,7 +86,7 @@ export function DashboardPage() {
   useEffect(() => {
     if (currentAdmin?.role !== "super_admin") return;
     void authApi.getSystemStatus(WORKSPACE_ID)
-      .then(({ warnings }) => setSecurityWarnings(warnings))
+      .then(({ warnings }) => setSecurityWarnings(warnings ?? []))
       .catch(() => { /* silently ignore — non-super_admin or backend unavailable */ });
   }, [currentAdmin]);
 

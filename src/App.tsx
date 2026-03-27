@@ -54,6 +54,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { ToastProvider } from "@/components/ui/toast";
 import { TokenExpiryGuard } from "@/components/auth/TokenExpiryGuard";
+import { ChooseWorkspacePage } from "@/pages/auth/ChooseWorkspacePage";
+import { getAuthMode } from "@/lib/auth";
 
 function resolveProtectedRoute(path: string, segments: string[]): React.ReactElement {
   if (path === "/" || path === "/dashboard") return <DashboardPage />;
@@ -177,19 +179,28 @@ function Router() {
   if (path.startsWith("/lon/subscribe/")) return <LONPublicSubscribePage />;
   // RGB LIFF consent page — opened inside LINE via LIFF link
   if (path === "/lon/rgb-consent") return <RGBConsentPage />;
+  // Kratos mode: workspace chooser (public — Kratos session already proves identity)
+  if (path === "/choose-workspace") return <ChooseWorkspacePage />;
 
   // ── Auth guard ────────────────────────────────────────────────────────────
-  const kratosLoginUrl = import.meta.env.VITE_KRATOS_LOGIN_URL || "";
-  if (kratosLoginUrl) {
-    // Kratos mode: let API calls handle 401 → redirect to Kratos
-  } else if (!isAuthenticated()) {
-    window.location.replace("/login");
+  if (!isAuthenticated()) {
+    if (getAuthMode() === "kratos") {
+      // Redirect to Kratos login flow — /self-service/login/browser creates
+      // a fresh flow. If the user already has a valid session, Kratos skips
+      // the form and redirects back immediately.
+      const accountsBase = import.meta.env.VITE_KRATOS_ACCOUNTS_URL || "https://accounts.sellsuki.local";
+      const returnTo = encodeURIComponent(window.location.origin + "/choose-workspace");
+      window.location.replace(`${accountsBase}/self-service/login/browser?return_to=${returnTo}`);
+    } else {
+      window.location.replace("/login");
+    }
     return null;
   }
 
   return (
     <>
-      <TokenExpiryGuard />
+      {/* TokenExpiryGuard only applies in local_jwt mode (Kratos uses session cookies) */}
+      {getAuthMode() === "local_jwt" && <TokenExpiryGuard />}
       {resolveProtectedRoute(path, segments)}
     </>
   );

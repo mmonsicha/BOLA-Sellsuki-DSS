@@ -57,15 +57,58 @@ export function getTokenExpiresIn(): number {
   return expiry.getTime() - Date.now();
 }
 
-/** Clear all auth state and redirect to login. */
-export function logout(): void {
+/** "kratos" | "local_jwt" — set by VITE_AUTH_MODE env var (default: local_jwt) */
+export function getAuthMode(): "kratos" | "local_jwt" {
+  const mode = import.meta.env.VITE_AUTH_MODE as string | undefined;
+  return mode === "kratos" ? "kratos" : "local_jwt";
+}
+
+/**
+ * Clear all auth state and redirect appropriately.
+ * In Kratos mode, calls the backend to destroy the Kratos session first,
+ * then redirects to the Kratos login page — one click, no confirmation pages.
+ */
+export async function logout(): Promise<void> {
   clearToken();
   clearWorkspaceId();
   clearTokenExpiry();
-  window.location.href = "/login";
+
+  if (getAuthMode() === "kratos") {
+    // Wait for the backend to revoke the Kratos session BEFORE redirecting.
+    // If we redirect too early, Kratos still sees an active session and
+    // bounces the user right back to /choose-workspace.
+    try {
+      await fetch("/v1/auth/logout", { method: "POST", credentials: "include" });
+    } catch {
+      // Network error — session might still be active, but redirect anyway.
+    }
+
+    // Redirect to Kratos login flow.
+    const accountsBase = import.meta.env.VITE_KRATOS_ACCOUNTS_URL || "https://accounts.sellsuki.local";
+    const returnTo = encodeURIComponent(window.location.origin + "/choose-workspace");
+    window.location.href = `${accountsBase}/self-service/login/browser?return_to=${returnTo}`;
+  } else {
+    window.location.href = "/login";
+  }
 }
 
-/** Returns true if the user has a stored JWT. */
+/**
+ * Kratos mode only — leave the current workspace but keep the Kratos session.
+ * Used for the "Switch Workspace" button in the sidebar.
+ */
+export function switchWorkspace(): void {
+  clearWorkspaceId();
+  window.location.href = "/choose-workspace";
+}
+
+/**
+ * Returns true if the user is considered authenticated.
+ * - local_jwt mode: has a stored JWT token
+ * - kratos mode: has a selected workspace (session cookie validated on each API call)
+ */
 export function isAuthenticated(): boolean {
+  if (getAuthMode() === "kratos") {
+    return Boolean(getWorkspaceId());
+  }
   return Boolean(getToken());
 }

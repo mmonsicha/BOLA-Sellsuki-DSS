@@ -7,6 +7,19 @@ export interface WorkspaceEntry {
   expires_at: string;
 }
 
+export interface MyWorkspace {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  company_id: string;
+  company_name: string;
+}
+
+export interface MyWorkspacesResponse {
+  workspaces: MyWorkspace[];
+}
+
 export interface GlobalLoginResponse {
   workspaces: WorkspaceEntry[];
 }
@@ -76,6 +89,10 @@ export const authApi = {
   /** Fetch system security warnings (super_admin only). */
   getSystemStatus: (workspaceId: string) =>
     api.get<SystemStatus>(`/v1/workspaces/${workspaceId}/auth/system-status`),
+
+  /** Kratos mode only — list all workspaces the session user is an admin of. */
+  getMyWorkspaces: () =>
+    api.get<MyWorkspacesResponse>("/v1/me/workspaces"),
 
   /** Update an admin's name and/or role. */
   updateAdmin: (workspaceId: string, adminId: string, data: { name?: string; role?: string }) =>
