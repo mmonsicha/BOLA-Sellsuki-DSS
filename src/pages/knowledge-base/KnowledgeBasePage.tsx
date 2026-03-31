@@ -24,8 +24,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const SOURCE_FILTERS = [
   { value: "all", label: "All" },
@@ -76,7 +77,7 @@ export function KnowledgeBasePage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
 
   // All unique tags from all entries
   const allTags = useMemo(() => {
@@ -210,14 +211,14 @@ export function KnowledgeBasePage() {
                 placeholder="Semantic search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                onKeyDown={(e) => { if (e.key === "Enter") { void handleSearch(); } }}
               />
               {searchResults && (
                 <button onClick={() => { setSearchResults(null); setSearchQuery(""); }} className="p-1.5 hover:bg-muted rounded">
                   <X size={14} />
                 </button>
               )}
-              <Button size="sm" variant="outline" onClick={handleSearch}><Search size={14} /></Button>
+              <Button size="sm" variant="outline" onClick={() => { void handleSearch(); }}><Search size={14} /></Button>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -337,7 +338,7 @@ export function KnowledgeBasePage() {
                         <div className="flex items-center gap-1 flex-shrink-0">
                           {/* Inline active toggle */}
                           <button
-                            onClick={() => handleToggleActive(entry)}
+                            onClick={() => { void handleToggleActive(entry); }}
                             disabled={togglingId === entry.id}
                             title={entry.is_active ? "Click to deactivate" : "Click to activate"}
                             className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -439,7 +440,7 @@ export function KnowledgeBasePage() {
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving || !form.title || !form.content}>
+              <Button onClick={() => { void handleSave(); }} disabled={saving || !form.title || !form.content}>
                 {saving ? "Saving..." : "Save"}
               </Button>
             </DialogFooter>
@@ -460,7 +461,7 @@ export function KnowledgeBasePage() {
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+              onClick={() => { void handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
             >
               ลบ
             </AlertDialogAction>

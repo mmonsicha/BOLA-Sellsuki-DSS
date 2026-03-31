@@ -4,8 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, X, AlertCircle, RefreshCw, Check, CheckCircle } from "lucide-react";
-import { workspaceApi } from "@/api/workspace";
 import { lineOAApi } from "@/api/lineOA";
+import { getWorkspaceId } from "@/lib/auth";
 import { segmentApi } from "@/api/segment";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { broadcastApi, type BroadcastMessageInput } from "@/api/broadcast";
@@ -203,8 +203,7 @@ export function BroadcastWizardPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const wsRes = await workspaceApi.list({ page: 1, page_size: 1 });
-        const id = wsRes?.data?.[0]?.id ?? "00000000-0000-0000-0000-000000000001";
+        const id = getWorkspaceId() ?? "";
         setWorkspaceId(id);
 
         const [oaRes, segRes, fmRes] = await Promise.all([

@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Send, Clock, CheckCircle, XCircle, Ban, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
-import { workspaceApi } from "@/api/workspace";
+import { getWorkspaceId } from "@/lib/auth";
 import { lineOAApi } from "@/api/lineOA";
 import { broadcastApi } from "@/api/broadcast";
 import type { Broadcast, BroadcastStatus, LineOA } from "@/types";
@@ -165,8 +165,7 @@ export function BroadcastsPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const wsRes = await workspaceApi.list({ page: 1, page_size: 1 });
-        const id = wsRes?.data?.[0]?.id ?? "00000000-0000-0000-0000-000000000001";
+        const id = getWorkspaceId() ?? "";
         setWorkspaceId(id);
 
         const oaRes = await lineOAApi.list({ workspace_id: id });
@@ -177,7 +176,7 @@ export function BroadcastsPage() {
         console.error("Failed to load LINE OAs", err);
       }
     };
-    load();
+    void load();
   }, []);
 
   // Load broadcasts when workspace or filter changes

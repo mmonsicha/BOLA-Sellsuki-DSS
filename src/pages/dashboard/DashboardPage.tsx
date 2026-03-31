@@ -15,8 +15,9 @@ import { segmentApi } from "@/api/segment";
 import { authApi } from "@/api/auth";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import type { LineOA, Broadcast } from "@/types";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const featureGroups = [
   {

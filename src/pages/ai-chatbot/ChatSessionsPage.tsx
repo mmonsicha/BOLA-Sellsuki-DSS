@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { RefreshCw, MessageCircle } from "lucide-react";
 import { chatSessionApi } from "@/api/aiChatbot";
 import type { ChatSession, ChatMode } from "@/types";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 function relativeTime(dateStr: string | null): string {
   if (!dateStr) return "—";

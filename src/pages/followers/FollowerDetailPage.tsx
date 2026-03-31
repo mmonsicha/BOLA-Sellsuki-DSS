@@ -7,7 +7,7 @@ import { ArrowLeft, RefreshCw, Plus, X, CheckCircle, XCircle, Activity } from "l
 import type { Follower, FollowerBehaviorSummary } from "@/types";
 import { followerApi } from "@/api/follower";
 import { analyticsApi } from "@/api/analytics";
-import { workspaceApi } from "@/api/workspace";
+import { getWorkspaceId } from "@/lib/auth";
 
 const followStatusVariant = {
   following: "success" as const,
@@ -267,7 +267,7 @@ export function FollowerDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [workspaceId, setWorkspaceId] = useState<string>("");
+  const workspaceId = getWorkspaceId() ?? "";
 
   const [form, setForm] = useState<FormState>({
     email: "",
@@ -278,16 +278,10 @@ export function FollowerDetailPage() {
   });
 
   useEffect(() => {
-    workspaceApi.list({}).then((res) => {
-      const ws = (res as any).data?.[0] || (res as any)[0];
-      if (ws) setWorkspaceId(ws.id);
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
     followerApi
       .get(id)
       .then((res) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const f = (res as any).data ?? res;
         setFollower(f);
         setForm({
@@ -314,6 +308,7 @@ export function FollowerDetailPage() {
         tags: form.tags,
         custom_fields: form.custom_fields,
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const f = (updated as any).data ?? updated;
       setFollower(f);
       setSaveSuccess(true);
@@ -507,7 +502,7 @@ export function FollowerDetailPage() {
 
         {/* Save */}
         <div className="flex items-center gap-3 pb-8">
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={() => { void handleSave(); }} disabled={saving}>
             {saving && <RefreshCw size={14} className="mr-2 animate-spin" />}
             {saving ? "Saving..." : "Save Changes"}
           </Button>

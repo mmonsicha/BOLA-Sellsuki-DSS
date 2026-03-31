@@ -28,8 +28,9 @@ import { oaLabel } from "@/lib/lineOAUtils";
 import { TemplateGalleryStep } from "@/components/rich_menu/TemplateGalleryStep";
 import { pctToLineArea } from "@/data/richMenuPresets";
 import type { RichMenuPreset } from "@/data/richMenuPresets";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 /**
  * Status rules:

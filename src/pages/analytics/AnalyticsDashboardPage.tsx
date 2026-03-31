@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { BarChart2, MousePointerClick, Eye, Users, TrendingUp, RefreshCw } from "lucide-react";
 import { analyticsApi } from "@/api/analytics";
 import { lineOAApi } from "@/api/lineOA";
-import { workspaceApi } from "@/api/workspace";
+import { getWorkspaceId } from "@/lib/auth";
 import type { AnalyticsSummary, AnalyticsEvent, TopElementStats, LineOA } from "@/types";
 
 const PERIODS = [
@@ -139,18 +139,12 @@ export function AnalyticsDashboardPage() {
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
   const [totalEvents, setTotalEvents] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [workspaceId, setWorkspaceId] = useState<string>("");
-
-  useEffect(() => {
-    workspaceApi.list({}).then((res) => {
-      const ws = (res as any).data?.[0] || (res as any)[0];
-      if (ws) setWorkspaceId(ws.id);
-    }).catch(() => {});
-  }, []);
+  const workspaceId = getWorkspaceId() ?? "";
 
   useEffect(() => {
     if (!workspaceId) return;
     lineOAApi.list({ workspace_id: workspaceId }).then((res) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const oas = (res as any).data || res;
       setLineOAs(Array.isArray(oas) ? oas : []);
     }).catch(() => {});

@@ -9,8 +9,9 @@ import type { LineOA } from "@/types";
 import { ConnectLineOADialog } from "./ConnectLineOADialog";
 import { useToast } from "@/components/ui/toast";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const statusVariant = {
   active: "success" as const,

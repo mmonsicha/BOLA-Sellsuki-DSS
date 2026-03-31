@@ -9,8 +9,9 @@ import { FlexMessagePicker } from "@/components/common/FlexMessagePicker";
 import type { AutoReply, QuickReply, TriggerType, MatchMode, Media } from "@/types";
 import { MediaPickerDialog } from "@/pages/chat-inbox/MediaPickerDialog";
 import { toDisplayUrl } from "@/lib/mediaUtils";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 

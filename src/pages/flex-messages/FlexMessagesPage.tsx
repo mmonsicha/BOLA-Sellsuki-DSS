@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Layers, Trash2, Edit, AlertCircle, ArrowLeft, Info } from "lucide-react";
 import { useState, useEffect } from "react";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
-import { workspaceApi } from "@/api/workspace";
 import { lineOAApi } from "@/api/lineOA";
+import { getWorkspaceId } from "@/lib/auth";
 import type { LineOA } from "@/types";
 import { flexMessageTemplates, type FlexTemplate } from "@/utils/flexMessageTemplates";
 import { FlexCardPreview } from "@/components/FlexCardPreview";
@@ -198,8 +198,7 @@ export function FlexMessagesPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const wsRes = await workspaceApi.list({ page: 1, page_size: 1 });
-        const id = wsRes?.data?.[0]?.id ?? "00000000-0000-0000-0000-000000000001";
+        const id = getWorkspaceId() ?? "";
         setWorkspaceId(id);
         const [tplRes, oaRes] = await Promise.all([
           flexMessageApi.list({ workspace_id: id }),

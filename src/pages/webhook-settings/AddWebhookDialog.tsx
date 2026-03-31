@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { webhookSettingApi } from "@/api/webhookSetting";
 import { lineOAApi } from "@/api/lineOA";
 import type { WebhookSetting, LineOA } from "@/types";
+import { getWorkspaceId } from "@/lib/auth";
 
 interface AddWebhookDialogProps {
   open: boolean;
@@ -38,7 +39,7 @@ const initialForm: Form = {
   response_msg: "",
 };
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 function Field({
   label,

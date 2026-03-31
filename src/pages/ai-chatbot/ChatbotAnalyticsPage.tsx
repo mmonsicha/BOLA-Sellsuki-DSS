@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { chatSessionApi, knowledgeBaseApi, unansweredQuestionApi } from "@/api/aiChatbot";
 import type { ChatSession, KnowledgeBase, UnansweredQuestion } from "@/types";
 import { MessageSquare, Bot, Users, Database, HelpCircle, CheckCircle, RefreshCw, TrendingUp } from "lucide-react";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const ESCALATION_LABELS: Record<string, string> = {
   low_confidence: "Low Confidence",
@@ -54,7 +55,7 @@ export function ChatbotAnalyticsPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
 
   if (loading) {
     return (
@@ -72,7 +73,7 @@ export function ChatbotAnalyticsPage() {
       <AppLayout title="Chatbot Analytics">
         <div className="p-4 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 flex items-center justify-between">
           <span>{error ?? "Unknown error"}</span>
-          <button onClick={load} className="ml-4 text-xs underline hover:no-underline">Retry</button>
+          <button onClick={() => { void load(); }} className="ml-4 text-xs underline hover:no-underline">Retry</button>
         </div>
       </AppLayout>
     );
@@ -114,7 +115,7 @@ export function ChatbotAnalyticsPage() {
             <p className="text-sm text-muted-foreground">Overview from last 100 sessions · KB entries · questions</p>
           </div>
           <button
-            onClick={load}
+            onClick={() => { void load(); }}
             disabled={loading}
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted"
           >

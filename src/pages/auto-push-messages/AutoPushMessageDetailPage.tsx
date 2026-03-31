@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, ArrowLeft, Copy, Check, RefreshCw, Trash2, CheckCircle, XCircle, ChevronDown, Search, ExternalLink } from "lucide-react";
+import { getWorkspaceId } from "@/lib/auth";
 import { CopyButton } from "@/components/CopyButton";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -252,7 +253,7 @@ export function AutoPushMessageDetailPage() {
 
           // Load flex messages for picker
           try {
-            const flexRes = await flexMessageApi.list({ workspace_id: "00000000-0000-0000-0000-000000000001" });
+            const flexRes = await flexMessageApi.list({ workspace_id: getWorkspaceId() ?? "" });
             setFlexMessages(flexRes.data ?? []);
           } catch (err) {
             console.error("Failed to load flex messages:", err);
@@ -695,7 +696,7 @@ export function AutoPushMessageDetailPage() {
                             setFollowerSearching(true);
                             try {
                               const res = await followerApi.list({
-                                workspace_id: apm?.workspace_id ?? "00000000-0000-0000-0000-000000000001",
+                                workspace_id: apm?.workspace_id ?? (getWorkspaceId() ?? ""),
                                 line_oa_id: apm?.line_oa_id,
                                 search: val.trim(),
                                 page: 1,

@@ -8,8 +8,9 @@ import type { LONDeliveryLog, LineOA } from "@/types";
 import { lonApi } from "@/api/lon";
 import { lineOAApi } from "@/api/lineOA";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const statusVariant = {
   success: "success" as const,
@@ -17,7 +18,7 @@ const statusVariant = {
   pending: "secondary" as const,
 };
 
-const statusColor = {
+const _statusColor = {
   success: "text-green-600",
   failed: "text-red-500",
   pending: "text-yellow-500",

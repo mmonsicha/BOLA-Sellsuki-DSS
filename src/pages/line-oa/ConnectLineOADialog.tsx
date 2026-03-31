@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, Eye, EyeOff, HelpCircle } from "lucide-react";
 import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 interface ConnectLineOADialogProps {
   open: boolean;

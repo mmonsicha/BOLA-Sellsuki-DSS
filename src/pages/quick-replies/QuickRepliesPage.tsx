@@ -17,8 +17,9 @@ import { quickReplyApi } from "@/api/richMenu";
 import { lineOAApi } from "@/api/lineOA";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 import { useToast } from "@/components/ui/toast";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const ACTION_TYPES = [
   { value: "message", label: "Send Message" },

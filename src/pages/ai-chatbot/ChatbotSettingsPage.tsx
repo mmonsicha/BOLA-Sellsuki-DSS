@@ -7,8 +7,9 @@ import { aiChatbotConfigApi, testLLMConnection } from "@/api/aiChatbot";
 import type { AIChatbotConfig, LineOA } from "@/types";
 import { lineOAApi } from "@/api/lineOA";
 import { Bot, Save, Wifi } from "lucide-react";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const LLM_PROVIDERS = [
   { value: "openai", label: "OpenAI", description: "GPT-4o, GPT-4o-mini and other OpenAI models. Requires an OpenAI API key." },
@@ -164,7 +165,7 @@ export function ChatbotSettingsPage() {
             {/* Enable/Disable toggle */}
             {config && (
               <button
-                onClick={handleToggle}
+                onClick={() => { void handleToggle(); }}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   form.is_enabled
                     ? "bg-green-100 text-green-700 hover:bg-green-200"
@@ -180,7 +181,7 @@ export function ChatbotSettingsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleTestConnection}
+              onClick={() => { void handleTestConnection(); }}
               disabled={testing || !selectedOAId}
               title="Test connection using the current form values (not yet saved)"
             >
@@ -196,7 +197,7 @@ export function ChatbotSettingsPage() {
               </span>
             )}
 
-            <Button onClick={handleSave} disabled={saving || !selectedOAId} size="sm">
+            <Button onClick={() => { void handleSave(); }} disabled={saving || !selectedOAId} size="sm">
               <Save size={14} className="mr-1" />
               {saving ? "Saving..." : "Save Settings"}
             </Button>

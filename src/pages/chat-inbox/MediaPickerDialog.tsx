@@ -4,8 +4,9 @@ import type { Media } from "@/types";
 import { X, RefreshCw, FileImage, Film, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toDisplayUrl } from "@/lib/mediaUtils";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 type MediaFilter = "all" | "image" | "video";
 

@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, X, RefreshCw, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
 import { segmentApi } from "@/api/segment";
 import { lineOAApi } from "@/api/lineOA";
-import { workspaceApi } from "@/api/workspace";
 import { useToast } from "@/components/ui/toast";
+import { getWorkspaceId } from "@/lib/auth";
 import type { LineOA, Segment } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -262,8 +262,7 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
   useEffect(() => {
     const load = async () => {
       try {
-        const wsRes = await workspaceApi.list({ page: 1, page_size: 1 });
-        const id = wsRes?.data?.[0]?.id ?? "00000000-0000-0000-0000-000000000001";
+        const id = getWorkspaceId() ?? "";
         setWorkspaceId(id);
 
         const oaRes = await lineOAApi.list({ workspace_id: id });

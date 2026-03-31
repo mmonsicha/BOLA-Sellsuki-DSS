@@ -21,8 +21,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/toast";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const triggerLabel: Record<TriggerType, string> = {
   follow:   "Follow",
@@ -253,7 +254,7 @@ export function AutoReplyPage() {
                 draggable
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
-                onDragEnd={handleDragEnd}
+                onDragEnd={() => { void handleDragEnd(); }}
                 className={[
                   "cursor-default select-none transition-opacity",
                   !ar.is_enabled ? "opacity-60" : "",
@@ -308,7 +309,7 @@ export function AutoReplyPage() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
-                      onClick={() => handleToggle(ar)}
+                      onClick={() => { void handleToggle(ar); }}
                       disabled={togglingId === ar.id}
                       className="text-muted-foreground hover:text-foreground transition-colors"
                       title={ar.is_enabled ? "Disable" : "Enable"}
@@ -360,7 +361,7 @@ export function AutoReplyPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+              onClick={() => { void handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
             >
               Delete
             </AlertDialogAction>

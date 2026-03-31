@@ -4,6 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Follower } from "@/types";
 import { followerApi } from "@/api/follower";
+import { getWorkspaceId } from "@/lib/auth";
+
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const followStatusVariant = {
   following: "success" as const,
@@ -15,7 +18,6 @@ export function CustomersPage() {
   const [followers, setFollowers] = useState<Follower[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
   useEffect(() => {
     const loadFollowers = async () => {
@@ -32,7 +34,7 @@ export function CustomersPage() {
       }
     };
 
-    loadFollowers();
+    void loadFollowers();
   }, []);
 
   return (

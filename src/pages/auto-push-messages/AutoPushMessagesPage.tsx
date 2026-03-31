@@ -21,8 +21,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/toast";
+import { getWorkspaceId } from "@/lib/auth";
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 const targetTypeMeta = {
   "follower": { label: "Single Follower", cls: "bg-blue-100 text-blue-700 border-0" },
@@ -35,7 +36,7 @@ const targetTypeMeta = {
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
-    navigator.clipboard.writeText(text).then(() => {
+    void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -119,6 +120,7 @@ export function AutoPushMessagesPage() {
 
   useEffect(() => {
     loadAutoPushMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLineOAId]);
 
   const handleToggle = async (apm: AutoPushMessage) => {
@@ -265,7 +267,7 @@ export function AutoPushMessagesPage() {
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => handleToggle(apm)}
+                        onClick={() => { void handleToggle(apm); }}
                         disabled={togglingId === apm.id}
                         className="text-muted-foreground hover:text-foreground transition-colors"
                         title={isActive ? "Deactivate" : "Activate"}
@@ -312,7 +314,7 @@ export function AutoPushMessagesPage() {
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => { handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
+              onClick={() => { void handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); }}
             >
               ลบ
             </AlertDialogAction>

@@ -2,6 +2,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { getWorkspaceId } from "@/lib/auth";
 import { autoPushMessageApi } from "@/api/autoPushMessage";
 import type { AutoPushMessage } from "@/api/autoPushMessage";
 import { webhookSettingApi } from "@/api/webhookSetting";
@@ -168,7 +169,7 @@ export function CreateAutoPushDialog({
   const loadLineOAs = async () => {
     setLoadingLineOAs(true);
     try {
-      const res = await lineOAApi.list({ workspace_id: "00000000-0000-0000-0000-000000000001" });
+      const res = await lineOAApi.list({ workspace_id: getWorkspaceId() ?? "" });
       setLineOAs(res.data ?? []);
     } catch (err) {
       console.error("Failed to load LINE OAs:", err);
@@ -181,7 +182,7 @@ export function CreateAutoPushDialog({
     setLoadingData(true);
     try {
       // Load webhook settings
-      const webhookRes = await webhookSettingApi.list({ workspace_id: "00000000-0000-0000-0000-000000000001" });
+      const webhookRes = await webhookSettingApi.list({ workspace_id: getWorkspaceId() ?? "" });
       setWebhooks(webhookRes.data ?? []);
 
       // Load segments
@@ -193,7 +194,7 @@ export function CreateAutoPushDialog({
       setSegments(segmentRes.data ?? []);
 
       // Load flex messages for picker
-      const flexRes = await flexMessageApi.list({ workspace_id: "00000000-0000-0000-0000-000000000001" });
+      const flexRes = await flexMessageApi.list({ workspace_id: getWorkspaceId() ?? "" });
       setFlexMessages(flexRes.data ?? []);
     } catch (err) {
       console.error("Failed to load options:", err);
@@ -222,7 +223,7 @@ export function CreateAutoPushDialog({
       setLoadingFollowers(true);
       try {
         const res = await followerApi.list({
-          workspace_id: "00000000-0000-0000-0000-000000000001",
+          workspace_id: getWorkspaceId() ?? "",
           line_oa_id: lineOAId,
           search: q.trim(),
           page: 1,
