@@ -1,128 +1,401 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { Follower } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { LineOAFilter } from "@/components/common/LineOAFilter";
+import { CsvImportWizard } from "@/components/contacts/CsvImportWizard";
+import { cn } from "@/lib/utils";
+import type { Follower, UnifiedContact, LineOA } from "@/types";
 import { followerApi } from "@/api/follower";
+import { lineOAApi } from "@/api/lineOA";
 import { getWorkspaceId } from "@/lib/auth";
+import { Upload, Users, Phone, Search, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
 
 const WORKSPACE_ID = getWorkspaceId() ?? "";
+const PAGE_SIZE = 20;
 
-const followStatusVariant = {
-  following: "success" as const,
-  unfollowed: "secondary" as const,
-  blocked: "destructive" as const,
+type ActiveTab = "followers" | "phone_only";
+
+// ---------- helpers ----------
+
+function getInitials(contact: UnifiedContact): string {
+  if (contact.display_name) return contact.display_name[0].toUpperCase();
+  if (contact.first_name) return contact.first_name[0].toUpperCase();
+  if (contact.phone) return contact.phone[0];
+  return "?";
+}
+
+function getDisplayLabel(contact: UnifiedContact): string {
+  if (contact.display_name) return contact.display_name;
+  const name = [contact.first_name, contact.last_name].filter(Boolean).join(" ");
+  if (name) return name;
+  return contact.phone ?? contact.line_user_id ?? contact.id;
+}
+
+function getSubLabel(contact: UnifiedContact): string | null {
+  if (contact.phone) return contact.phone;
+  return null;
+}
+
+const followStatusVariant: Record<string, "success" | "secondary" | "destructive"> = {
+  following: "success",
+  unfollowed: "secondary",
+  blocked: "destructive",
 };
 
-export function CustomersPage() {
+export function ContactsPage() {
+  // LINE OA list
+  const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
+  const [selectedLineOAId, setSelectedLineOAId] = useState("");
+
+  // Tab
+  const [activeTab, setActiveTab] = useState<ActiveTab>("followers");
+
+  // Data
   const [followers, setFollowers] = useState<Follower[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [unifiedContacts, setUnifiedContacts] = useState<UnifiedContact[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Search (debounced)
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Import modal
+  const [importOpen, setImportOpen] = useState(false);
+
+  // ---- Load LINE OAs ----
   useEffect(() => {
-    const loadFollowers = async () => {
+    const load = async () => {
       try {
-        setLoading(true);
-        const response = await followerApi.list({ workspace_id: WORKSPACE_ID });
-        setFollowers(response.data || []);
-        setError(null);
+        const res = await lineOAApi.list({ workspace_id: WORKSPACE_ID });
+        setLineOAs(res.data ?? []);
+      } catch {
+        // non-fatal: filter just won't show
+      }
+    };
+    void load();
+  }, []);
+
+  // ---- Debounce search input ----
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1);
+    }, 400);
+  };
+
+  // ---- Reset page on tab / OA / search change ----
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, selectedLineOAId]);
+
+  // ---- Load data ----
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (activeTab === "followers") {
+          const res = await followerApi.list({
+            workspace_id: WORKSPACE_ID,
+            line_oa_id: selectedLineOAId || undefined,
+            search: search || undefined,
+            page,
+            page_size: PAGE_SIZE,
+          });
+          setFollowers(res.data ?? []);
+          setTotal(res.total ?? 0);
+          setUnifiedContacts([]);
+        } else {
+          const res = await followerApi.listUnified({
+            workspace_id: WORKSPACE_ID,
+            line_oa_id: selectedLineOAId || undefined,
+            contact_status: "phone_only",
+            search: search || undefined,
+            page,
+            page_size: PAGE_SIZE,
+          });
+          setUnifiedContacts(res.data ?? []);
+          setTotal(res.total ?? 0);
+          setFollowers([]);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load followers");
-        setFollowers([]);
+        setError(err instanceof Error ? err.message : "Failed to load contacts");
       } finally {
         setLoading(false);
       }
     };
+    void load();
+  }, [activeTab, selectedLineOAId, search, page]);
 
-    void loadFollowers();
-  }, []);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <AppLayout title="Followers">
+    <AppLayout title="Contacts">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        {/* Top bar */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            Manage your LINE followers. They are automatically added when they follow your LINE OA.
+            Manage your LINE contacts — followers, phone imports, and more.
           </p>
           <div className="flex items-center gap-2">
-            {/* Filter by LINE OA */}
-            <select className="border rounded-md px-3 py-1.5 text-sm bg-background">
-              <option value="">All LINE OAs</option>
-            </select>
+            <a
+              href={`${import.meta.env.VITE_API_URL || ""}/v1/contacts/swagger`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="ghost" size="sm" className="flex items-center gap-1.5 text-muted-foreground">
+                <BookOpen size={14} />
+                API Docs
+              </Button>
+            </a>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-shrink-0 flex items-center gap-1.5"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload size={14} />
+              Import Phones
+            </Button>
           </div>
         </div>
 
+        {/* LINE OA filter */}
+        <LineOAFilter
+          lineOAs={lineOAs}
+          selectedId={selectedLineOAId}
+          onChange={(id) => { setSelectedLineOAId(id); setPage(1); }}
+          showAll
+        />
+
+        {/* Tabs */}
+        <div className="flex gap-1 border-b">
+          <button
+            onClick={() => setActiveTab("followers")}
+            className={cn(
+              "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
+              activeTab === "followers"
+                ? "border-line text-line"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <span className="flex items-center gap-1.5">
+              <Users size={14} />
+              All Followers
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab("phone_only")}
+            className={cn(
+              "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
+              activeTab === "phone_only"
+                ? "border-line text-line"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <span className="flex items-center gap-1.5">
+              <Phone size={14} />
+              Phone Only
+            </span>
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, phone…"
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        {/* Error */}
         {error && (
           <Card className="border-destructive">
             <CardContent className="text-center py-8">
-              <div className="text-4xl mb-3">⚠️</div>
-              <p className="font-medium text-destructive">Error loading followers</p>
+              <p className="font-medium text-destructive">Error loading contacts</p>
               <p className="text-sm text-muted-foreground mt-1">{error}</p>
             </CardContent>
           </Card>
         )}
 
+        {/* Loading skeleton */}
         {loading && (
           <Card>
             <CardContent className="text-center py-12">
-              <div className="text-4xl mb-3">⏳</div>
-              <p className="font-medium">Loading followers...</p>
+              <p className="font-medium text-muted-foreground animate-pulse">Loading…</p>
             </CardContent>
           </Card>
         )}
 
-        {!loading && !error && followers.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <div className="text-4xl mb-3">👥</div>
-              <p className="font-medium">No followers yet</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Followers will appear here when they follow your LINE OA.
-              </p>
-            </CardContent>
-          </Card>
-        ) : !loading && !error && (
-          <div className="grid gap-3">
-            {followers.map((follower) => (
-              <Card key={follower.id}>
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex-shrink-0 overflow-hidden">
-                    {follower.picture_url ? (
-                      <img src={follower.picture_url} alt={follower.display_name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 font-medium">
-                        {follower.display_name?.[0] || "?"}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{follower.display_name}</span>
-                      <Badge variant={followStatusVariant[follower.follow_status]}>
-                        {follower.follow_status}
-                      </Badge>
+        {/* All Followers tab content */}
+        {!loading && !error && activeTab === "followers" && (
+          followers.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Users className="mx-auto mb-3 text-muted-foreground" size={36} />
+                <p className="font-medium">No followers yet</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Followers will appear here when they follow your LINE OA.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3">
+              {followers.map((follower) => (
+                <Card key={follower.id}>
+                  <CardContent className="flex items-center gap-4 p-4">
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
+                      {follower.picture_url ? (
+                        <img
+                          src={follower.picture_url}
+                          alt={follower.display_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground font-medium text-sm">
+                          {follower.display_name?.[0]?.toUpperCase() ?? "?"}
+                        </div>
+                      )}
                     </div>
-                    {follower.tags?.length > 0 && (
-                      <div className="flex gap-1 mt-1 flex-wrap">
-                        {follower.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium truncate">{follower.display_name}</span>
+                        <Badge variant={followStatusVariant[follower.follow_status] ?? "secondary"}>
+                          {follower.follow_status}
+                        </Badge>
                       </div>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground flex-shrink-0">
-                    {follower.followed_at
-                      ? new Date(follower.followed_at).toLocaleDateString()
-                      : "—"}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      {follower.tags?.length > 0 && (
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {follower.tags.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Date */}
+                    <div className="text-xs text-muted-foreground flex-shrink-0">
+                      {follower.followed_at
+                        ? new Date(follower.followed_at).toLocaleDateString()
+                        : "—"}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* Phone Only tab content */}
+        {!loading && !error && activeTab === "phone_only" && (
+          unifiedContacts.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Phone className="mx-auto mb-3 text-muted-foreground" size={36} />
+                <p className="font-medium">No phone contacts yet</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Import phone numbers using the "Import Phones" button above.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3">
+              {unifiedContacts.map((contact) => (
+                <Card
+                  key={contact.id}
+                  className="cursor-pointer hover:bg-muted/40 transition-colors"
+                  onClick={() => window.location.href = `/contacts/phone/${contact.id}`}
+                >
+                  <CardContent className="flex items-center gap-4 p-4">
+                    {/* Avatar / initials */}
+                    <div className="w-10 h-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
+                      {contact.picture_url ? (
+                        <img
+                          src={contact.picture_url}
+                          alt={getDisplayLabel(contact)}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground font-medium text-sm">
+                          {getInitials(contact)}
+                        </div>
+                      )}
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium truncate">{getDisplayLabel(contact)}</span>
+                        <Badge variant="secondary">Phone Only</Badge>
+                      </div>
+                      {getSubLabel(contact) && getSubLabel(contact) !== getDisplayLabel(contact) && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {getSubLabel(contact)}
+                        </p>
+                      )}
+                    </div>
+                    {/* Date */}
+                    <div className="text-xs text-muted-foreground flex-shrink-0">
+                      {contact.created_at
+                        ? new Date(contact.created_at).toLocaleDateString()
+                        : "—"}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* Pagination */}
+        {!loading && !error && total > PAGE_SIZE && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-sm text-muted-foreground">
+              Page {page} of {totalPages} ({total} total)
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                <ChevronLeft size={14} />
+                Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+              >
+                Next
+                <ChevronRight size={14} />
+              </Button>
+            </div>
           </div>
         )}
       </div>
+
+      <CsvImportWizard
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        lineOAId={selectedLineOAId}
+      />
     </AppLayout>
   );
 }

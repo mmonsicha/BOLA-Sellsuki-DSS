@@ -1,5 +1,12 @@
 import { api } from "./client";
-import type { Follower, PaginatedResponse } from "@/types";
+import type { Follower, PaginatedResponse, UnifiedContact, ImportPhoneContactsPreview, PhoneContactDetail } from "@/types";
+
+export interface ImportContactItem {
+  phone: string;
+  first_name?: string;
+  last_name?: string;
+  line_uid?: string;
+}
 
 export interface ListFollowersParams {
   workspace_id: string;
@@ -46,4 +53,16 @@ export const followerApi = {
 
   getSyncStatus: (lineOAId: string) =>
     api.get<FollowerSyncStatus>(`/v1/followers/sync/status`, { line_oa_id: lineOAId }),
+
+  listUnified: (params: ListFollowersParams & { contact_status?: string }) =>
+    api.get<PaginatedResponse<UnifiedContact>>("/v1/contacts", params),
+
+  previewImportPhones: (lineOaId: string, contacts: ImportContactItem[]) =>
+    api.post<ImportPhoneContactsPreview>(`/v1/contacts/import-phones/preview?line_oa_id=${lineOaId}`, { contacts }),
+
+  importPhones: (lineOaId: string, contacts: ImportContactItem[]) =>
+    api.post<{ imported: number }>(`/v1/contacts/import-phones?line_oa_id=${lineOaId}`, { contacts }),
+
+  getPhoneContact: (id: string) =>
+    api.get<PhoneContactDetail>(`/v1/contacts/phone/${id}`),
 };

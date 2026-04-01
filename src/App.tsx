@@ -9,6 +9,8 @@ import { LineOAPage } from "@/pages/line-oa/LineOAPage";
 import { LineOADetailPage } from "@/pages/line-oa/LineOADetailPage";
 import { FollowersPage } from "@/pages/followers/FollowersPage";
 import { FollowerDetailPage } from "@/pages/followers/FollowerDetailPage";
+import { ContactsPage } from "@/pages/customers/CustomersPage";
+import { PhoneContactDetailPage } from "@/pages/customers/PhoneContactDetailPage";
 import { BroadcastsPage } from "@/pages/broadcasts/BroadcastsPage";
 import { BroadcastWizardPage } from "@/pages/broadcasts/BroadcastWizardPage";
 import { BroadcastDetailPage } from "@/pages/broadcasts/BroadcastDetailPage";
@@ -38,6 +40,8 @@ import { QuickRepliesPage } from "@/pages/quick-replies/QuickRepliesPage";
 import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
 import { LONDeliveryLogsPage } from "@/pages/lon-delivery-logs/LONDeliveryLogsPage";
 import { LONByPhonePage } from "@/pages/lon-by-phone/LONByPhonePage";
+import { LONTemplatesPage } from "@/pages/lon-templates/LONTemplatesPage";
+import { LONJobsPage } from "@/pages/lon-jobs/LONJobsPage";
 import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscribePage";
 import { RGBConsentPage } from "@/pages/lon/RGBConsentPage";
 import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFormsPage";
@@ -66,7 +70,13 @@ function resolveProtectedRoute(path: string, segments: string[]): React.ReactEle
     return <LineOAPage />;
   }
 
-  if (path.startsWith("/customers") || segments[0] === "followers") {
+  if (segments[0] === "contacts" && segments[1] === "phone" && segments[2]) {
+    return <PhoneContactDetailPage contactId={segments[2]} />;
+  }
+  if (path.startsWith("/contacts")) {
+    return <ContactsPage />;
+  }
+  if (segments[0] === "followers") {
     if (segments[1]) return <FollowerDetailPage />;
     return <FollowersPage />;
   }
@@ -130,6 +140,8 @@ function resolveProtectedRoute(path: string, segments: string[]): React.ReactEle
   if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
   if (path.startsWith("/lon-delivery-logs")) return <LONDeliveryLogsPage />;
   if (path.startsWith("/lon-by-phone")) return <LONByPhonePage />;
+  if (path.startsWith("/lon-templates")) return <LONTemplatesPage />;
+  if (path.startsWith("/lon-jobs")) return <LONJobsPage />;
 
   // Registration Forms
   if (segments[0] === "registration-forms") {

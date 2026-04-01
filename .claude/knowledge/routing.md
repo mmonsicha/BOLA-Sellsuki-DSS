@@ -45,6 +45,8 @@ if (!isAuthenticated()) {
 | `/` or `/dashboard` | `DashboardPage` |
 | `/line-oa` | `LineOAPage` |
 | `/line-oa/:id` | `LineOADetailPage` |
+| `/contacts` | `ContactsPage` (followers + phone-only tabs) |
+| `/contacts/phone/:id` | `PhoneContactDetailPage` — phone contact detail with linked OAs |
 | `/customers` or `/followers` | `FollowersPage` |
 | `/followers/:id` | `FollowerDetailPage` |
 | `/broadcasts` | `BroadcastsPage` |
@@ -77,6 +79,7 @@ if (!isAuthenticated()) {
 | `/lon-subscribers` | `LONSubscribersPage` |
 | `/lon-delivery-logs` | `LONDeliveryLogsPage` |
 | `/lon-by-phone` | `LONByPhonePage` |
+| `/lon-templates` | `LONTemplatesPage` |
 | `/registration-forms` | `RegistrationFormsPage` |
 | `/registration-forms/:id` | `RegistrationFormBuilderPage` |
 | `/registration-forms/:id/submissions` | `RegistrationSubmissionsPage` |
@@ -122,6 +125,7 @@ src/pages/
 ├── lon-subscribers/   LONSubscribersPage, LONPublicSubscribePage
 ├── lon-delivery-logs/ LONDeliveryLogsPage
 ├── lon-by-phone/      LONByPhonePage
+├── lon-templates/     LONTemplatesPage
 ├── lon/               RGBConsentPage
 ├── registration-forms/ RegistrationFormsPage, RegistrationFormBuilderPage, RegistrationSubmissionsPage
 ├── analytics/         AnalyticsDashboardPage

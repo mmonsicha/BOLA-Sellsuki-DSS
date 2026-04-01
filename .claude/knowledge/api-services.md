@@ -34,11 +34,17 @@ All API paths are prefixed with `/v1/workspaces/${workspaceId}/...` where `works
 - `listLineOAs(workspaceId)` — `GET /v1/workspaces/:id/line-oas`
 - `getLineOA(workspaceId, id)` — `GET /v1/workspaces/:id/line-oas/:id`
 
-## Followers (`src/api/follower.ts`)
+## Followers & Contacts (`src/api/follower.ts` — `followerApi`)
 
-- `listFollowers(workspaceId, params)` — `GET /v1/workspaces/:id/followers`
-- `getFollower(workspaceId, id)` — `GET /v1/workspaces/:id/followers/:id`
-- `updateFollower(workspaceId, id, data)` — `PUT`
+- `list(params)` — `GET /v1/followers` — list LINE followers
+- `get(id)` — `GET /v1/followers/:id`
+- `update(id, body)` — `PUT /v1/followers/:id`
+- `startSync(lineOAId)` — `POST /v1/followers/sync`
+- `getSyncStatus(lineOAId)` — `GET /v1/followers/sync/status`
+- `listUnified(params)` — `GET /v1/contacts` — unified contacts (pass `contact_status=phone_only` for phone tab)
+- `previewImportPhones(lineOaId, contacts)` — `POST /v1/contacts/import-phones/preview`
+- `importPhones(lineOaId, contacts)` — `POST /v1/contacts/import-phones`
+- `getPhoneContact(id)` — `GET /v1/contacts/phone/:id` — returns `PhoneContactDetail` with `linked_oas[]`
 
 ## Segments (`src/api/segment.ts`)
 
@@ -77,11 +83,38 @@ Standard CRUD for flex message templates.
 
 ## LON (`src/api/lon.ts`)
 
-- `listSubscribers(workspaceId, params)` — list LON subscribers
-- `getSubscriberStats(workspaceId)` — stats
-- `revokeSubscriber(workspaceId, id)` — revoke consent
-- `listDeliveryLogs(workspaceId, params)` — delivery log list
-- `sendNotification(workspaceId, data)` — send LON message
+`lonApi`:
+- `listSubscribers(params)` — GET `/v1/lon-subscribers`
+- `getSubscriberStats(lineOAId)` — GET `/v1/lon-subscribers/stats`
+- `getSubscriber(id)` — GET `/v1/lon-subscribers/:id`
+- `revokeSubscriber(id)` — DELETE `/v1/lon-subscribers/:id`
+- `recordSubscriberAccess(id)` — POST `/v1/lon-subscribers/:id/access-log` (fire-and-forget; fires audit `lon_subscriber.view_phone`)
+- `listDeliveryLogs(params)` — GET `/v1/lon-delivery-logs`
+- `subscribeByPhone(params)` — POST `/v1/lon/subscribe-by-phone`
+- `bulkSubscribeByPhone(params)` — POST `/v1/lon/bulk-subscribe-by-phone`
+- `getPublicOAInfo(lineOAId)` — GET `/v1/public/lon/oa-info`
+- `liffConsent(params)` — POST `/v1/public/lon/liff-consent`
+- `sendConsentRequest(params)` — POST `/v1/lon/send-consent-request`
+- `sendLONByPhone(params)` — POST `/v1/pnp/send` → returns `PNPDeliveryLog` (incl. `phone_hash`)
+- `listLONByPhoneLogs(params)` — GET `/v1/pnp/logs`
+
+**localStorage side-effect**: after `sendLONByPhone`, `LONByPhonePage` writes `{ [phone_hash]: maskedPhone }` to `bola_lon_phone_map` so `LONDeliveryLogsPage` PNP tab can show readable masked phones.
+
+### `pnpTemplateApi` (same file `src/api/lon.ts`)
+
+```typescript
+pnpTemplateApi.list({ line_oa_id? })           // GET /v1/pnp-templates — returns { data: PNPTemplate[] }
+pnpTemplateApi.get(id)                          // GET /v1/pnp-templates/:id — returns PNPTemplate
+pnpTemplateApi.saveAs({ line_oa_id, name, description?, source_id?, json_body?, message_type?, variant? })
+                                                // POST /v1/pnp-templates — clone from preset (source_id) or create from scratch
+pnpTemplateApi.update(id, { name?, description?, json_body?, editable_schema? })
+                                                // PUT /v1/pnp-templates/:id
+pnpTemplateApi.delete(id)                       // DELETE /v1/pnp-templates/:id
+```
+
+**Response** for list: `{ data: PNPTemplate[] }` — includes both global presets (`is_preset: true`) and OA-specific templates.
+Filter to show only custom templates on the page: `templates.filter(t => !t.is_preset)`
+Filter to get presets for the picker: `templates.filter(t => t.is_preset)`
 
 ## RGB (`src/api/rgb.ts`)
 
@@ -127,6 +160,45 @@ LON RGB identity consent page API calls (public, no auth required).
 ## Outbound Events (`src/api/outboundEvent.ts`)
 
 - `listOutboundEvents(workspaceId)` — list outbound events
+
+---
+
+## Shared Rendering Utilities
+
+### `FlexCardPreview` (`src/components/FlexCardPreview.tsx`)
+
+Renders a LINE Flex Message JSON string as a visual card (mimics LINE chat background `#C6D0D9`).
+
+```tsx
+<FlexCardPreview
+  content={JSON.stringify(template.json_body)}  // must be a bubble object {type:"bubble",...}
+  height={320}      // default 320px
+  scrollable        // optional: overflow-y-auto + max-height instead of clipped overflow-hidden
+/>
+```
+
+- Uses `flex-render` library internally; silently shows "Preview unavailable" on error
+- Pass `scrollable` in editor modals so tall templates (list/mix) can be scrolled instead of clipped
+- Broken image URLs (LINE CDN, CORS) are replaced with a gray placeholder automatically
+
+### `applyTemplateVariables` (`src/utils/pnpTemplateUtils.ts`)
+
+Patches a Flex bubble JSON body with user-provided values using dot-notation paths.
+
+```typescript
+import { applyTemplateVariables } from "@/utils/pnpTemplateUtils";
+
+const patched = applyTemplateVariables(
+  template.json_body,         // Record<string, unknown> — source bubble
+  template.editable_schema,   // PNPTemplateEditableField[]
+  vars                        // Record<string, string> — keyed by field.path
+);
+// Returns deep-copied bubble with values applied; unknown paths are silently skipped
+```
+
+Path format: `body.contents[0].contents[1].text` — dot-notation with `[N]` array indices.
+
+---
 
 ## Adding a New API Service
 

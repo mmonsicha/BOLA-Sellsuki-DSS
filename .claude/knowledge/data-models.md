@@ -52,6 +52,36 @@ interface Follower {
 }
 ```
 
+## Phone Contact (detail view)
+
+```typescript
+type ContactStatus = "follower" | "phone_only" | "subscriber" | "linked"
+
+interface UnifiedContact {
+  id, workspace_id, line_oa_id
+  contact_status: ContactStatus
+  line_user_id?, display_name?, picture_url?, phone?
+  first_name?, last_name?, follow_status?, followed_at?
+  created_at, updated_at
+}
+
+interface PhoneContactFollowerDetail {
+  id: string
+  line_oa_id: string
+  line_user_id: string         // LINE UID for this OA
+  follower_id: string | null   // null until contact follows the OA
+  is_follower: boolean
+  linked_at: string
+}
+
+interface PhoneContactDetail {
+  id, phone, first_name, last_name
+  source: "csv" | "webhook" | "manual"
+  created_at, updated_at
+  linked_oas: PhoneContactFollowerDetail[]  // one per LINE OA this phone is linked to
+}
+```
+
 ## Segment
 
 ```typescript
@@ -128,6 +158,40 @@ interface Media {
 }
 ```
 
+## PNP Templates
+
+```typescript
+interface PNPTemplateEditableField {
+  path: string           // dot-notation JSON path into json_body, e.g. "body.contents[0].text"
+  type: "text" | "url" | "button_label"  // input UI hint (for send form), NOT a structure change
+  label: string          // human-readable label in send form
+  max_len?: number       // 0 or undefined = no limit
+}
+
+interface PNPTemplate {
+  id: string
+  workspace_id: string
+  line_oa_id: string
+  name: string
+  description: string
+  message_type: "basic" | "emphasis" | "list" | "mix"
+  variant: string        // "a" .. "f"
+  json_body: Record<string, unknown>   // full LINE Flex bubble {type:"bubble", header, body, footer, styles}
+  editable_schema: PNPTemplateEditableField[]
+  is_preset: boolean     // true = global LINE-approved preset (read-only, cannot delete/update)
+  preset_ref_id: string  // e.g. "1a", "2c"
+  created_by: string
+  created_at, updated_at: string
+}
+```
+
+**Key rules:**
+- `json_body` is a Flex **bubble** object — pass directly to `FlexCardPreview` as `JSON.stringify(template.json_body)`
+- `is_preset: true` = global preset seeded from LINE sample code (18 total: 1a-1c, 2a-2c, 3a-3f, 4a-4f)
+- `is_preset: false` = OA-specific custom template (editable, deletable)
+- `editable_schema[].type` only affects input UI in the send form; does NOT change how values are applied to json_body
+- Use `applyTemplateVariables(json_body, editable_schema, vars)` from `@/utils/pnpTemplateUtils.ts` to patch example/real values onto json_body for preview or sending
+
 ## LON (LINE Notification Messaging)
 
 ```typescript
@@ -156,6 +220,36 @@ interface LONDeliveryLog {
   status: LONDeliveryStatus
   error_message?, http_status_code?: number
   triggered_by, sent_at: string
+}
+
+// PNP (LON by Phone) — delivery via LINE Partner Notification Push
+interface PNPDeliveryLog {
+  id, workspace_id, line_oa_id: string
+  phone_hash: string          // SHA256(phone); resolve via bola_lon_phone_map localStorage key
+  template_key: string
+  status: "success" | "failed"
+  error_message?: string
+  http_status_code?: number
+  triggered_by, sent_at, created_at: string
+}
+
+interface PNPTemplateEditableField {
+  path: string
+  type: "text" | "url" | "button_label"
+  label: string
+  max_len?: number
+}
+
+interface PNPTemplate {
+  id, workspace_id, line_oa_id: string
+  name, description: string
+  message_type: "basic" | "emphasis" | "list" | "mix"
+  variant: string
+  json_body: Record<string, unknown>
+  editable_schema: PNPTemplateEditableField[]
+  is_preset: boolean       // true = global preset (read-only); false = OA-specific (editable)
+  preset_ref_id: string
+  created_by, created_at, updated_at: string
 }
 ```
 

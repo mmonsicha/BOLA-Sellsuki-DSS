@@ -39,11 +39,77 @@ export interface Follower {
   updated_at: string;
 }
 
+export type ContactStatus = "follower" | "phone_only" | "subscriber" | "linked";
+
+export interface UnifiedContact {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  contact_status: ContactStatus;
+  line_user_id?: string;
+  display_name?: string;
+  picture_url?: string;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+  follow_status?: string;
+  followed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---- Phone Contact Detail ----
+export interface PhoneContactFollowerDetail {
+  id: string;
+  line_oa_id: string;
+  line_user_id: string;
+  follower_id: string | null;
+  is_follower: boolean;
+  linked_at: string;
+}
+
+export interface PhoneContactDetail {
+  id: string;
+  phone: string;
+  first_name: string;
+  last_name: string;
+  source: string;
+  created_at: string;
+  updated_at: string;
+  linked_oas: PhoneContactFollowerDetail[];
+}
+
+// ---- PNP Templates ----
+export interface PNPTemplateEditableField {
+  path: string;
+  type: "text" | "url" | "button_label";
+  label: string;
+  max_len?: number;
+}
+
+export interface PNPTemplate {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  name: string;
+  description: string;
+  message_type: "basic" | "emphasis" | "list" | "mix";
+  variant: string;
+  json_body: Record<string, unknown>;
+  editable_schema: PNPTemplateEditableField[];
+  is_preset: boolean;
+  preset_ref_id: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // ---- Segment ----
 export interface Segment {
   id: string;
   workspace_id: string;
   line_oa_id: string;
+  source_type: "follower" | "contact";
   name: string;
   description: string;
   rule: {
@@ -52,6 +118,7 @@ export interface Segment {
       field: string;
       operator: string;
       value: string;
+      key?: string;
     }>;
   };
   customer_count: number;
@@ -62,7 +129,7 @@ export interface Segment {
 
 // ---- Broadcast ----
 export type BroadcastStatus = "draft" | "scheduled" | "sending" | "sent" | "failed" | "cancelled";
-export type BroadcastTargetType = "all" | "segment" | "manual";
+export type BroadcastTargetType = "all" | "segment" | "manual" | "lon_subscribers" | "phone_contacts";
 
 export interface Broadcast {
   id: string;
@@ -73,6 +140,8 @@ export interface Broadcast {
   target_type: BroadcastTargetType;
   target_segment_id: string;
   target_user_ids?: string[];
+  target_template_id?: string;
+  target_template_variables?: Record<string, string>;
   messages?: Array<{ type: string; payload: unknown }>;
   scheduled_at: string | null;
   sent_at: string | null;
@@ -508,6 +577,16 @@ export interface PNPDeliveryLog {
   created_at: string;
 }
 
+export interface BulkSendPNPResult {
+  phone_number: string;
+  log?: PNPDeliveryLog;
+  error?: string;
+}
+
+export interface BulkSendLONByPhoneResponse {
+  results: BulkSendPNPResult[];
+}
+
 // ---- Registration Form ----
 export type FieldType = "text" | "phone" | "email" | "date" | "select" | "checkbox" | "number";
 
@@ -604,4 +683,50 @@ export interface FollowerBehaviorSummary {
 export interface AnalyticsEventConfig {
   token: string;
   tracking_url: string;
+}
+
+// ---- LON Jobs ----
+export type LONJobScheduleType = "weekly" | "monthly";
+export type LONJobStatus = "active" | "paused";
+
+export interface LONJob {
+  id: string;
+  workspace_id: string;
+  line_oa_id: string;
+  name: string;
+  description: string;
+  schedule_type: LONJobScheduleType;
+  schedule_weekday?: number; // 0=Sun..6=Sat
+  schedule_day_of_month?: number; // 1–31
+  schedule_hour: number; // 0–23
+  schedule_minute: number; // 0–59
+  timezone: string;
+  target_type: "all_contacts" | "segment";
+  target_segment_id?: string;
+  template_id: string;
+  template_variables: Record<string, string>;
+  status: LONJobStatus;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  last_run_status: string;
+  total_runs: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---- CSV Import Preview ----
+export interface ImportPreviewError {
+  row: number;
+  phone: string;
+  reason: string;
+}
+
+export interface ImportPhoneContactsPreview {
+  total: number;
+  insert_count: number;
+  update_count: number;
+  skip_count: number;
+  error_count: number;
+  errors: ImportPreviewError[];
 }
