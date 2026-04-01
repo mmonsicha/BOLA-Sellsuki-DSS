@@ -181,6 +181,19 @@ Renders a LINE Flex Message JSON string as a visual card (mimics LINE chat backg
 - Pass `scrollable` in editor modals so tall templates (list/mix) can be scrolled instead of clipped
 - Broken image URLs (LINE CDN, CORS) are replaced with a gray placeholder automatically
 
+### `patchFlexHtml` (`src/utils/flexPreviewUtils.ts`)
+
+Patches raw HTML from `flex-render` to fix broken image URLs and other rendering issues.
+Used by `FlexCardPreview` and `LONTemplatesPage` JPG export.
+
+### JPG Export (`LONTemplatesPage.tsx` — `handleExportJpg`)
+
+Exports the Flex card preview as a JPEG file using `html2canvas`:
+1. **Fresh render** — re-renders flex HTML via `renderFlexMessage` + `patchFlexHtml` (no inherited constraints from the scrollable preview container)
+2. **onclone unlock** — sets all elements to `overflow:visible` in html2canvas's internal clone to prevent content clipping from nested flex-render CSS rules
+3. **Height buffer** — captures at `naturalHeight + 120px` to accommodate font rendering differences (especially Thai/CJK text)
+4. **Auto-crop** — trims canvas back to `naturalHeight` for tight fit
+
 ### `applyTemplateVariables` (`src/utils/pnpTemplateUtils.ts`)
 
 Patches a Flex bubble JSON body with user-provided values using dot-notation paths.

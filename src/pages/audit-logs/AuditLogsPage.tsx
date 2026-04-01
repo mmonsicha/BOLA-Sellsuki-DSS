@@ -24,6 +24,9 @@ function actionBadgeClass(action: string): string {
   if (action.includes("login") || action.includes("logout")) {
     return "bg-purple-100 text-purple-800 border-purple-200";
   }
+  if (action.includes("view")) {
+    return "bg-amber-100 text-amber-800 border-amber-200";
+  }
   return "bg-gray-100 text-gray-700 border-gray-200";
 }
 

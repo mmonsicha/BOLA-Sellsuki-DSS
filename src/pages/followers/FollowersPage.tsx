@@ -100,6 +100,7 @@ export function FollowersPage() {
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to load followers");
+        setHasMore(false);
       })
       .finally(() => {
         setInitialLoading(false);

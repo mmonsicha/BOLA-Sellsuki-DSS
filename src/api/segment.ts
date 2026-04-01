@@ -4,6 +4,7 @@ import type { Segment } from "@/types";
 export interface PreviewCountBody {
   workspace_id: string;
   line_oa_id: string;
+  source_type?: "follower" | "contact";
   rule: {
     operator: string;
     conditions: Array<{
@@ -25,6 +26,7 @@ export const segmentApi = {
   create: (body: {
     workspace_id: string;
     line_oa_id: string;
+    source_type?: "follower" | "contact";
     name: string;
     description?: string;
     rule: object;

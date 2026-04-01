@@ -73,11 +73,7 @@ function MaskedPhoneCell({ phone, subscriberId }: MaskedPhoneCellProps) {
       return;
     }
     setRevealed(true);
-    // TODO: POST audit log when backend endpoint is ready
-    // POST /v1/lon/subscribers/${subscriberId}/access-log
-    // body: { action: "view_phone", resource_id: subscriberId }
-    // This should be fire-and-forget once the endpoint exists.
-    void subscriberId; // referenced to avoid unused var lint error
+    void lonApi.recordSubscriberAccess(subscriberId).catch(() => { /* fire-and-forget */ });
     // Auto-hide after 5 seconds
     timerRef.current = setTimeout(() => {
       setRevealed(false);

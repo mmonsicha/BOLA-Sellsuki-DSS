@@ -13,9 +13,11 @@ export interface CreateBroadcastRequest {
   line_oa_id: string;
   name: string;
   messages: BroadcastMessageInput[];
-  target_type: "all" | "segment" | "manual";
+  target_type: "all" | "segment" | "manual" | "lon_subscribers" | "phone_contacts";
   target_segment_id?: string;
   target_user_ids?: string[];
+  target_template_id?: string;
+  target_template_variables?: Record<string, string>;
   scheduled_at?: string | null;
 }
 
@@ -24,8 +26,10 @@ export interface CreateCampaignBroadcastRequest {
   campaign_name: string;
   line_oa_ids: string[];
   messages: BroadcastMessageInput[];
-  target_type: "all" | "segment" | "manual";
+  target_type: "all" | "segment" | "manual" | "lon_subscribers" | "phone_contacts";
   target_segment_id?: string;
+  target_template_id?: string;
+  target_template_variables?: Record<string, string>;
   scheduled_at?: string | null;
 }
 

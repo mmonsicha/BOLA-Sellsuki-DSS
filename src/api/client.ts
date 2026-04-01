@@ -18,8 +18,11 @@ class ApiClient {
     body?: unknown,
     params?: Record<string, string | number | boolean>
   ): Promise<T> {
-    let url = `${this.baseURL}${path}`;
-    const searchParams = new URLSearchParams();
+    // Split any query string already embedded in the path (e.g. "/v1/foo?bar=1")
+    const qIdx = path.indexOf("?");
+    const cleanPath = qIdx >= 0 ? path.slice(0, qIdx) : path;
+    const searchParams = new URLSearchParams(qIdx >= 0 ? path.slice(qIdx + 1) : "");
+    let url = `${this.baseURL}${cleanPath}`;
     if (params) {
       for (const [k, v] of Object.entries(params)) {
         if (v !== undefined && v !== null) {

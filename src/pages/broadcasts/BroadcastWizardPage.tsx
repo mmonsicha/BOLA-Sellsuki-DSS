@@ -1,18 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, X, AlertCircle, RefreshCw, Check, CheckCircle } from "lucide-react";
+import { ArrowLeft, Plus, X, AlertCircle, RefreshCw, Check, CheckCircle, LayoutTemplate } from "lucide-react";
 import { lineOAApi } from "@/api/lineOA";
 import { getWorkspaceId } from "@/lib/auth";
 import { segmentApi } from "@/api/segment";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { broadcastApi, type BroadcastMessageInput } from "@/api/broadcast";
+import { pnpTemplateApi } from "@/api/lon";
 import { FlexCardPreview } from "@/components/FlexCardPreview";
 import { FlexMessagePicker } from "@/components/common/FlexMessagePicker";
 import { useToast } from "@/components/ui/toast";
-import type { LineOA, Segment } from "@/types";
+import { applyTemplateVariables } from "@/utils/pnpTemplateUtils";
+import type { LineOA, Segment, PNPTemplate } from "@/types";
 
 // ─── Step indicator ────────────────────────────────────────────────────────
 
@@ -172,6 +174,7 @@ export function BroadcastWizardPage() {
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [flexMessages, setFlexMessages] = useState<FlexMessage[]>([]);
+  const [pnpTemplates, setPnpTemplates] = useState<PNPTemplate[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   // Step 1 fields
@@ -179,9 +182,16 @@ export function BroadcastWizardPage() {
   const [selectedOAIds, setSelectedOAIds] = useState<Set<string>>(new Set());
 
   // Step 2 fields
-  const [targetType, setTargetType] = useState<"all" | "segment" | "manual" | "lon_subscribers">("all");
+  const [targetType, setTargetType] = useState<"all" | "segment" | "manual" | "lon_subscribers" | "phone_contacts">("all");
   const [targetSegmentId, setTargetSegmentId] = useState("");
   const [manualUserIds, setManualUserIds] = useState("");
+  // phone_contacts: audience scope (all contacts vs segment)
+  const [pncScope, setPncScope] = useState<"all_contacts" | "segment">("all_contacts");
+
+  // Step 3 — PNP template (used when targetType === "phone_contacts")
+  const [showPNPTemplatePicker, setShowPNPTemplatePicker] = useState(false);
+  const [selectedPNPTemplate, setSelectedPNPTemplate] = useState<PNPTemplate | null>(null);
+  const [pnpTemplateVariables, setPnpTemplateVariables] = useState<Record<string, string>>({});
 
   // Step 3 fields
   const [messages, setMessages] = useState<MessageEntry[]>([
@@ -200,22 +210,38 @@ export function BroadcastWizardPage() {
   // Validation errors per step
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const pnpPreviewContent = useMemo(() => {
+    if (!selectedPNPTemplate) return null;
+    try {
+      const patched = applyTemplateVariables(
+        selectedPNPTemplate.json_body,
+        selectedPNPTemplate.editable_schema,
+        pnpTemplateVariables
+      );
+      return JSON.stringify(patched);
+    } catch {
+      return JSON.stringify(selectedPNPTemplate.json_body);
+    }
+  }, [selectedPNPTemplate, pnpTemplateVariables]);
+
   useEffect(() => {
     const load = async () => {
       try {
         const id = getWorkspaceId() ?? "";
         setWorkspaceId(id);
 
-        const [oaRes, segRes, fmRes] = await Promise.all([
+        const [oaRes, segRes, fmRes, pnpRes] = await Promise.all([
           lineOAApi.list({ workspace_id: id }),
           segmentApi.list({ workspace_id: id }),
           flexMessageApi.list({ workspace_id: id }),
+          pnpTemplateApi.list({}),
         ]);
 
         const oas = oaRes.data ?? [];
         setLineOAs(oas);
         setSegments(segRes.data ?? []);
         setFlexMessages(fmRes.data ?? []);
+        setPnpTemplates(pnpRes?.data ?? []);
 
         // Pre-select first OA
         if (oas.length > 0) {
@@ -239,11 +265,16 @@ export function BroadcastWizardPage() {
     }
     if (s === 2) {
       if (targetType === "segment" && !targetSegmentId) return "Select a segment.";
+      if (targetType === "phone_contacts" && pncScope === "segment" && !targetSegmentId) return "Select a segment.";
     }
     if (s === 3) {
-      for (const msg of messages) {
-        if (msg.type === "text" && !msg.text.trim()) return "All text messages must have content.";
-        if (msg.type === "flex" && !msg.flexMessageId) return "All flex message slots must have a selected template.";
+      if (targetType === "phone_contacts") {
+        if (!selectedPNPTemplate) return "Select a PNP template for the phone contacts broadcast.";
+      } else {
+        for (const msg of messages) {
+          if (msg.type === "text" && !msg.text.trim()) return "All text messages must have content.";
+          if (msg.type === "flex" && !msg.flexMessageId) return "All flex message slots must have a selected template.";
+        }
       }
     }
     if (s === 4) {
@@ -308,6 +339,11 @@ export function BroadcastWizardPage() {
   const audienceSummary = () => {
     if (targetType === "all") return "All followers";
     if (targetType === "segment") return selectedSegment ? `Segment: ${selectedSegment.name}` : "Segment (not selected)";
+    if (targetType === "lon_subscribers") return "All LON subscribers";
+    if (targetType === "phone_contacts") {
+      if (pncScope === "segment") return selectedSegment ? `Phone contacts — segment: ${selectedSegment.name}` : "Phone contacts — segment (not selected)";
+      return "All phone contacts";
+    }
     return `${manualIds.length} custom user${manualIds.length !== 1 ? "s" : ""}`;
   };
 
@@ -323,8 +359,8 @@ export function BroadcastWizardPage() {
     setSubmitting(true);
     setSubmitError(null);
 
-    // Build message payloads
-    const messagePayloads: BroadcastMessageInput[] = messages.map((m) => {
+    // Build message payloads (empty for phone_contacts — PNP template is used instead)
+    const messagePayloads: BroadcastMessageInput[] = targetType === "phone_contacts" ? [] : messages.map((m) => {
       if (m.type === "text") {
         return { type: "text", payload: { text: m.text } };
       }
@@ -345,8 +381,10 @@ export function BroadcastWizardPage() {
           name: campaignName.trim(),
           messages: messagePayloads,
           target_type: targetType,
-          target_segment_id: targetType === "segment" ? targetSegmentId : undefined,
+          target_segment_id: targetType === "segment" ? targetSegmentId : (targetType === "phone_contacts" && pncScope === "segment" ? targetSegmentId : undefined),
           target_user_ids: targetType === "manual" ? manualIds : undefined,
+          target_template_id: targetType === "phone_contacts" ? (selectedPNPTemplate?.id ?? "") : undefined,
+          target_template_variables: targetType === "phone_contacts" ? pnpTemplateVariables : undefined,
           scheduled_at: sendMode === "scheduled" ? scheduledAt : null,
         });
         // The API may return { data: Broadcast } or the Broadcast directly
@@ -389,7 +427,9 @@ export function BroadcastWizardPage() {
           line_oa_ids: oaIdList,
           messages: messagePayloads,
           target_type: targetType,
-          target_segment_id: targetType === "segment" ? targetSegmentId : undefined,
+          target_segment_id: targetType === "segment" ? targetSegmentId : (targetType === "phone_contacts" && pncScope === "segment" ? targetSegmentId : undefined),
+          target_template_id: targetType === "phone_contacts" ? (selectedPNPTemplate?.id ?? "") : undefined,
+          target_template_variables: targetType === "phone_contacts" ? pnpTemplateVariables : undefined,
           scheduled_at: sendMode === "scheduled" ? scheduledAt : null,
         });
         // If "Send Now" was selected, trigger delivery for each created broadcast
@@ -545,6 +585,7 @@ export function BroadcastWizardPage() {
                       { value: "segment", label: "Segment", description: "Target followers matching a saved segment" },
                       { value: "manual", label: "Custom List", description: "Paste specific LINE user IDs" },
                       { value: "lon_subscribers", label: "LINE Notification Subscribers (LON)", description: "Send to users who enrolled via LINE Notification Messaging (LON) — requires LON service to be active on this OA" },
+                      { value: "phone_contacts", label: "Phone Contacts (LON by Phone)", description: "Send PNP notifications via phone number to contacts in your workspace — recipients must have LINE linked to their phone number" },
                     ] as const
                   ).map((option) => (
                     <label
@@ -610,6 +651,63 @@ export function BroadcastWizardPage() {
                 </div>
               )}
 
+              {/* Phone contacts scope */}
+              {targetType === "phone_contacts" && (
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Audience Scope</label>
+                  <div className="space-y-2">
+                    {(
+                      [
+                        { value: "all_contacts", label: "All Phone Contacts", description: "Send to every phone contact in your workspace" },
+                        { value: "segment", label: "By Segment", description: "Filter to phone contacts matched to a specific follower segment" },
+                      ] as const
+                    ).map((opt) => (
+                      <label
+                        key={opt.value}
+                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          pncScope === opt.value ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="pncScope"
+                          value={opt.value}
+                          checked={pncScope === opt.value}
+                          onChange={() => setPncScope(opt.value)}
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <p className="text-sm font-medium">{opt.label}</p>
+                          <p className="text-xs text-muted-foreground">{opt.description}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+
+                  {pncScope === "segment" && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">Select Segment</label>
+                      {segments.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No segments available.</p>
+                      ) : (
+                        <select
+                          className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                          value={targetSegmentId}
+                          onChange={(e) => setTargetSegmentId(e.target.value)}
+                        >
+                          <option value="">-- Select a segment --</option>
+                          {segments.map((seg) => (
+                            <option key={seg.id} value={seg.id}>
+                              {seg.name} ({seg.customer_count} members)
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Audience preview summary */}
               <div className="bg-muted px-4 py-3 rounded-md text-sm">
                 <span className="font-medium">Est. audience: </span>
@@ -622,13 +720,162 @@ export function BroadcastWizardPage() {
                   <span>{manualIds.length} user{manualIds.length !== 1 ? "s" : ""} per selected OA</span>
                 )}
                 {targetType === "lon_subscribers" && <span>All active LON subscribers for selected OA</span>}
+                {targetType === "phone_contacts" && pncScope === "all_contacts" && <span>All phone contacts in workspace</span>}
+                {targetType === "phone_contacts" && pncScope === "segment" && selectedSegment && (
+                  <span>Phone contacts matched to segment: {selectedSegment.name}</span>
+                )}
+                {targetType === "phone_contacts" && pncScope === "segment" && !selectedSegment && <span>Select a segment above</span>}
               </div>
             </CardContent>
           </Card>
         )}
 
         {/* ── Step 3: Compose Message ── */}
-        {step === 3 && (
+        {step === 3 && targetType === "phone_contacts" && (
+          <div className="flex gap-6 items-start">
+            {/* Left: template picker */}
+            <div className="flex-1 min-w-0 space-y-4">
+              <Card>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">
+                      PNP Message Template <span className="text-destructive">*</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Select the PNP template to send to phone contacts. Recipients must have LINE linked to their phone number.
+                    </p>
+                  </div>
+
+                  {/* Selected template display */}
+                  {selectedPNPTemplate ? (
+                    <div className="rounded-lg border p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <LayoutTemplate size={16} className="text-blue-600 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{selectedPNPTemplate.name}</p>
+                          {selectedPNPTemplate.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">{selectedPNPTemplate.description}</p>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowPNPTemplatePicker(true)}
+                          className="flex-shrink-0 text-xs"
+                        >
+                          Change
+                        </Button>
+                      </div>
+
+                      {/* Variable inputs */}
+                      {selectedPNPTemplate.editable_schema.length > 0 && (
+                        <div className="space-y-3 border-t pt-3">
+                          <p className="text-xs font-medium text-muted-foreground">Template Variables</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {selectedPNPTemplate.editable_schema.map((field) => (
+                              <div key={field.path} className="space-y-1">
+                                <label className="text-xs font-medium">
+                                  {field.label}
+                                  {field.max_len && <span className="text-muted-foreground ml-1">(max {field.max_len})</span>}
+                                </label>
+                                <input
+                                  type={field.type === "url" ? "url" : "text"}
+                                  value={pnpTemplateVariables[field.path] ?? ""}
+                                  onChange={(e) =>
+                                    setPnpTemplateVariables((prev) => ({ ...prev, [field.path]: e.target.value }))
+                                  }
+                                  maxLength={field.max_len ?? undefined}
+                                  className="w-full border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                  placeholder={field.label}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowPNPTemplatePicker(true)}
+                      className="w-full gap-2 justify-start text-muted-foreground"
+                    >
+                      <LayoutTemplate size={14} />
+                      Pick a PNP template...
+                    </Button>
+                  )}
+
+                  {/* Template picker panel */}
+                  {showPNPTemplatePicker && (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-2 bg-muted border-b">
+                        <span className="text-sm font-medium">Select Template</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowPNPTemplatePicker(false)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto divide-y">
+                        {pnpTemplates.length === 0 ? (
+                          <p className="text-sm text-muted-foreground px-4 py-6 text-center">
+                            No PNP templates available.{" "}
+                            <a href="/lon-templates" className="underline text-primary">Create one first.</a>
+                          </p>
+                        ) : (
+                          pnpTemplates.map((tpl) => (
+                            <button
+                              key={tpl.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPNPTemplate(tpl);
+                                const initialVars: Record<string, string> = {};
+                                for (const field of tpl.editable_schema) {
+                                  initialVars[field.path] = "";
+                                }
+                                setPnpTemplateVariables(initialVars);
+                                setShowPNPTemplatePicker(false);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+                            >
+                              <LayoutTemplate size={14} className="text-blue-600 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{tpl.name}</p>
+                                {tpl.description && (
+                                  <p className="text-xs text-muted-foreground truncate">{tpl.description}</p>
+                                )}
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right: flex card preview */}
+            <div className="hidden lg:block w-64 flex-shrink-0">
+              <div className="sticky top-4">
+                <p className="text-xs font-medium text-muted-foreground mb-2 text-center">Preview</p>
+                {pnpPreviewContent ? (
+                  <FlexCardPreview content={pnpPreviewContent} height={520} scrollable />
+                ) : (
+                  <div className="border rounded-xl bg-muted/30 flex items-center justify-center" style={{ height: 320 }}>
+                    <p className="text-xs text-muted-foreground text-center px-4">Select a template to preview</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && targetType !== "phone_contacts" && (
           <div className="flex gap-6 items-start">
             {/* Left: compose */}
             <div className="flex-1 min-w-0 space-y-4">
@@ -822,7 +1069,9 @@ export function BroadcastWizardPage() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Messages</span>
                     <span className="font-medium">
-                      {messages.length} message{messages.length !== 1 ? "s" : ""}
+                      {targetType === "phone_contacts"
+                        ? selectedPNPTemplate ? `PNP: ${selectedPNPTemplate.name}` : "No template selected"
+                        : `${messages.length} message${messages.length !== 1 ? "s" : ""}`}
                     </span>
                   </div>
                   <div className="flex justify-between">

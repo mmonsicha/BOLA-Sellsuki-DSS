@@ -1,8 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Bell,
   Phone,
@@ -14,19 +20,25 @@ import {
   PhoneCall,
   ChevronDown,
   ChevronUp,
+  LayoutTemplate,
+  ChevronRight,
+  Eye,
+  Users,
 } from "lucide-react";
-import { lonApi } from "@/api/lon";
+import { lonApi, pnpTemplateApi } from "@/api/lon";
+import { followerApi } from "@/api/follower";
 import { lineOAApi } from "@/api/lineOA";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
-import type { PNPDeliveryLog, LineOA } from "@/types";
+import { FlexCardPreview } from "@/components/FlexCardPreview";
+import { applyTemplateVariables } from "@/utils/pnpTemplateUtils";
+import type { LineOA, PNPTemplate, UnifiedContact, BulkSendPNPResult } from "@/types";
+import { maskPhone } from "@/lib/phone";
 import { getWorkspaceId } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 // ─── Infographic Component ─────────────────────────────────────────────────────
-// Japanese infographic style: clean two-column comparison with numbered steps,
-// color-coded sides (LINE green for LON Subscribers, blue for LON by Phone),
-// and a feature comparison table at the bottom.
 
 function HowItWorksInfographic() {
   const [collapsed, setCollapsed] = useState(false);
@@ -208,42 +220,356 @@ function HowItWorksInfographic() {
   );
 }
 
+// ─── Contact Picker Modal ─────────────────────────────────────────────────────
+
+interface ContactPickerModalProps {
+  open: boolean;
+  onClose: () => void;
+  workspaceId: string;
+  lineOAId: string;
+  onConfirm: (contacts: UnifiedContact[]) => void;
+}
+
+function ContactPickerModal({ open, onClose, workspaceId, lineOAId, onConfirm }: ContactPickerModalProps) {
+  const [contacts, setContacts] = useState<UnifiedContact[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!open || !workspaceId) return;
+    setLoading(true);
+    setSelected(new Set());
+    setSearch("");
+    followerApi
+      .listUnified({ workspace_id: workspaceId, contact_status: "phone_only", page_size: 200 })
+      .then((res) => {
+        const all = (res.data ?? []).filter((c) => c.phone && c.phone.trim() !== "");
+        setContacts(all);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [open, workspaceId, lineOAId]);
+
+  const filtered = contacts.filter((c) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const name = [c.first_name, c.last_name, c.display_name].filter(Boolean).join(" ").toLowerCase();
+    return name.includes(q) || (c.phone ?? "").includes(q);
+  });
+
+  const allSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((c) => next.delete(c.id));
+        return next;
+      });
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((c) => next.add(c.id));
+        return next;
+      });
+    }
+  }
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleConfirm() {
+    const chosen = contacts.filter((c) => selected.has(c.id));
+    onConfirm(chosen);
+  }
+
+  const displayName = (c: UnifiedContact) => {
+    const n = [c.first_name, c.last_name].filter(Boolean).join(" ");
+    return n || c.display_name || "—";
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users size={18} />
+            Choose Contacts
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="px-6 py-3 border-b">
+          <input
+            type="text"
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="Search by name or phone…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground gap-2">
+            <RefreshCw size={14} className="animate-spin" /> Loading contacts…
+          </div>
+        ) : contacts.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+            No phone contacts found for this workspace.
+          </div>
+        ) : (
+          <>
+            {/* Select all row */}
+            <div className="flex items-center gap-3 px-6 py-2 border-b bg-muted/30">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-4 h-4 cursor-pointer" />
+              <span className="text-xs font-medium text-muted-foreground">
+                {selected.size > 0 ? `${selected.size} selected` : `Select all (${filtered.length})`}
+              </span>
+            </div>
+
+            {/* Contact list */}
+            <div className="overflow-y-auto max-h-72 divide-y">
+              {filtered.map((c) => (
+                <label key={c.id} className="flex items-center gap-3 px-6 py-2.5 hover:bg-muted/30 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(c.id)}
+                    onChange={() => toggle(c.id)}
+                    className="w-4 h-4 cursor-pointer flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{displayName(c)}</p>
+                    <p className="text-xs text-muted-foreground">{c.phone}</p>
+                  </div>
+                  <Badge variant="secondary" className="text-xs flex-shrink-0">{c.contact_status}</Badge>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="flex justify-between items-center px-6 py-3 border-t">
+          <span className="text-sm text-muted-foreground">{selected.size} contact{selected.size !== 1 ? "s" : ""} selected</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+            <Button size="sm" onClick={handleConfirm} disabled={selected.size === 0}>
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Bulk Results Modal ────────────────────────────────────────────────────────
+
+interface BulkResultsModalProps {
+  open: boolean;
+  onClose: () => void;
+  results: BulkSendPNPResult[];
+}
+
+function BulkResultsModal({ open, onClose, results }: BulkResultsModalProps) {
+  const successCount = results.filter((r) => !r.error).length;
+  const failCount = results.filter((r) => r.error).length;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Bulk Send Results</DialogTitle>
+        </DialogHeader>
+        <div className="px-6 py-3 flex gap-4 border-b">
+          <span className="text-sm text-green-700 font-medium">✓ {successCount} sent</span>
+          {failCount > 0 && <span className="text-sm text-destructive font-medium">✗ {failCount} failed</span>}
+        </div>
+        <div className="overflow-y-auto max-h-80 divide-y">
+          {results.map((r, i) => (
+            <div key={i} className="flex items-center gap-3 px-6 py-2.5">
+              <span className={`text-sm flex-shrink-0 ${r.error ? "text-destructive" : "text-green-700"}`}>
+                {r.error ? "✗" : "✓"}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-mono">{r.phone_number}</p>
+                {r.error && <p className="text-xs text-destructive mt-0.5 truncate">{r.error}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end px-6 py-3 border-t">
+          <Button size="sm" onClick={onClose}>Close</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Template Picker Modal ─────────────────────────────────────────────────────
+
+const MESSAGE_TYPE_COLORS: Record<PNPTemplate["message_type"], string> = {
+  basic: "border-transparent bg-blue-100 text-blue-800",
+  emphasis: "border-transparent bg-purple-100 text-purple-800",
+  list: "border-transparent bg-amber-100 text-amber-800",
+  mix: "border-transparent bg-teal-100 text-teal-800",
+};
+
+interface TemplatePickerModalProps {
+  open: boolean;
+  onClose: () => void;
+  templates: PNPTemplate[];
+  loading: boolean;
+  onSelect: (template: PNPTemplate) => void;
+}
+
+function TemplatePickerModal({
+  open,
+  onClose,
+  templates,
+  loading,
+  onSelect,
+}: TemplatePickerModalProps) {
+  const custom = templates.filter((t) => !t.is_preset);
+
+  const [hoveredTemplate, setHoveredTemplate] = useState<PNPTemplate | null>(
+    () => custom[0] ?? null
+  );
+
+  useEffect(() => {
+    setHoveredTemplate(custom[0] ?? null);
+  }, [templates]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const showSplit = !loading && custom.length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <LayoutTemplate size={18} />
+            Pick a Template
+          </DialogTitle>
+        </DialogHeader>
+
+        {showSplit ? (
+          <div className="flex" style={{ minHeight: "420px" }}>
+            {/* Left column — saved templates only */}
+            <div className="w-64 flex-shrink-0 border-r overflow-y-auto max-h-[60vh] py-4 px-3 space-y-2">
+              {custom.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => onSelect(t)}
+                  onMouseEnter={() => setHoveredTemplate(t)}
+                  className={cn(
+                    "w-full text-left flex items-start gap-3 rounded-lg border p-3 hover:bg-muted/50 transition-colors group",
+                    hoveredTemplate?.id === t.id && "bg-muted/60"
+                  )}
+                >
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium">{t.name}</span>
+                      <Badge className={cn("capitalize text-xs", MESSAGE_TYPE_COLORS[t.message_type])}>
+                        {t.message_type}
+                      </Badge>
+                    </div>
+                    {t.description && (
+                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                        {t.description}
+                      </p>
+                    )}
+                  </div>
+                  <ChevronRight size={16} className="flex-shrink-0 text-muted-foreground mt-0.5 group-hover:text-foreground transition-colors" />
+                </button>
+              ))}
+            </div>
+
+            {/* Right column — preview */}
+            <div className="flex-1 flex flex-col gap-3 p-4 justify-start overflow-y-auto max-h-[60vh]">
+              {hoveredTemplate ? (
+                <>
+                  <FlexCardPreview content={JSON.stringify(hoveredTemplate.json_body)} height={380} />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold">{hoveredTemplate.name}</span>
+                      <Badge className={cn("capitalize text-xs", MESSAGE_TYPE_COLORS[hoveredTemplate.message_type])}>
+                        {hoveredTemplate.message_type}
+                      </Badge>
+                    </div>
+                    {hoveredTemplate.description && (
+                      <p className="text-xs text-muted-foreground leading-relaxed">{hoveredTemplate.description}</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full text-sm text-muted-foreground italic">
+                  Hover a template to preview
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center" style={{ minHeight: "420px" }}>
+            {loading ? (
+              <div className="text-sm text-muted-foreground text-center py-6">Loading templates…</div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center py-6">
+                No templates available for this LINE OA.
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export function LONByPhonePage() {
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [selectedLineOAId, setSelectedLineOAId] = useState("");
-  const [logs, setLogs] = useState<PNPDeliveryLog[]>([]);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 20;
+
+  // Template state
+  const [templates, setTemplates] = useState<PNPTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<PNPTemplate | null>(null);
+  const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
+
+  const previewContent = useMemo(() => {
+    if (!selectedTemplate) return null;
+    try {
+      const patched = applyTemplateVariables(
+        selectedTemplate.json_body,
+        selectedTemplate.editable_schema,
+        templateVariables
+      );
+      return JSON.stringify(patched);
+    } catch {
+      return JSON.stringify(selectedTemplate.json_body);
+    }
+  }, [selectedTemplate, templateVariables]);
+
+  // Bulk send state
+  const [sendMode, setSendMode] = useState<"single" | "bulk">("single");
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [selectedContacts, setSelectedContacts] = useState<UnifiedContact[]>([]);
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkResults, setBulkResults] = useState<BulkSendPNPResult[]>([]);
+  const [showBulkResults, setShowBulkResults] = useState(false);
 
   // Send form state
   const [phone, setPhone] = useState("");
   const [phoneValidationError, setPhoneValidationError] = useState("");
-  const [templateKey, setTemplateKey] = useState("");
-  const [bodyJson, setBodyJson] = useState('{\n  "items": []\n}');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
   const [sendSuccess, setSendSuccess] = useState(false);
-
-  // Map from phone_hash → masked phone for display in logs. Persisted to localStorage
-  // so it survives page reloads. Key: "bola_lon_phone_map".
-  const [sentPhoneMap, setSentPhoneMapState] = useState<Record<string, string>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("bola_lon_phone_map") ?? "{}") as Record<string, string>;
-    } catch {
-      return {};
-    }
-  });
-
-  function setSentPhoneMap(updater: (prev: Record<string, string>) => Record<string, string>) {
-    setSentPhoneMapState((prev) => {
-      const next = updater(prev);
-      try { localStorage.setItem("bola_lon_phone_map", JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }
 
   // Load OAs
   useEffect(() => {
@@ -257,29 +583,56 @@ export function LONByPhonePage() {
       .catch(console.error);
   }, []);
 
-  // Load logs when OA/page changes
+  // Load templates when OA changes
   useEffect(() => {
     if (!selectedLineOAId) return;
-    setLogsLoading(true);
-    lonApi
-      .listLONByPhoneLogs({
-        line_oa_id: selectedLineOAId,
-        page,
-        page_size: PAGE_SIZE,
-      })
-      .then((res) => setLogs(res.data ?? []))
+    setTemplatesLoading(true);
+    pnpTemplateApi
+      .list({ line_oa_id: selectedLineOAId })
+      .then((res) => setTemplates(res.data ?? []))
       .catch(console.error)
-      .finally(() => setLogsLoading(false));
-  }, [selectedLineOAId, page]);
+      .finally(() => setTemplatesLoading(false));
+    // Reset selected template when OA changes
+    setSelectedTemplate(null);
+    setTemplateVariables({});
+  }, [selectedLineOAId]);
 
-  function maskPhone(p: string): string {
-    // Show first 3 chars (e.g. "+66") and last 3 digits, mask the rest
-    const trimmed = p.trim();
-    if (trimmed.length <= 6) return trimmed;
-    const prefix = trimmed.slice(0, 3);
-    const suffix = trimmed.slice(-3);
-    const masked = "*".repeat(Math.max(0, trimmed.length - 6));
-    return `${prefix}${masked}${suffix}`;
+  function handleSelectTemplate(template: PNPTemplate) {
+    setSelectedTemplate(template);
+    // Initialize all editable fields to empty strings
+    const initialVars: Record<string, string> = {};
+    for (const field of template.editable_schema) {
+      initialVars[field.path] = "";
+    }
+    setTemplateVariables(initialVars);
+    setShowTemplatePicker(false);
+    setSendError("");
+  }
+
+  async function handleBulkSend() {
+    if (!selectedLineOAId) { setSendError("Please select a LINE OA."); return; }
+    if (!selectedTemplate) { setSendError("Please pick a template."); return; }
+    if (selectedContacts.length === 0) { setSendError("Please choose at least one contact."); return; }
+    setSendError("");
+    setBulkSending(true);
+    try {
+      const phoneNumbers = selectedContacts.map((c) => c.phone!).filter(Boolean);
+      const res = await lonApi.bulkSendLONByPhone({
+        line_oa_id: selectedLineOAId,
+        phone_numbers: phoneNumbers,
+        template_id: selectedTemplate.id,
+        template_variables: templateVariables,
+        triggered_by: "manual_bulk",
+      });
+      setBulkResults(res.results ?? []);
+      setShowBulkResults(true);
+      setSelectedContacts([]);
+      void handleRefreshLogs();
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : "Bulk send failed.");
+    } finally {
+      setBulkSending(false);
+    }
   }
 
   async function handleSend(e: React.FormEvent) {
@@ -289,7 +642,6 @@ export function LONByPhonePage() {
     setPhoneValidationError("");
 
     const trimmedPhone = phone.trim();
-    const trimmedKey = templateKey.trim();
 
     if (!trimmedPhone) {
       setPhoneValidationError("Phone number is required.");
@@ -299,8 +651,8 @@ export function LONByPhonePage() {
       setPhoneValidationError("Phone number must be in E.164 format (e.g. +66812345678).");
       return;
     }
-    if (!trimmedKey) {
-      setSendError("Template key is required.");
+    if (!selectedTemplate) {
+      setSendError("Please pick a template.");
       return;
     }
     if (!selectedLineOAId) {
@@ -308,40 +660,22 @@ export function LONByPhonePage() {
       return;
     }
 
-    let body: Record<string, unknown>;
-    try {
-      body = JSON.parse(bodyJson);
-    } catch {
-      setSendError("Message body must be valid JSON.");
-      return;
-    }
-
     setSending(true);
     try {
-      await lonApi.sendLONByPhone({
+      const result = await lonApi.sendLONByPhone({
         line_oa_id: selectedLineOAId,
         phone_number: trimmedPhone,
-        template_key: trimmedKey,
-        body,
+        template_id: selectedTemplate.id,
+        template_variables: templateVariables,
       });
       setSendSuccess(true);
       setPhone("");
-      // Refresh logs
-      const res = await lonApi.listLONByPhoneLogs({
-        line_oa_id: selectedLineOAId,
-        page: 1,
-        page_size: PAGE_SIZE,
-      });
-      const newLogs = res.data ?? [];
-      // Store masked phone mapping so it survives page reloads
-      if (newLogs.length > 0) {
-        setSentPhoneMap((prev) => ({
-          ...prev,
-          [newLogs[0].phone_hash]: maskPhone(trimmedPhone),
-        }));
-      }
-      setLogs(newLogs);
-      setPage(1);
+      // Store masked phone → hash mapping for the Delivery Logs page
+      try {
+        const map = JSON.parse(localStorage.getItem("bola_lon_phone_map") ?? "{}") as Record<string, string>;
+        map[result.phone_hash] = maskPhone(trimmedPhone);
+        localStorage.setItem("bola_lon_phone_map", JSON.stringify(map));
+      } catch { /* ignore */ }
       setTimeout(() => setSendSuccess(false), 4000);
     } catch (err) {
       setSendError(err instanceof Error ? err.message : "Failed to send notification. Please check your inputs and try again.");
@@ -420,67 +754,175 @@ export function LONByPhonePage() {
               </span>
             </div>
             <form onSubmit={(e) => void handleSend(e)} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Phone Number */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-700">
-                    Phone Number *
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value);
-                      setPhoneValidationError("");
-                    }}
-                    placeholder="+66812345678"
-                    disabled={sending}
-                    className={`w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 ${phoneValidationError ? "border-destructive focus:ring-destructive/50" : ""}`}
-                  />
-                  {phoneValidationError ? (
-                    <p className="text-[11px] text-destructive font-medium">{phoneValidationError}</p>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground">
-                      E.164 format (e.g. +66812345678). Will be SHA256-hashed before sending.
-                    </p>
-                  )}
-                </div>
-
-                {/* Template Key */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-700">
-                    Template Key *
-                  </label>
-                  <input
-                    type="text"
-                    value={templateKey}
-                    onChange={(e) => setTemplateKey(e.target.value)}
-                    placeholder="e.g. order_confirmation"
-                    disabled={sending}
-                    className="w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Pre-approved template key from LINE Developers Console.
-                  </p>
-                </div>
+              {/* Send mode toggle */}
+              <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+                {(["single", "bulk"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => { setSendMode(mode); setSendError(""); }}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                      sendMode === mode
+                        ? "bg-background shadow-sm text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {mode === "single" ? "Single" : "Bulk from Contacts"}
+                  </button>
+                ))}
               </div>
 
-              {/* Body JSON */}
+              {sendMode === "single" ? (
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">
-                  Message Body (JSON) *
+                  Phone Number *
                 </label>
-                <textarea
-                  value={bodyJson}
-                  onChange={(e) => setBodyJson(e.target.value)}
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setPhoneValidationError("");
+                  }}
+                  placeholder="+66812345678"
                   disabled={sending}
-                  rows={5}
-                  className="w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 resize-y"
+                  className={`w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 ${phoneValidationError ? "border-destructive focus:ring-destructive/50" : ""}`}
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Template body fields as defined in LINE Developers Console.
-                </p>
+                {phoneValidationError ? (
+                  <p className="text-[11px] text-destructive font-medium">{phoneValidationError}</p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    E.164 format (e.g. +66812345678). Will be SHA256-hashed before sending.
+                  </p>
+                )}
               </div>
+              ) : (
+                /* Bulk mode */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-gray-700">
+                      Contacts ({selectedContacts.length} selected)
+                    </label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowContactPicker(true)}
+                      disabled={!selectedLineOAId}
+                      className="gap-1.5 text-xs"
+                    >
+                      <Users size={13} />
+                      Choose Contacts
+                    </Button>
+                  </div>
+                  {selectedContacts.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                      {selectedContacts.map((c) => (
+                        <Badge key={c.id} variant="secondary" className="text-xs gap-1">
+                          {[c.first_name, c.last_name].filter(Boolean).join(" ") || c.display_name || c.phone}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedContacts((prev) => prev.filter((x) => x.id !== c.id))}
+                            className="hover:text-destructive ml-0.5"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Template Picker */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-700">
+                  Message Template *
+                </label>
+                {selectedTemplate ? (
+                  <div className="flex items-center gap-3 rounded-lg border p-3 bg-muted/30">
+                    <LayoutTemplate size={16} className="text-blue-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium">{selectedTemplate.name}</span>
+                        <Badge className={cn("capitalize text-xs", MESSAGE_TYPE_COLORS[selectedTemplate.message_type])}>
+                          {selectedTemplate.message_type}
+                        </Badge>
+                      </div>
+                      {selectedTemplate.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{selectedTemplate.description}</p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowTemplatePicker(true)}
+                      className="flex-shrink-0 text-xs"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowTemplatePicker(true)}
+                    disabled={!selectedLineOAId}
+                    className="gap-2 w-full justify-start text-muted-foreground"
+                  >
+                    <LayoutTemplate size={15} />
+                    Pick Template…
+                  </Button>
+                )}
+              </div>
+
+              {/* Dynamic fields from editable_schema */}
+              {selectedTemplate && selectedTemplate.editable_schema.length > 0 && (
+                <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                  <p className="text-xs font-medium text-gray-700">Template Variables</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {selectedTemplate.editable_schema.map((field) => (
+                      <div key={field.path} className="space-y-1">
+                        <label className="text-xs font-medium text-gray-700">
+                          {field.label}
+                          {field.max_len && (
+                            <span className="text-muted-foreground font-normal ml-1">
+                              (max {field.max_len})
+                            </span>
+                          )}
+                        </label>
+                        <input
+                          type={field.type === "url" ? "url" : "text"}
+                          value={templateVariables[field.path] ?? ""}
+                          onChange={(e) =>
+                            setTemplateVariables((prev) => ({
+                              ...prev,
+                              [field.path]: e.target.value,
+                            }))
+                          }
+                          maxLength={field.max_len}
+                          disabled={sending}
+                          placeholder={field.type === "url" ? "https://…" : field.label}
+                          className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Message Preview */}
+              {previewContent && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700">
+                    <Eye size={13} />
+                    Message Preview
+                  </div>
+                  <FlexCardPreview content={previewContent} height={360} />
+                </div>
+              )}
 
               {sendError && (
                 <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
@@ -495,127 +937,81 @@ export function LONByPhonePage() {
                 </div>
               )}
 
-              <Button
-                type="submit"
-                disabled={
-                  sending ||
-                  !phone.trim() ||
-                  !templateKey.trim() ||
-                  !selectedLineOAId
-                }
-                className="gap-2"
-              >
-                {sending ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : (
-                  <Send size={14} />
-                )}
-                {sending ? "Sending..." : "Send Notification"}
-              </Button>
+              {sendMode === "single" ? (
+                <Button
+                  type="submit"
+                  disabled={
+                    sending ||
+                    !phone.trim() ||
+                    !selectedTemplate ||
+                    !selectedLineOAId
+                  }
+                  className="gap-2"
+                >
+                  {sending ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" /> Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Send size={14} />
+                      Send Notification
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={() => void handleBulkSend()}
+                  disabled={
+                    bulkSending ||
+                    selectedContacts.length === 0 ||
+                    !selectedTemplate ||
+                    !selectedLineOAId
+                  }
+                  className="gap-2"
+                >
+                  {bulkSending ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" /> Sending {selectedContacts.length}…
+                    </>
+                  ) : (
+                    <>
+                      <Users size={14} />
+                      Send to {selectedContacts.length} Contact{selectedContacts.length !== 1 ? "s" : ""}
+                    </>
+                  )}
+                </Button>
+              )}
             </form>
           </CardContent>
         </Card>
 
-        {/* Delivery Logs */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Delivery Logs</h3>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleRefreshLogs}
-            >
-              <RefreshCw size={13} className="mr-1" /> Refresh
-            </Button>
-          </div>
-
-          {logsLoading ? (
-            <div className="text-sm text-muted-foreground">Loading...</div>
-          ) : logs.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center">
-                <Phone size={28} className="mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  No delivery logs yet.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {logs.map((log) => {
-                const maskedPhone = sentPhoneMap[log.phone_hash];
-                return (
-                <Card key={log.id}>
-                  <CardContent className="py-3 flex items-center justify-between gap-4">
-                    <div className="min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {maskedPhone ? (
-                          <span className="text-xs font-mono text-foreground font-medium">
-                            {maskedPhone}
-                          </span>
-                        ) : (
-                          <span
-                            className="text-xs font-mono text-muted-foreground truncate max-w-[200px]"
-                            title={log.phone_hash}
-                          >
-                            {log.phone_hash.slice(0, 8)}…
-                          </span>
-                        )}
-                        <Badge
-                          variant={
-                            log.status === "success" ? "success" : "destructive"
-                          }
-                        >
-                          {log.status}
-                        </Badge>
-                        {log.http_status_code && (
-                          <span className="text-xs text-muted-foreground">
-                            HTTP {log.http_status_code}
-                          </span>
-                        )}
-                        <span className="text-xs font-mono text-muted-foreground">
-                          {log.template_key}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(log.sent_at).toLocaleString()}
-                        {log.error_message && (
-                          <span className="text-destructive ml-2">
-                            — {log.error_message}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                );
-              })}
-              {/* Pagination */}
-              <div className="flex items-center gap-2 justify-end">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {page}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={logs.length < PAGE_SIZE}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
       </div>
+
+      {/* Template Picker Modal */}
+      <TemplatePickerModal
+        open={showTemplatePicker}
+        onClose={() => setShowTemplatePicker(false)}
+        templates={templates}
+        loading={templatesLoading}
+        onSelect={handleSelectTemplate}
+      />
+      <ContactPickerModal
+        open={showContactPicker}
+        onClose={() => setShowContactPicker(false)}
+        workspaceId={WORKSPACE_ID}
+        lineOAId={selectedLineOAId}
+        onConfirm={(contacts) => {
+          setSelectedContacts(contacts);
+          setShowContactPicker(false);
+        }}
+      />
+      <BulkResultsModal
+        open={showBulkResults}
+        onClose={() => setShowBulkResults(false)}
+        results={bulkResults}
+      />
     </AppLayout>
   );
 }

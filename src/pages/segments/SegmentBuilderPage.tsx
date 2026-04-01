@@ -12,7 +12,11 @@ import type { LineOA, Segment } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
-type FieldType = "follow_status" | "tag" | "follow_date" | "custom_field";
+type SourceType = "follower" | "contact";
+
+type FollowerFieldType = "follow_status" | "tag" | "follow_date" | "custom_field" | "has_phone" | "has_email";
+type ContactFieldType = "follows_oa" | "pnp_count";
+type FieldType = FollowerFieldType | ContactFieldType;
 
 interface ConditionState {
   id: string;
@@ -27,10 +31,11 @@ interface ConditionState {
 interface FieldConfig {
   label: string;
   operators: Array<{ value: string; label: string }>;
-  valueType: "select_follow_status" | "text" | "date" | "custom_field";
+  valueType: "select_follow_status" | "text" | "date" | "custom_field" | "boolean" | "select_oa" | "pnp_count";
 }
 
 const FIELD_CONFIG: Record<FieldType, FieldConfig> = {
+  // ── Follower fields (existing) ──
   follow_status: {
     label: "Follow Status",
     operators: [
@@ -66,16 +71,56 @@ const FIELD_CONFIG: Record<FieldType, FieldConfig> = {
     ],
     valueType: "custom_field",
   },
+  // ── Follower fields (new) ──
+  has_phone: {
+    label: "Has Phone",
+    operators: [{ value: "eq", label: "Is" }],
+    valueType: "boolean",
+  },
+  has_email: {
+    label: "Has Email",
+    operators: [{ value: "eq", label: "Is" }],
+    valueType: "boolean",
+  },
+  // ── Contact fields (new) ──
+  follows_oa: {
+    label: "Follows LINE OA",
+    operators: [
+      { value: "eq", label: "Is Following" },
+      { value: "neq", label: "Not Following" },
+    ],
+    valueType: "select_oa",
+  },
+  pnp_count: {
+    label: "PNP Sent Count",
+    operators: [
+      { value: "lte", label: "≤" },
+      { value: "gte", label: "≥" },
+      { value: "eq", label: "=" },
+    ],
+    valueType: "pnp_count",
+  },
 };
 
-const FIELD_OPTIONS: Array<{ value: FieldType; label: string }> = [
+const FOLLOWER_FIELD_OPTIONS: Array<{ value: FollowerFieldType; label: string }> = [
   { value: "follow_status", label: "Follow Status" },
   { value: "tag", label: "Tag" },
   { value: "follow_date", label: "Follow Date" },
   { value: "custom_field", label: "Custom Field" },
+  { value: "has_phone", label: "Has Phone" },
+  { value: "has_email", label: "Has Email" },
+];
+
+const CONTACT_FIELD_OPTIONS: Array<{ value: ContactFieldType; label: string }> = [
+  { value: "follows_oa", label: "Follows LINE OA" },
+  { value: "pnp_count", label: "PNP Sent Count" },
 ];
 
 const FOLLOW_STATUS_OPTIONS = ["following", "unfollowed", "blocked"];
+
+function defaultFieldForSource(sourceType: SourceType): FieldType {
+  return sourceType === "contact" ? "follows_oa" : "follow_status";
+}
 
 function defaultOperatorForField(field: FieldType): string {
   return FIELD_CONFIG[field].operators[0].value;
@@ -83,6 +128,7 @@ function defaultOperatorForField(field: FieldType): string {
 
 function defaultValueForField(field: FieldType): string {
   if (field === "follow_status") return "following";
+  if (field === "has_phone" || field === "has_email") return "true";
   return "";
 }
 
@@ -94,10 +140,11 @@ function generateId(): string {
 
 interface ValueInputProps {
   condition: ConditionState;
+  lineOAs: LineOA[];
   onChange: (partial: Partial<ConditionState>) => void;
 }
 
-function ValueInput({ condition, onChange }: ValueInputProps) {
+function ValueInput({ condition, lineOAs, onChange }: ValueInputProps) {
   const config = FIELD_CONFIG[condition.field];
 
   if (config.valueType === "select_follow_status") {
@@ -148,6 +195,65 @@ function ValueInput({ condition, onChange }: ValueInputProps) {
     );
   }
 
+  if (config.valueType === "boolean") {
+    return (
+      <select
+        className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring flex-1"
+        value={condition.value}
+        onChange={(e) => onChange({ value: e.target.value })}
+      >
+        <option value="true">Yes</option>
+        <option value="false">No</option>
+      </select>
+    );
+  }
+
+  if (config.valueType === "select_oa") {
+    return (
+      <select
+        className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring flex-1"
+        value={condition.value}
+        onChange={(e) => onChange({ value: e.target.value })}
+      >
+        <option value="">Select LINE OA...</option>
+        {lineOAs.map((oa) => (
+          <option key={oa.id} value={oa.id}>
+            {oa.name}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (config.valueType === "pnp_count") {
+    return (
+      <>
+        {/* Optional OA scope (key) */}
+        <select
+          className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring flex-1"
+          value={condition.key ?? ""}
+          onChange={(e) => onChange({ key: e.target.value || undefined })}
+        >
+          <option value="">All OAs</option>
+          {lineOAs.map((oa) => (
+            <option key={oa.id} value={oa.id}>
+              {oa.name}
+            </option>
+          ))}
+        </select>
+        {/* Count threshold */}
+        <input
+          type="number"
+          min="0"
+          className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring w-24"
+          placeholder="Count"
+          value={condition.value}
+          onChange={(e) => onChange({ value: e.target.value })}
+        />
+      </>
+    );
+  }
+
   // text
   return (
     <input
@@ -164,12 +270,15 @@ function ValueInput({ condition, onChange }: ValueInputProps) {
 
 interface ConditionRowProps {
   condition: ConditionState;
+  sourceType: SourceType;
+  lineOAs: LineOA[];
   onChange: (id: string, partial: Partial<ConditionState>) => void;
   onRemove: (id: string) => void;
 }
 
-function ConditionRow({ condition, onChange, onRemove }: ConditionRowProps) {
+function ConditionRow({ condition, sourceType, lineOAs, onChange, onRemove }: ConditionRowProps) {
   const config = FIELD_CONFIG[condition.field];
+  const fieldOptions = sourceType === "contact" ? CONTACT_FIELD_OPTIONS : FOLLOWER_FIELD_OPTIONS;
 
   const handleFieldChange = (field: FieldType) => {
     onChange(condition.id, {
@@ -188,7 +297,7 @@ function ConditionRow({ condition, onChange, onRemove }: ConditionRowProps) {
         value={condition.field}
         onChange={(e) => handleFieldChange(e.target.value as FieldType)}
       >
-        {FIELD_OPTIONS.map((o) => (
+        {fieldOptions.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
@@ -211,6 +320,7 @@ function ConditionRow({ condition, onChange, onRemove }: ConditionRowProps) {
       {/* Value input(s) */}
       <ValueInput
         condition={condition}
+        lineOAs={lineOAs}
         onChange={(partial) => onChange(condition.id, partial)}
       />
 
@@ -241,6 +351,7 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
   const [selectedLineOAId, setSelectedLineOAId] = useState<string>("");
 
   // Form fields
+  const [sourceType, setSourceType] = useState<SourceType>("follower");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isDynamic, setIsDynamic] = useState(false);
@@ -271,18 +382,22 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
 
         if (mode === "edit" && segmentId) {
           const seg = await segmentApi.get(segmentId) as Segment;
+          const segSource = (seg.source_type ?? "follower") as SourceType;
+          setSourceType(segSource);
           setName(seg.name);
           setDescription(seg.description ?? "");
           setIsDynamic(seg.is_dynamic ?? false);
           setMatchOperator((seg.rule?.operator as "AND" | "OR") ?? "AND");
-          setSelectedLineOAId(seg.line_oa_id ?? (oas[0]?.id ?? ""));
+          if (segSource === "follower") {
+            setSelectedLineOAId(seg.line_oa_id ?? (oas[0]?.id ?? ""));
+          }
           setConditions(
             (seg.rule?.conditions ?? []).map((c) => ({
               id: generateId(),
               field: c.field as FieldType,
               operator: c.operator,
               value: c.value,
-              key: (c as { key?: string }).key,
+              key: c.key,
             }))
           );
         } else {
@@ -297,9 +412,26 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
     void load();
   }, [mode, segmentId]);
 
+  // Switch source type — reset conditions to avoid invalid field mix
+  const handleSourceTypeChange = (newSource: SourceType) => {
+    setSourceType(newSource);
+    setConditions([]);
+    setPreviewCount(null);
+    if (newSource === "contact") {
+      setSelectedLineOAId("");
+    } else if (lineOAs.length > 0) {
+      setSelectedLineOAId(lineOAs[0].id);
+    }
+  };
+
   // Debounced preview count
   const fetchPreview = useCallback(() => {
-    if (!selectedLineOAId || !workspaceId || conditions.length === 0) {
+    const isContactMode = sourceType === "contact";
+    const hasConditions = conditions.length > 0;
+    const hasOA = !!selectedLineOAId;
+
+    // For follower mode, require an OA; for contact mode, just need conditions
+    if (!workspaceId || !hasConditions || (!isContactMode && !hasOA)) {
       setPreviewCount(null);
       return;
     }
@@ -308,21 +440,22 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
     segmentApi
       .previewCount({
         workspace_id: workspaceId,
-        line_oa_id: selectedLineOAId,
+        line_oa_id: isContactMode ? "" : selectedLineOAId,
+        source_type: sourceType,
         rule: {
           operator: matchOperator,
           conditions: conditions.map((c) => ({
             field: c.field,
             operator: c.operator,
             value: c.value,
-            ...(c.field === "custom_field" && c.key ? { key: c.key } : {}),
+            ...(c.key ? { key: c.key } : {}),
           })),
         },
       })
       .then((res) => setPreviewCount(res.count))
       .catch(() => setPreviewCount(null))
       .finally(() => setPreviewLoading(false));
-  }, [selectedLineOAId, workspaceId, conditions, matchOperator]);
+  }, [sourceType, selectedLineOAId, workspaceId, conditions, matchOperator]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -336,7 +469,7 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
 
   // Condition handlers
   const handleAddCondition = () => {
-    const field: FieldType = "follow_status";
+    const field = defaultFieldForSource(sourceType);
     setConditions((prev) => [
       ...prev,
       {
@@ -364,7 +497,7 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
       setSaveError("Name is required.");
       return;
     }
-    if (!selectedLineOAId) {
+    if (sourceType === "follower" && !selectedLineOAId) {
       setSaveError("Please select a LINE OA.");
       return;
     }
@@ -378,7 +511,7 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
         field: c.field,
         operator: c.operator,
         value: c.value,
-        ...(c.field === "custom_field" && c.key ? { key: c.key } : {}),
+        ...(c.key ? { key: c.key } : {}),
       })),
     };
 
@@ -386,7 +519,8 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
       if (mode === "create") {
         await segmentApi.create({
           workspace_id: workspaceId,
-          line_oa_id: selectedLineOAId,
+          line_oa_id: sourceType === "contact" ? "" : selectedLineOAId,
+          source_type: sourceType,
           name: name.trim(),
           description: description.trim() || undefined,
           rule,
@@ -401,7 +535,6 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
         });
       }
       setSaveSuccess(true);
-      // Toast: next-step suggestion for new segments
       if (mode === "create") {
         toast.toast({
           variant: "success",
@@ -416,6 +549,8 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
       setSaving(false);
     }
   };
+
+  const canSave = !!name.trim() && (sourceType === "contact" || !!selectedLineOAId);
 
   if (loadingPage) {
     return (
@@ -445,6 +580,57 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
 
         {/* Page heading */}
         <h1 className="text-xl font-semibold">{title}</h1>
+
+        {/* Source type toggle */}
+        {mode === "create" && (
+          <Card>
+            <CardContent className="pt-6 space-y-3">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  Segment Type{" "}
+                  <span className="relative group inline-flex items-center">
+                    <HelpCircle size={13} className="text-muted-foreground cursor-help" />
+                    <span className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 w-80 rounded bg-gray-800 px-2.5 py-1.5 text-xs text-white font-normal opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 leading-relaxed">
+                      <strong>Follower:</strong> filters LINE followers of a specific OA. Use for broadcasts and targeted messaging.{"\n"}
+                      <strong>Contact:</strong> filters phone contacts by OA follow status and PNP history. Use for LON campaigns and data enrichment.
+                    </span>
+                  </span>
+                </label>
+                <div className="flex rounded-md overflow-hidden border w-fit">
+                  <button
+                    type="button"
+                    className={`px-4 py-2 text-sm font-medium transition-colors ${
+                      sourceType === "follower"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                    onClick={() => handleSourceTypeChange("follower")}
+                    disabled={saving}
+                  >
+                    Follower
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-4 py-2 text-sm font-medium transition-colors ${
+                      sourceType === "contact"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                    onClick={() => handleSourceTypeChange("contact")}
+                    disabled={saving}
+                  >
+                    Contact
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {sourceType === "follower"
+                    ? "Filters LINE followers of the selected OA."
+                    : "Filters phone contacts by OA follow status or PNP history (workspace-wide)."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Basic info card */}
         <Card>
@@ -478,25 +664,27 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
                 />
               </div>
 
-              {/* LINE OA */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium">LINE OA</label>
-                <select
-                  className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                  value={selectedLineOAId}
-                  onChange={(e) => setSelectedLineOAId(e.target.value)}
-                  disabled={saving}
-                >
-                  {lineOAs.length === 0 && (
-                    <option value="">No LINE OAs available</option>
-                  )}
-                  {lineOAs.map((oa) => (
-                    <option key={oa.id} value={oa.id}>
-                      {oa.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* LINE OA — only for follower segments */}
+              {sourceType === "follower" && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">LINE OA</label>
+                  <select
+                    className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={selectedLineOAId}
+                    onChange={(e) => setSelectedLineOAId(e.target.value)}
+                    disabled={saving}
+                  >
+                    {lineOAs.length === 0 && (
+                      <option value="">No LINE OAs available</option>
+                    )}
+                    {lineOAs.map((oa) => (
+                      <option key={oa.id} value={oa.id}>
+                        {oa.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Dynamic toggle */}
               <div className="space-y-1">
@@ -505,7 +693,7 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
                   <span className="relative group inline-flex items-center">
                     <HelpCircle size={13} className="text-muted-foreground cursor-help" />
                     <span className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 w-72 rounded bg-gray-800 px-2.5 py-1.5 text-xs text-white font-normal opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 leading-relaxed">
-                      <strong>Dynamic:</strong> audience is re-calculated at send time — always uses the freshest follower data. Use for recurring broadcasts.{"\n"}
+                      <strong>Dynamic:</strong> audience is re-calculated at send time — always uses the freshest data. Use for recurring broadcasts.{"\n"}
                       <strong>Static:</strong> audience is a fixed snapshot taken when the segment is saved. Useful when you need a precise, unchanging list.
                     </span>
                   </span>
@@ -582,7 +770,9 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
             {/* Condition rows */}
             {conditions.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center border rounded-md border-dashed">
-                No conditions yet. Add a condition to filter followers.
+                {sourceType === "contact"
+                  ? "No conditions yet. Add a condition to filter contacts."
+                  : "No conditions yet. Add a condition to filter followers."}
               </p>
             ) : (
               <div className="space-y-3">
@@ -601,6 +791,8 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
                     <div className="flex-1">
                       <ConditionRow
                         condition={cond}
+                        sourceType={sourceType}
+                        lineOAs={lineOAs}
                         onChange={handleChangeCondition}
                         onRemove={handleRemoveCondition}
                       />
@@ -640,13 +832,15 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
                   <span className="text-sm text-muted-foreground">
                     Matches{" "}
                     <span className="font-bold text-foreground">{previewCount}</span>{" "}
-                    follower{previewCount !== 1 ? "s" : ""}
+                    {sourceType === "contact" ? "contact" : "follower"}{previewCount !== 1 ? "s" : ""}
                   </span>
                 ) : (
                   <span className="text-sm text-muted-foreground">
-                    {conditions.length === 0 || !selectedLineOAId
-                      ? "Add conditions and select a LINE OA to preview"
-                      : "—"}
+                    {conditions.length === 0
+                      ? "Add conditions to preview"
+                      : sourceType === "follower" && !selectedLineOAId
+                        ? "Select a LINE OA to preview"
+                        : "—"}
                   </span>
                 )}
               </div>
@@ -656,7 +850,11 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
                 size="sm"
                 className="gap-1.5 text-muted-foreground"
                 onClick={fetchPreview}
-                disabled={previewLoading || conditions.length === 0 || !selectedLineOAId}
+                disabled={
+                  previewLoading ||
+                  conditions.length === 0 ||
+                  (sourceType === "follower" && !selectedLineOAId)
+                }
               >
                 <RefreshCw size={13} />
                 Refresh
@@ -694,7 +892,7 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
           <Button
             type="button"
             onClick={() => { void handleSave(); }}
-            disabled={saving || !name.trim() || !selectedLineOAId}
+            disabled={saving || !canSave}
           >
             {saving ? (
               <span className="flex items-center gap-2">

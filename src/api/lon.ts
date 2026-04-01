@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { LONSubscriber, LONSubscriberStats, LONDeliveryLog, PNPDeliveryLog } from "@/types";
+import type { LONSubscriber, LONSubscriberStats, LONDeliveryLog, PNPDeliveryLog, PNPTemplate } from "@/types";
 
 export interface ListLONSubscribersParams {
   line_oa_id: string;
@@ -75,8 +75,20 @@ export interface SendConsentRequestResult {
 export interface SendLONByPhoneParams {
   line_oa_id: string;
   phone_number: string;
-  template_key: string;
-  body: Record<string, unknown>;
+  triggered_by?: string;
+  // Template mode (preferred)
+  template_id?: string;
+  template_variables?: Record<string, string>;
+  // Legacy mode
+  template_key?: string;
+  body?: Record<string, unknown>;
+}
+
+export interface BulkSendLONByPhoneParams {
+  line_oa_id: string;
+  phone_numbers: string[];
+  template_id?: string;
+  template_variables?: Record<string, string>;
   triggered_by?: string;
 }
 
@@ -103,6 +115,9 @@ export const lonApi = {
   revokeSubscriber: (id: string) =>
     api.delete<void>(`/v1/lon-subscribers/${id}`),
 
+  recordSubscriberAccess: (id: string) =>
+    api.post<void>(`/v1/lon-subscribers/${id}/access-log`, {}),
+
   listDeliveryLogs: (params: ListLONDeliveryLogsParams) =>
     api.get<ListLONDeliveryLogsResponse>("/v1/lon-delivery-logs", params),
 
@@ -126,4 +141,25 @@ export const lonApi = {
 
   listLONByPhoneLogs: (params: ListPNPLogsParams) =>
     api.get<ListPNPLogsResponse>("/v1/pnp/logs", params),
+
+  bulkSendLONByPhone: (body: BulkSendLONByPhoneParams) =>
+    api.post<import("@/types").BulkSendLONByPhoneResponse>("/v1/pnp/bulk-send", body),
+};
+
+export const pnpTemplateApi = {
+  list: (params: { line_oa_id?: string }) =>
+    api.get<{ data: PNPTemplate[] }>("/v1/pnp-templates", params),
+  get: (id: string) =>
+    api.get<PNPTemplate>(`/v1/pnp-templates/${id}`),
+  saveAs: (body: { line_oa_id: string; name: string; description?: string; source_id?: string }) =>
+    api.post<PNPTemplate>("/v1/pnp-templates", body),
+  update: (id: string, body: {
+    name?: string;
+    description?: string;
+    json_body?: Record<string, unknown>;
+    editable_schema?: Array<{ path: string; type: string; label: string; max_len?: number }>;
+  }) =>
+    api.put<PNPTemplate>(`/v1/pnp-templates/${id}`, body),
+  delete: (id: string) =>
+    api.delete<void>(`/v1/pnp-templates/${id}`),
 };
