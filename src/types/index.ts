@@ -56,6 +56,7 @@ export interface UnifiedContact {
   followed_at?: string | null;
   created_at: string;
   updated_at: string;
+  linked_oa_count?: number;
 }
 
 // ---- Phone Contact Detail ----

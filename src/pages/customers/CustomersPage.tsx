@@ -254,7 +254,11 @@ export function ContactsPage() {
           ) : (
             <div className="grid gap-3">
               {followers.map((follower) => (
-                <Card key={follower.id}>
+                <Card
+                  key={follower.id}
+                  className="cursor-pointer hover:bg-muted/40 transition-colors"
+                  onClick={() => window.location.href = `/followers/${follower.id}`}
+                >
                   <CardContent className="flex items-center gap-4 p-4">
                     {/* Avatar */}
                     <div className="w-10 h-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
@@ -341,6 +345,11 @@ export function ContactsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium truncate">{getDisplayLabel(contact)}</span>
                         <Badge variant="secondary">Phone Only</Badge>
+                        {contact.linked_oa_count != null && contact.linked_oa_count > 0 && (
+                          <Badge variant="outline" className="text-xs text-line border-line/40">
+                            {contact.linked_oa_count} OA{contact.linked_oa_count > 1 ? "s" : ""} linked
+                          </Badge>
+                        )}
                       </div>
                       {getSubLabel(contact) && getSubLabel(contact) !== getDisplayLabel(contact) && (
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">
