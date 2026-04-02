@@ -192,6 +192,14 @@ interface PNPTemplate {
 - `editable_schema[].type` only affects input UI in the send form; does NOT change how values are applied to json_body
 - Use `applyTemplateVariables(json_body, editable_schema, vars)` from `@/utils/pnpTemplateUtils.ts` to patch example/real values onto json_body for preview or sending
 
+**LON Template CMS Editor — `LONTemplateSchemaEditor` (3-panel layout):**
+- `src/components/lon/LONTemplateSchemaEditor.tsx` — main CMS editor; wraps ComponentTree + LONInteractivePreview + PropertyEditor/schema tabs
+- `src/components/lon/LONInteractivePreview.tsx` — click-to-select preview; green outline = editable field, blue = selected
+- Left panel: `ComponentTree` (reused from FlexBuilder) — add/remove/move-up/move-down; `+` opens `AddComponentMenu`
+- Right "Properties" tab: `PropertyEditor` (reused from FlexBuilder) — text/button/image/box/separator property forms; auto-switches when element selected
+- Right "Editable Fields" tab: click element in preview → `Add` buttons appear for `.text`, `.action.label`, `.action.uri`, `.url` — no manual JSON path typing needed
+- `SchemaDraft` (local interface exported from `LONTemplateSchemaEditor.tsx`): `{ _id, path, type, label, max_len }`
+
 ## LON (LINE Notification Messaging)
 
 ```typescript
