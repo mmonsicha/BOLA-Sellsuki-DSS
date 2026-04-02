@@ -33,7 +33,19 @@ export function BoxProperties({ node, onChange }: BoxPropertiesProps) {
       </div>
 
       <SpacingSelect value={node.spacing as string} onChange={(v) => onChange({ spacing: v })} label="Spacing" />
-      <SpacingSelect value={node.paddingAll as string} onChange={(v) => onChange({ paddingAll: v })} label="Padding" />
+
+      {/* Padding */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-muted-foreground">Padding</label>
+        <SpacingSelect value={node.paddingAll as string} onChange={(v) => onChange({ paddingAll: v })} label="All" />
+        <div className="grid grid-cols-2 gap-1.5">
+          <SpacingSelect value={node.paddingTop as string} onChange={(v) => onChange({ paddingTop: v })} label="Top" />
+          <SpacingSelect value={node.paddingBottom as string} onChange={(v) => onChange({ paddingBottom: v })} label="Bottom" />
+          <SpacingSelect value={node.paddingStart as string} onChange={(v) => onChange({ paddingStart: v })} label="Start" />
+          <SpacingSelect value={node.paddingEnd as string} onChange={(v) => onChange({ paddingEnd: v })} label="End" />
+        </div>
+      </div>
+
       <SpacingSelect value={node.margin as string} onChange={(v) => onChange({ margin: v })} label="Margin" />
 
       <ColorPicker

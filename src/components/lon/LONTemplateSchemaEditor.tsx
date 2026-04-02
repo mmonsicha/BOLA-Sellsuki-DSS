@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { Trash2, ChevronDown, ChevronRight, CheckCircle2, Plus, Sparkles } from "lucide-react";
+import { Trash2, ChevronDown, ChevronRight, CheckCircle2, Plus, Sparkles, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getNodeAtPath,
@@ -98,6 +98,12 @@ function getDefaultLabel(type: SuggestedField["type"]): string {
   return "Field";
 }
 
+/** Header and footer sections are locked — cannot add/edit/delete in LON templates */
+function isLockedPath(path: string | null): boolean {
+  if (!path) return false;
+  return /^(header|footer)(\..*)?$/.test(path);
+}
+
 export function LONTemplateSchemaEditor({
   jsonBody,
   editableSchema,
@@ -146,10 +152,12 @@ export function LONTemplateSchemaEditor({
   }, [jsonBody, onJsonBodyChange]);
 
   const handleUpdateProperty = useCallback((path: string, updates: Record<string, unknown>) => {
+    if (isLockedPath(path)) return;
     applyChange((parsed) => updateNodeAtPath(parsed, path, updates));
   }, [applyChange]);
 
   const handleAddComponent = useCallback((parentPath: string, index: number, component: Record<string, unknown>) => {
+    if (isLockedPath(parentPath)) return;
     applyChange((parsed) => {
       const result = insertChildAtPath(parsed, parentPath, component, index);
       setSelectedPath(`${parentPath}.contents[${index}]`);
@@ -159,11 +167,13 @@ export function LONTemplateSchemaEditor({
   }, [applyChange]);
 
   const handleRemoveComponent = useCallback((path: string) => {
+    if (isLockedPath(path)) return;
     applyChange((parsed) => removeNodeAtPath(parsed, path));
     if (selectedPath === path) setSelectedPath(null);
   }, [applyChange, selectedPath]);
 
   const handleMoveComponent = useCallback((parentPath: string, fromIndex: number, toIndex: number) => {
+    if (isLockedPath(parentPath)) return;
     applyChange((parsed) => moveChildInParent(parsed, parentPath, fromIndex, toIndex));
     if (selectedPath === `${parentPath}.contents[${fromIndex}]`) {
       setSelectedPath(`${parentPath}.contents[${toIndex}]`);
@@ -176,6 +186,8 @@ export function LONTemplateSchemaEditor({
       const match = parentPath.match(/__section_(header|hero|body|footer)$/);
       if (match) {
         const section = match[1];
+        // Block adding locked sections
+        if (section === "header" || section === "footer") return;
         const bubblePath = parentPath.replace(/\.?__section_\w+$/, "");
         applyChange((parsed) => {
           if (section === "hero") {
@@ -188,6 +200,8 @@ export function LONTemplateSchemaEditor({
         return;
       }
     }
+
+    if (isLockedPath(parentPath)) return;
 
     // Determine parent type for AddComponentMenu
     let parentType = "box";
@@ -516,12 +530,24 @@ export function LONTemplateSchemaEditor({
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto">
             {rightTab === "properties" ? (
-              <PropertyEditor
-                content={jsonBodyStr}
-                selectedPath={selectedPath}
-                onUpdateProperty={handleUpdateProperty}
-                variables={[]}
-              />
+              isLockedPath(selectedPath) ? (
+                <div className="p-6 flex flex-col items-center gap-3 text-center">
+                  <Lock size={24} className="text-amber-500" />
+                  <p className="text-xs font-semibold text-foreground">
+                    {selectedPath?.startsWith("header") ? "Header" : "Footer"} is locked
+                  </p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Header and footer sections cannot be edited in LON templates.
+                  </p>
+                </div>
+              ) : (
+                <PropertyEditor
+                  content={jsonBodyStr}
+                  selectedPath={selectedPath}
+                  onUpdateProperty={handleUpdateProperty}
+                  variables={[]}
+                />
+              )
             ) : (
               schemaPanelContent
             )}
