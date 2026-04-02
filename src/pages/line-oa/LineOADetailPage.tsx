@@ -19,6 +19,8 @@ import {
   HelpCircle,
   Users,
   Download,
+  Webhook,
+  Info,
 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { lineOAApi } from "@/api/lineOA";
@@ -183,6 +185,12 @@ export function LineOADetailPage() {
   const [savedLiff, setSavedLiff] = useState(false);
   const [liffError, setLiffError] = useState("");
 
+  // Outbound webhook settings
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [webhookEvents, setWebhookEvents] = useState<string[]>([]);
+  const [savingWebhook, setSavingWebhook] = useState(false);
+
   // Follower sync
   const [syncStatus, setSyncStatus] = useState<FollowerSyncStatus | null>(null);
   const [startingSync, setStartingSync] = useState(false);
@@ -270,6 +278,13 @@ export function LineOADetailPage() {
         setDescription(data.description ?? "");
         setIsDefault(data.is_default);
         setLiffId(data.liff_id ?? "");
+        setWebhookUrl(data.outbound_webhook_url ?? "");
+        setWebhookSecret(data.outbound_webhook_secret ?? "");
+        setWebhookEvents(
+          data.outbound_webhook_events
+            ? data.outbound_webhook_events.split(",").filter(Boolean)
+            : [],
+        );
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -341,6 +356,23 @@ export function LineOADetailPage() {
       setLiffError(err instanceof Error ? err.message : "Failed to save LIFF ID.");
     } finally {
       setSavingLiff(false);
+    }
+  };
+
+  const handleSaveOutboundWebhook = async () => {
+    if (!oa) return;
+    setSavingWebhook(true);
+    try {
+      await lineOAApi.updateOutboundWebhook(oa.id, {
+        webhook_url: webhookUrl.trim(),
+        secret: webhookSecret.trim(),
+        events: webhookEvents.join(","),
+      });
+      toast.toast({ variant: "success", title: "บันทึกสำเร็จ" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save outbound webhook.");
+    } finally {
+      setSavingWebhook(false);
     }
   };
 
@@ -883,7 +915,93 @@ export function LineOADetailPage() {
           </CardContent>
         </Card>
 
-        {/* ── Card 5: Danger Zone ───────────────────────────────────────────── */}
+        {/* ── Card 5: Outbound Events ──────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Webhook size={16} />
+              Outbound Events
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Forward incoming chat events to an external webhook URL. BOLA will POST a JSON payload
+              for each selected event type.
+            </p>
+
+            <Field label="Webhook URL">
+              <TextInput
+                value={webhookUrl}
+                onChange={setWebhookUrl}
+                placeholder="https://your-server.example.com/webhook"
+                disabled={savingWebhook}
+              />
+            </Field>
+
+            <Field label="Secret (optional)">
+              <SecretInput
+                value={webhookSecret}
+                onChange={setWebhookSecret}
+                placeholder="Leave blank to disable signing"
+                disabled={savingWebhook}
+              />
+            </Field>
+
+            <div className="flex items-start gap-2 rounded-md bg-muted/60 border px-3 py-2.5 text-xs text-muted-foreground">
+              <Info size={13} className="mt-0.5 flex-shrink-0" />
+              <span>
+                Secret ใช้ sign payload ด้วย HMAC-SHA256 (Header:{" "}
+                <code className="bg-muted px-1 rounded font-mono">X-BOLA-Signature</code>)
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Events</label>
+              <div className="flex flex-wrap gap-4">
+                {(
+                  [
+                    { value: "message", label: "ข้อความ" },
+                    { value: "follow", label: "Follow" },
+                    { value: "unfollow", label: "Unfollow" },
+                  ] as const
+                ).map(({ value, label }) => (
+                  <label key={value} className="flex items-center gap-2 cursor-pointer select-none text-sm">
+                    <input
+                      type="checkbox"
+                      className="rounded border-border h-4 w-4 accent-primary"
+                      checked={webhookEvents.includes(value)}
+                      onChange={(e) => {
+                        setWebhookEvents((prev) =>
+                          e.target.checked ? [...prev, value] : prev.filter((v) => v !== value),
+                        );
+                      }}
+                      disabled={savingWebhook}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                onClick={() => { void handleSaveOutboundWebhook(); }}
+                disabled={savingWebhook}
+                variant="outline"
+                className="gap-2 min-w-[130px]"
+              >
+                {savingWebhook ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+                {savingWebhook ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Card 6: Danger Zone ───────────────────────────────────────────── */}
         <Card className="border-destructive/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base text-destructive">

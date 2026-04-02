@@ -42,4 +42,10 @@ export const lineOAApi = {
 
   delete: (id: string) =>
     api.delete<void>(`/v1/line-oas/${id}`),
+
+  updateOutboundWebhook: (id: string, body: { webhook_url: string; secret: string; events: string }) =>
+    api.put<{ line_oa_id: string; webhook_url: string; has_secret: boolean; events: string }>(
+      `/v1/line-oas/${id}/outbound-webhook`,
+      body
+    ),
 };
