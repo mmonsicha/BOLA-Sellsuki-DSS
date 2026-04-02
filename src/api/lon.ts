@@ -144,6 +144,9 @@ export const lonApi = {
 
   bulkSendLONByPhone: (body: BulkSendLONByPhoneParams) =>
     api.post<import("@/types").BulkSendLONByPhoneResponse>("/v1/pnp/bulk-send", body),
+
+  resolveGreetingToken: (body: { token: string; line_uid: string }) =>
+    api.post<{ ok: boolean }>("/v1/pnp/resolve-link-token", body),
 };
 
 export const pnpTemplateApi = {

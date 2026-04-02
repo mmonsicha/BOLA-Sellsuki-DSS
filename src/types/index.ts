@@ -101,6 +101,8 @@ export interface PNPTemplate {
   variant: string;
   json_body: Record<string, unknown>;
   editable_schema: PNPTemplateEditableField[];
+  /** ID of the greeting template used for LIFF Track & Greet PNP sends. */
+  greeting_template_id: string;
   is_preset: boolean;
   preset_ref_id: string;
   created_by: string;
