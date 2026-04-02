@@ -148,7 +148,7 @@ export function ContactsPage() {
           </p>
           <div className="flex items-center gap-2">
             <a
-              href={`${import.meta.env.VITE_API_URL || ""}/v1/contacts/swagger`}
+              href={`${(import.meta.env.VITE_API_URL || "").replace(/\/$/, "")}/v1/contacts/swagger`}
               target="_blank"
               rel="noopener noreferrer"
             >
