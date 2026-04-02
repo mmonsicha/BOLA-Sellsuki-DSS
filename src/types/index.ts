@@ -169,6 +169,7 @@ export interface BroadcastDeliveryLog {
 // ---- Auto Reply ----
 export type TriggerType = "follow" | "unfollow" | "keyword" | "postback" | "default";
 export type MatchMode = "exact" | "contains" | "prefix" | "regex";
+export type AutoReplyConditionType = "" | "lon_phone_contact" | "lon_subscriber";
 
 export interface AutoReply {
   id: string;
@@ -181,6 +182,7 @@ export interface AutoReply {
   keywords: string[];
   match_mode: MatchMode;
   postback_data: string;
+  condition_type: AutoReplyConditionType;
   quick_reply_id?: string;
   messages: Array<{ type: string; payload: unknown }>;
   created_at: string;
