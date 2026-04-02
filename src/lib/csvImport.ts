@@ -139,6 +139,15 @@ function parseCSVRow(line: string, delimiter: string): string[] {
   return result;
 }
 
+// ---- Phone-only line detector ----
+
+/** Returns true when a string looks like a bare phone number (no header). */
+function looksLikePhoneNumber(s: string): boolean {
+  const t = s.trim();
+  // Starts with +, 0, or is purely digits/spaces/dashes
+  return /^[+0][\d\s\-().]{4,}$/.test(t) || /^\d{6,}$/.test(t);
+}
+
 // ---- Main parse function ----
 
 export function parseCSVText(text: string): DetectionResult {
@@ -148,6 +157,19 @@ export function parseCSVText(text: string): DetectionResult {
 
   if (lines.length === 0) {
     return { headers: [], mapping: detectColumnMapping([]), rows: [], sample: [] };
+  }
+
+  // ---- Phone-only mode: no header row, every line is a phone number ----
+  // Detect when first line itself looks like a phone number (e.g. user pasted
+  // a plain list of numbers without a header row).
+  if (looksLikePhoneNumber(lines[0])) {
+    const syntheticHeaders = ["phone"];
+    const mapping = detectColumnMapping(syntheticHeaders);
+    const rows: ParsedCSVRow[] = lines
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((phone) => ({ phone, _raw: { phone } }));
+    return { headers: syntheticHeaders, mapping, rows, sample: rows.slice(0, 5) };
   }
 
   const delimiter = detectDelimiter(lines);

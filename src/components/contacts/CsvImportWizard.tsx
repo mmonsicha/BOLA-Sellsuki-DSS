@@ -265,7 +265,7 @@ export function CsvImportWizard({ open, onClose, lineOAId = "" }: CsvImportWizar
             <TabsContent value="paste">
               <textarea
                 className="mt-3 w-full h-40 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none font-mono"
-                placeholder={"phone,first_name,last_name\n+66812345678,John,Doe\n+66898765432,Jane,Smith"}
+                placeholder={"วางเบอร์โทรได้เลย (ทีละบรรทัด) หรือ CSV พร้อม header:\n+66812345678\n0898765432\n\nหรือ CSV:\nphone,first_name,last_name\n+66812345678,สมชาย,ใจดี"}
                 value={rawText}
                 onChange={(e) => handleTextChange(e.target.value)}
               />
