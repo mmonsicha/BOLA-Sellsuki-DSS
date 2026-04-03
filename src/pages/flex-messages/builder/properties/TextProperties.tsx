@@ -14,6 +14,24 @@ interface TextPropertiesProps {
 }
 
 export function TextProperties({ node, onChange, variables = [] }: TextPropertiesProps) {
+  // Text nodes may use span-based rich text (contents: [{type:"span", text:"..."}])
+  // instead of a plain text field. In that case, read/write the first span's text.
+  const isSpanBased = node.text === undefined && Array.isArray(node.contents);
+  const textValue = isSpanBased
+    ? (node.contents as Array<{ text?: string }>).map((s) => s.text || "").join("")
+    : (node.text as string) || "";
+
+  function handleTextChange(newText: string) {
+    if (isSpanBased) {
+      const contents = (node.contents as Array<Record<string, unknown>>).map((span, idx) =>
+        idx === 0 ? { ...span, text: newText } : span
+      );
+      onChange({ contents });
+    } else {
+      onChange({ text: newText });
+    }
+  }
+
   return (
     <div className="space-y-3">
       {/* Text content */}
@@ -22,12 +40,12 @@ export function TextProperties({ node, onChange, variables = [] }: TextPropertie
           <label className="text-xs font-medium text-muted-foreground">Text Content</label>
           <FieldInsertButton
             variables={variables}
-            onInsert={(name) => onChange({ text: ((node.text as string) || "") + `{${name}}` })}
+            onInsert={(name) => handleTextChange(textValue + `{${name}}`)}
           />
         </div>
         <textarea
-          value={(node.text as string) || ""}
-          onChange={(e) => onChange({ text: e.target.value })}
+          value={textValue}
+          onChange={(e) => handleTextChange(e.target.value)}
           rows={3}
           className="w-full border rounded px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-y"
         />

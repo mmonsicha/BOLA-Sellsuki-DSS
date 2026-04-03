@@ -147,6 +147,9 @@ export const lonApi = {
 
   resolveGreetingToken: (body: { token: string; line_uid: string }) =>
     api.post<{ ok: boolean }>("/v1/pnp/resolve-link-token", body),
+
+  getConfig: () =>
+    api.get<{ shared_liff_id: string }>("/v1/pnp/config", undefined),
 };
 
 export const pnpTemplateApi = {

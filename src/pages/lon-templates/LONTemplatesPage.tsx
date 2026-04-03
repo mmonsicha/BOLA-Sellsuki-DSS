@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 import { useToast } from "@/components/ui/toast";
-import { pnpTemplateApi } from "@/api/lon";
+import { pnpTemplateApi, lonApi } from "@/api/lon";
 import { lineOAApi } from "@/api/lineOA";
 import type { PNPTemplate, LineOA } from "@/types";
 import { getWorkspaceId } from "@/lib/auth";
@@ -26,6 +26,7 @@ import {
   Pencil,
   Download,
   Camera,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FlexCardPreview } from "@/components/FlexCardPreview";
@@ -339,7 +340,7 @@ function TemplateEditorModal({ open, onClose, onSaved, template, allTemplates }:
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="sm:max-w-5xl h-[92vh] max-h-[92vh] overflow-hidden p-0 flex flex-col">
         {/* Header */}
         <DialogHeader className="px-6 pt-5 pb-3 border-b flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
@@ -823,6 +824,7 @@ export function LONTemplatesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<PNPTemplate | null>(null);
+  const [sharedLiffId, setSharedLiffId] = useState<string | null>(null);
 
   // Load OAs
   useEffect(() => {
@@ -834,6 +836,11 @@ export function LONTemplatesPage() {
         if (oas.length > 0) setSelectedLineOAId(oas[0].id);
       })
       .catch(console.error);
+  }, []);
+
+  // Load PNP config (LIFF ID) once
+  useEffect(() => {
+    lonApi.getConfig().then((res) => setSharedLiffId(res.shared_liff_id ?? "")).catch(() => setSharedLiffId(""));
   }, []);
 
   // Load templates when OA changes — skip until an OA is actually selected
@@ -876,11 +883,28 @@ export function LONTemplatesPage() {
       <div className="space-y-5">
         {/* Description + Add button */}
         <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            Manage message templates for LON by Phone (PNP). Add templates from
-            LINE-approved presets or write your own Flex Message JSON. Custom
-            templates are OA-specific and can be deleted at any time.
-          </p>
+          <div className="space-y-1.5">
+            <p className="text-sm text-muted-foreground">
+              Manage message templates for LON by Phone (PNP). Add templates from
+              LINE-approved presets or write your own Flex Message JSON. Custom
+              templates are OA-specific and can be deleted at any time.
+            </p>
+            {sharedLiffId !== null && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <Smartphone size={12} className="text-muted-foreground" />
+                <span className="text-muted-foreground">LIFF (Track &amp; Greet):</span>
+                {sharedLiffId ? (
+                  <code className="bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5 font-mono">
+                    {sharedLiffId}
+                  </code>
+                ) : (
+                  <span className="bg-amber-50 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5">
+                    Not configured — LIFF Track &amp; Greet templates will fail
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           <Button
             onClick={() => setShowAddModal(true)}
             className="gap-2 flex-shrink-0"
