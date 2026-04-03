@@ -66,6 +66,8 @@ export interface UnifiedContact {
 export interface PhoneContactFollowerDetail {
   id: string;
   line_oa_id: string;
+  line_oa_name: string;
+  line_oa_basic_id: string;
   line_user_id: string;
   follower_id: string | null;
   is_follower: boolean;
@@ -576,6 +578,7 @@ export interface PNPDeliveryLog {
   workspace_id: string;
   line_oa_id: string;
   phone_hash: string;
+  masked_phone?: string;
   template_key: string;
   status: "success" | "failed";
   error_message?: string;

@@ -154,14 +154,19 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
                         {/* Detail */}
                         <div className="flex-1 min-w-0 space-y-0.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-medium text-muted-foreground">LINE OA</span>
-                            <span className="font-mono text-xs truncate">{oa.line_oa_id}</span>
+                            <span className="text-sm font-medium">{oa.line_oa_name || oa.line_oa_id}</span>
                             {oa.is_follower ? (
                               <span className="text-xs text-line font-medium">Follower</span>
                             ) : (
                               <span className="text-xs text-muted-foreground">Phone Only</span>
                             )}
                           </div>
+                          {oa.line_oa_basic_id && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground">Basic ID:</span>
+                              <span className="font-mono text-xs text-foreground">{oa.line_oa_basic_id}</span>
+                            </div>
+                          )}
                           {oa.line_user_id && (
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs text-muted-foreground">LINE UID:</span>

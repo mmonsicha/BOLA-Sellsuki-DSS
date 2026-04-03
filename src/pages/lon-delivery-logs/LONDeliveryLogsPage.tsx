@@ -162,8 +162,8 @@ function PNPLogsTab({ lineOAs, selectedLineOAId, onOAChange }: PNPLogsTabProps) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Read phone_hash → masked_phone mapping written by LON by Phone page on successful send
-  const phoneMap = (() => {
+  // Read phone_hash → masked_phone mapping from localStorage (fallback for older logs not in phone_contacts)
+  const localPhoneMap = (() => {
     try { return JSON.parse(localStorage.getItem("bola_lon_phone_map") ?? "{}") as Record<string, string>; }
     catch { return {} as Record<string, string>; }
   })();
@@ -216,7 +216,7 @@ function PNPLogsTab({ lineOAs, selectedLineOAId, onOAChange }: PNPLogsTabProps) 
       ) : (
         <div className="space-y-2">
           {logs.map((log) => {
-            const maskedPhone = phoneMap[log.phone_hash];
+            const maskedPhone = log.masked_phone ?? localPhoneMap[log.phone_hash];
             return (
               <Card key={log.id}>
                 <CardContent className="py-3 flex items-center justify-between gap-4">
