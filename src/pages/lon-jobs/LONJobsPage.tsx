@@ -35,6 +35,8 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  Users,
+  Phone,
 } from "lucide-react";
 import { lonJobApi } from "@/api/lonJob";
 import type { CreateLONJobRequest, UpdateLONJobRequest } from "@/api/lonJob";
@@ -317,10 +319,11 @@ interface JobFormDialogProps {
   onSave: (data: JobFormData) => Promise<void>;
   initialData?: Partial<JobFormData>;
   lineOAs: LineOA[];
+  segments: Segment[];
   title: string;
 }
 
-function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, title }: JobFormDialogProps) {
+function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, segments, title }: JobFormDialogProps) {
   const [step, setStep] = useState(0); // 0: schedule, 1: target, 2: template
   const [form, setForm] = useState<JobFormData>({ ...DEFAULT_FORM, ...initialData });
   const [saving, setSaving] = useState(false);
@@ -332,9 +335,6 @@ function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, title }: J
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PNPTemplate | null>(null);
 
-  // Segments
-  const [segments, setSegments] = useState<Segment[]>([]);
-
   // Reset when opening
   useEffect(() => {
     if (open) {
@@ -344,15 +344,6 @@ function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, title }: J
       setSelectedTemplate(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Load segments
-  useEffect(() => {
-    if (!open) return;
-    segmentApi
-      .list({ workspace_id: WORKSPACE_ID })
-      .then((res) => setSegments(res.data ?? []))
-      .catch(console.error);
-  }, [open]);
 
   // Load templates when OA is selected
   useEffect(() => {
@@ -609,21 +600,41 @@ function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, title }: J
                     ))}
                   </div>
                 </div>
-                {form.target_type === "segment" && (
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Segment *</label>
-                    <select
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                      value={form.target_segment_id}
-                      onChange={(e) => set("target_segment_id", e.target.value)}
-                    >
-                      <option value="">Select a segment…</option>
-                      {segments.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                {form.target_type === "segment" && (() => {
+                  const selectedSeg = segments.find((s) => s.id === form.target_segment_id);
+                  return (
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium">Segment *</label>
+                        <select
+                          className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                          value={form.target_segment_id}
+                          onChange={(e) => set("target_segment_id", e.target.value)}
+                        >
+                          <option value="">Select a segment…</option>
+                          {segments.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {selectedSeg && (
+                        <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs">
+                          {selectedSeg.source_type === "follower" ? (
+                            <Users size={13} className="text-violet-500 flex-shrink-0" />
+                          ) : (
+                            <Phone size={13} className="text-blue-500 flex-shrink-0" />
+                          )}
+                          <span className="text-muted-foreground">
+                            {selectedSeg.source_type === "follower" ? "Followers" : "Phone Contacts"}
+                          </span>
+                          <span className="ml-auto font-semibold tabular-nums">
+                            {selectedSeg.customer_count.toLocaleString()} คน
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -779,6 +790,15 @@ export function LONJobsPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
 
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [refreshingSegId, setRefreshingSegId] = useState<string | null>(null);
+
+  // Lookup map for quick access by id
+  const segmentMap = useMemo(
+    () => Object.fromEntries(segments.map((s) => [s.id, s])),
+    [segments]
+  );
+
   // Load LINE OAs
   useEffect(() => {
     lineOAApi
@@ -786,6 +806,26 @@ export function LONJobsPage() {
       .then((res) => setLineOAs(res.data ?? []))
       .catch(console.error);
   }, []);
+
+  // Load segments (page-level, used in both form and job cards)
+  useEffect(() => {
+    segmentApi
+      .list({ workspace_id: WORKSPACE_ID, page_size: 200 })
+      .then((res) => setSegments(res.data ?? []))
+      .catch(console.error);
+  }, []);
+
+  async function refreshSegmentCount(segId: string) {
+    setRefreshingSegId(segId);
+    try {
+      const fresh = await segmentApi.get(segId);
+      setSegments((prev) => prev.map((s) => (s.id === segId ? fresh : s)));
+    } catch {
+      /* ignore */
+    } finally {
+      setRefreshingSegId(null);
+    }
+  }
 
   const load = () => {
     setLoading(true);
@@ -988,9 +1028,42 @@ export function LONJobsPage() {
                           <CalendarDays size={11} />
                           {formatSchedule(job)}
                         </span>
-                        <span>
-                          Target: {job.target_type === "all_contacts" ? "All Contacts" : "Segment"}
-                        </span>
+                        {job.target_type === "all_contacts" ? (
+                          <span className="flex items-center gap-1">
+                            <Users size={11} />
+                            All Contacts
+                          </span>
+                        ) : (() => {
+                          const seg = job.target_segment_id ? segmentMap[job.target_segment_id] : undefined;
+                          if (!seg) return <span>Segment</span>;
+                          return (
+                            <span className="flex items-center gap-1.5">
+                              {seg.source_type === "follower" ? (
+                                <Users size={11} className="text-violet-500" />
+                              ) : (
+                                <Phone size={11} className="text-blue-500" />
+                              )}
+                              <span>{seg.name}</span>
+                              <span className="font-semibold text-foreground tabular-nums">
+                                {seg.customer_count.toLocaleString()} คน
+                              </span>
+                              <button
+                                title="Refresh audience count"
+                                onClick={(e) => { e.stopPropagation(); void refreshSegmentCount(seg.id); }}
+                                className="rounded p-0.5 hover:bg-muted/60 transition-colors"
+                                disabled={refreshingSegId === seg.id}
+                              >
+                                <RefreshCw
+                                  size={10}
+                                  className={cn(
+                                    "text-muted-foreground",
+                                    refreshingSegId === seg.id && "animate-spin"
+                                  )}
+                                />
+                              </button>
+                            </span>
+                          );
+                        })()}
                         {job.total_runs > 0 && (
                           <span>Runs: {job.total_runs}</span>
                         )}
@@ -1077,6 +1150,7 @@ export function LONJobsPage() {
         onClose={() => setShowCreate(false)}
         onSave={handleCreate}
         lineOAs={lineOAs}
+        segments={segments}
         title="New LON Job"
       />
 
@@ -1087,6 +1161,7 @@ export function LONJobsPage() {
         onSave={handleUpdate}
         initialData={editInitialData}
         lineOAs={lineOAs}
+        segments={segments}
         title="Edit LON Job"
       />
 
