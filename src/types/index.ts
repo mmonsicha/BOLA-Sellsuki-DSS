@@ -9,6 +9,9 @@ export interface LineOA {
   webhook_url: string;
   basic_id: string;
   liff_id: string;
+  outbound_webhook_url: string;
+  outbound_webhook_secret: string;
+  outbound_webhook_events: string;
   status: "active" | "inactive" | "error";
   is_default: boolean;
   follower_count: number;
