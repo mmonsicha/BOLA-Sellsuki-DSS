@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
-import { lonApi } from "@/api/lon";
 import liff from "@line/liff";
 
 /**
@@ -24,30 +23,15 @@ import liff from "@line/liff";
 type PageStatus = "loading" | "error" | "success";
 
 export function PNPGreetingLIFFPage() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const token = urlParams.get("token") ?? "";
-
   const [status, setStatus] = useState<PageStatus>("loading");
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    if (!token) {
-      setErrorMsg("ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว");
-      setStatus("error");
-      return;
-    }
-
     void initFlow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function initFlow() {
-    if (!liff.isInClient()) {
-      setErrorMsg("กรุณาเปิดผ่าน LINE เท่านั้น");
-      setStatus("error");
-      return;
-    }
-
     try {
       const liffId = (import.meta.env.VITE_SHARED_LIFF_ID as string | undefined) ?? "";
       if (!liffId) {
@@ -56,17 +40,51 @@ export function PNPGreetingLIFFPage() {
         return;
       }
 
+      // init() must run first — it processes liff.state and restores query params
+      // (e.g. ?token=xxx arrives encoded as liff.state before init runs)
       await liff.init({ liffId });
+
+      if (!liff.isInClient()) {
+        setErrorMsg("กรุณาเปิดผ่าน LINE เท่านั้น");
+        setStatus("error");
+        return;
+      }
 
       if (!liff.isLoggedIn()) {
         liff.login({ redirectUri: window.location.href });
         return;
       }
 
+      // Read token AFTER liff.init() — liff.state has been decoded and applied to URL
+      const token = new URLSearchParams(window.location.search).get("token") ?? "";
+      if (!token) {
+        setErrorMsg("ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว");
+        setStatus("error");
+        return;
+      }
+
       const profile = await liff.getProfile();
       const lineUid = profile.userId;
 
-      await lonApi.resolveGreetingToken({ token, line_uid: lineUid });
+      // Use raw fetch with credentials: "omit" (no BOLA session needed for this public endpoint).
+      // VITE_PUBLIC_API_URL points directly at the backend tunnel to bypass the Vite dev proxy,
+      // which can drop connections when accessed from mobile devices via cloudflare tunnel.
+      const publicApiBase = (import.meta.env.VITE_PUBLIC_API_URL as string | undefined)
+        || (import.meta.env.VITE_API_URL as string | undefined)
+        || "";
+      const res = await fetch(`${publicApiBase}/v1/pnp/resolve-link-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "skip",
+        },
+        credentials: "omit",
+        body: JSON.stringify({ token, line_uid: lineUid }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
 
       setStatus("success");
 

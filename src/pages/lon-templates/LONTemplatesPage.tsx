@@ -132,9 +132,11 @@ interface TemplateEditorModalProps {
   onClose: () => void;
   onSaved: (updated: PNPTemplate) => void;
   template: PNPTemplate | null;
+  /** All custom templates for the same OA — used for greeting template picker */
+  allTemplates: PNPTemplate[];
 }
 
-function TemplateEditorModal({ open, onClose, onSaved, template }: TemplateEditorModalProps) {
+function TemplateEditorModal({ open, onClose, onSaved, template, allTemplates }: TemplateEditorModalProps) {
   const toast = useToast();
   const previewWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -146,6 +148,7 @@ function TemplateEditorModal({ open, onClose, onSaved, template }: TemplateEdito
   const [exampleVars, setExampleVars] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [exportingJpg, setExportingJpg] = useState(false);
+  const [greetingTemplateId, setGreetingTemplateId] = useState("");
 
   // Initialization
   useEffect(() => {
@@ -164,6 +167,7 @@ function TemplateEditorModal({ open, onClose, onSaved, template }: TemplateEdito
         }))
       );
       setExampleVars({});
+      setGreetingTemplateId(template.greeting_template_id || "");
     }
   }, [open, template]);
 
@@ -216,6 +220,7 @@ function TemplateEditorModal({ open, onClose, onSaved, template }: TemplateEdito
           label: f.label,
           max_len: parseInt(f.max_len) || undefined,
         })),
+        greeting_template_id: greetingTemplateId || undefined,
       });
       toast.success("Template saved", `"${name}" has been updated.`);
       onSaved(updated);
@@ -360,6 +365,30 @@ function TemplateEditorModal({ open, onClose, onSaved, template }: TemplateEdito
               className="flex-1 min-w-0 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
+        </div>
+
+        {/* Greeting Template row */}
+        <div className="px-6 py-2 border-b flex-shrink-0 flex items-center gap-2">
+          <label className="text-xs font-medium whitespace-nowrap">
+            Greeting Template
+          </label>
+          <select
+            value={greetingTemplateId}
+            onChange={(e) => setGreetingTemplateId(e.target.value)}
+            className="flex-1 min-w-0 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+          >
+            <option value="">— None —</option>
+            {allTemplates
+              .filter((t) => t.id !== template?.id && !t.is_preset)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+          </select>
+          <p className="text-xs text-muted-foreground whitespace-nowrap">
+            Sent via LINE after LIFF Track &amp; Greet link is resolved
+          </p>
         </div>
 
         {/* CMS Schema Editor — fills remaining height */}
@@ -922,6 +951,7 @@ export function LONTemplatesPage() {
           setEditingTemplate(null);
         }}
         template={editingTemplate}
+        allTemplates={custom}
       />
     </AppLayout>
   );

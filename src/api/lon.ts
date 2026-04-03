@@ -161,6 +161,7 @@ export const pnpTemplateApi = {
     description?: string;
     json_body?: Record<string, unknown>;
     editable_schema?: Array<{ path: string; type: string; label: string; max_len?: number }>;
+    greeting_template_id?: string;
   }) =>
     api.put<PNPTemplate>(`/v1/pnp-templates/${id}`, body),
   delete: (id: string) =>
