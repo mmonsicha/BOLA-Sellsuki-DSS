@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Trash2, ChevronDown, ChevronRight, CheckCircle2, Plus, Sparkles, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -113,6 +113,10 @@ export function LONTemplateSchemaEditor({
   onExampleVarsChange,
   previewWrapperRef,
 }: LONTemplateSchemaEditorProps) {
+  // Ref so applyChange always reads the latest jsonBody without stale-closure issues
+  const jsonBodyRef = useRef(jsonBody);
+  jsonBodyRef.current = jsonBody;
+
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [jsonAccordionOpen, setJsonAccordionOpen] = useState(false);
   const [jsonText, setJsonText] = useState<string | null>(null);
@@ -147,9 +151,9 @@ export function LONTemplateSchemaEditor({
   // ── Layout editing helpers (mirror FlexBuilder) ────────────────────────────
 
   const applyChange = useCallback((updater: (parsed: unknown) => unknown) => {
-    const updated = updater(jsonBody);
+    const updated = updater(jsonBodyRef.current);
     onJsonBodyChange(updated as Record<string, unknown>);
-  }, [jsonBody, onJsonBodyChange]);
+  }, [onJsonBodyChange]);
 
   const handleUpdateProperty = useCallback((path: string, updates: Record<string, unknown>) => {
     if (isLockedPath(path)) return;
@@ -473,7 +477,7 @@ export function LONTemplateSchemaEditor({
     <>
       <div className="flex h-full min-h-0 overflow-hidden">
         {/* Left: Component Tree */}
-        <div className="w-56 border-r flex flex-col overflow-hidden bg-muted/20 flex-shrink-0">
+        <div className="w-56 border-r flex flex-col overflow-y-auto bg-muted/20 flex-shrink-0">
           <ComponentTree
             content={jsonBodyStr}
             selectedPath={selectedPath}
@@ -495,7 +499,7 @@ export function LONTemplateSchemaEditor({
         </div>
 
         {/* Right: Tabbed panel */}
-        <div className="w-72 flex-shrink-0 border-l flex flex-col overflow-hidden">
+        <div className="w-72 flex-shrink-0 border-l flex flex-col min-h-0">
           {/* Tab bar */}
           <div className="flex border-b flex-shrink-0">
             <button

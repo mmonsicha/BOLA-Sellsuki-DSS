@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -144,6 +144,11 @@ function TemplateEditorModal({ open, onClose, onSaved, template, allTemplates }:
   const [description, setDescription] = useState("");
   const [jsonBodyText, setJsonBodyText] = useState("");
   const [jsonError, setJsonError] = useState("");
+
+  // Stable callback — avoids recreating the entire applyChange chain on every render
+  const handleJsonBodyChange = useCallback((body: Record<string, unknown>) => {
+    setJsonBodyText(JSON.stringify(body, null, 2));
+  }, []);
   const [schemaFields, setSchemaFields] = useState<SchemaDraft[]>([]);
   const [exampleVars, setExampleVars] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -397,7 +402,7 @@ function TemplateEditorModal({ open, onClose, onSaved, template, allTemplates }:
             jsonBody={jsonBodyParsed ?? {}}
             editableSchema={schemaFields}
             exampleVars={exampleVars}
-            onJsonBodyChange={(body) => setJsonBodyText(JSON.stringify(body, null, 2))}
+            onJsonBodyChange={handleJsonBodyChange}
             onSchemaChange={setSchemaFields}
             onExampleVarsChange={setExampleVars}
             previewWrapperRef={previewWrapperRef}
