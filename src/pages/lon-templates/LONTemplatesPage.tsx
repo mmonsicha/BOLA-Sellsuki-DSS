@@ -840,7 +840,7 @@ export function LONTemplatesPage() {
 
   // Load PNP config (LIFF ID) once
   useEffect(() => {
-    lonApi.getConfig().then((res) => setSharedLiffId(res.shared_liff_id ?? "")).catch(() => setSharedLiffId(""));
+    lonApi.getConfig().then((res) => setSharedLiffId(res.shared_liff_id ?? "")).catch(() => { /* endpoint not available, keep badge hidden */ });
   }, []);
 
   // Load templates when OA changes — skip until an OA is actually selected
