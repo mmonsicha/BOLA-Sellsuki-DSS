@@ -201,6 +201,24 @@ function ElementPickerOverlay({
 // Main Widget
 // ---------------------------------------------------------------------------
 
+const STORAGE_KEY = "bola_feedback_btn_pos";
+
+function getInitialPos(): { x: number; y: number } {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved) as { x: number; y: number };
+  } catch { /* ignore */ }
+  return { x: window.innerWidth - 120, y: window.innerHeight - 60 };
+}
+
+function clampPos(x: number, y: number): { x: number; y: number } {
+  const btnW = 120, btnH = 40, margin = 8;
+  return {
+    x: Math.max(margin, Math.min(x, window.innerWidth - btnW - margin)),
+    y: Math.max(margin, Math.min(y, window.innerHeight - btnH - margin)),
+  };
+}
+
 export function FeedbackWidget() {
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(0);
@@ -210,6 +228,11 @@ export function FeedbackWidget() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Drag state
+  const [pos, setPos] = useState<{ x: number; y: number }>(getInitialPos);
+  const posRef = useRef(pos);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+
   // Context state
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbEntry[]>([]);
   const [pickedElement, setPickedElement] = useState<BreadcrumbEntry | undefined>();
@@ -217,6 +240,62 @@ export function FeedbackWidget() {
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | undefined>();
   const [takingScreenshot, setTakingScreenshot] = useState(false);
   const lastClickedRef = useRef<Element | null>(null);
+
+  // Drag — document-level listeners so fast mouse movement never loses the drag
+  useEffect(() => {
+    const btn = btnRef.current;
+    if (!btn) return;
+
+    let isDragging = false;
+    let didDrag = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    function onPointerDown(e: PointerEvent) {
+      if (e.button !== 0) return;
+      isDragging = true;
+      didDrag = false;
+      offsetX = e.clientX - posRef.current.x;
+      offsetY = e.clientY - posRef.current.y;
+      e.preventDefault();
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      if (!isDragging) return;
+      didDrag = true;
+      const newPos = clampPos(e.clientX - offsetX, e.clientY - offsetY);
+      posRef.current = newPos;
+      setPos({ ...newPos });
+    }
+
+    function onPointerUp() {
+      if (!isDragging) return;
+      isDragging = false;
+      if (!didDrag) {
+        setOpen(true);
+      } else {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current)); } catch { /* ignore */ }
+      }
+    }
+
+    btn.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+
+    return () => {
+      btn.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]); // re-run when open flips so we re-attach to the freshly mounted button
+
+  // Reposition if window resizes
+  useEffect(() => {
+    const onResize = () => setPos((p) => clampPos(p.x, p.y));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Option D: track last clicked element passively
   useEffect(() => {
@@ -313,13 +392,14 @@ export function FeedbackWidget() {
         />
       )}
 
-      {/* Floating trigger button */}
+      {/* Floating trigger button (draggable) */}
       {!open && (
         <button
-          onClick={() => setOpen(true)}
+          ref={btnRef}
           aria-label="ส่งความคิดเห็น"
-          title="ส่งความคิดเห็น"
-          className="fixed bottom-6 right-6 z-[9990] flex items-center gap-2 bg-line hover:bg-line/90 text-white rounded-full px-4 py-2.5 shadow-lg transition-all hover:shadow-xl hover:scale-105 text-sm font-medium"
+          title="ส่งความคิดเห็น (ลากเพื่อย้าย)"
+          style={{ left: pos.x, top: pos.y, touchAction: "none" }}
+          className="fixed z-[9990] flex items-center gap-2 bg-line hover:bg-line/90 text-white rounded-full px-4 py-2.5 shadow-lg transition-shadow hover:shadow-xl text-sm font-medium cursor-grab active:cursor-grabbing select-none"
         >
           <MessageSquare size={16} />
           <span className="hidden sm:inline">Feedback</span>
