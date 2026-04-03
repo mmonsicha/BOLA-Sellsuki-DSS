@@ -76,7 +76,6 @@ export function PNPGreetingLIFFPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "skip",
         },
         credentials: "omit",
         body: JSON.stringify({ token, line_uid: lineUid }),
