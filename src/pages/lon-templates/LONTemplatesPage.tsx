@@ -30,6 +30,8 @@ import {
 import { cn } from "@/lib/utils";
 import { FlexCardPreview } from "@/components/FlexCardPreview";
 import { applyTemplateVariables } from "@/utils/pnpTemplateUtils";
+import { LONTemplateSchemaEditor } from "@/components/lon/LONTemplateSchemaEditor";
+import type { SchemaDraft } from "@/components/lon/LONTemplateSchemaEditor";
 import { patchFlexHtml } from "@/utils/flexPreviewUtils";
 
 const WORKSPACE_ID = getWorkspaceId() ?? "";
@@ -124,14 +126,6 @@ function TemplateCard({ template, onDelete, onEdit, deletingId }: TemplateCardPr
 }
 
 // ── TemplateEditorModal ───────────────────────────────────────────────────────
-
-interface SchemaDraft {
-  _id: string;
-  path: string;
-  type: "text" | "url" | "button_label";
-  label: string;
-  max_len: string;
-}
 
 interface TemplateEditorModalProps {
   open: boolean;
@@ -333,53 +327,10 @@ function TemplateEditorModal({ open, onClose, onSaved, template }: TemplateEdito
     }
   }
 
-  function addSchemaField() {
-    setSchemaFields((prev) => [
-      ...prev,
-      {
-        _id: Math.random().toString(36).slice(2),
-        path: "",
-        type: "text",
-        label: "",
-        max_len: "",
-      },
-    ]);
-  }
-
-  function updateSchemaField(idx: number, key: keyof SchemaDraft, value: string) {
-    setSchemaFields((prev) => {
-      const updated = [...prev];
-      const oldPath = updated[idx].path;
-      updated[idx] = { ...updated[idx], [key]: value };
-      if (key === "path" && oldPath !== value) {
-        setExampleVars((prevVars) => {
-          const next = { ...prevVars };
-          delete next[oldPath];
-          return next;
-        });
-      }
-      return updated;
-    });
-  }
-
-  function removeSchemaField(idx: number) {
-    setSchemaFields((prev) => {
-      const removed = prev[idx];
-      const next = prev.filter((_, i) => i !== idx);
-      if (removed.path) {
-        setExampleVars((prevVars) => {
-          const nextVars = { ...prevVars };
-          delete nextVars[removed.path];
-          return nextVars;
-        });
-      }
-      return next;
-    });
-  }
-
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-hidden p-0 flex flex-col">
+        {/* Header */}
         <DialogHeader className="px-6 pt-5 pb-3 border-b flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Pencil size={16} />
@@ -387,228 +338,86 @@ function TemplateEditorModal({ open, onClose, onSaved, template }: TemplateEdito
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left column */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 border-r">
-            {/* Metadata */}
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Template Name *</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="My Custom Template"
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Description</label>
-                <input
-                  type="text"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional description"
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-            </div>
-
-            {/* Flex Message JSON */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Flex Message JSON (bubble)</label>
-              <textarea
-                value={jsonBodyText}
-                onChange={(e) => setJsonBodyText(e.target.value)}
-                className="w-full font-mono text-xs border rounded-md p-3 h-48 resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                spellCheck={false}
-              />
-              {jsonError && (
-                <p className="text-xs text-destructive">{jsonError}</p>
-              )}
-            </div>
-
-            {/* Variable Fields */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Editable Fields</p>
-                  <p className="text-xs text-muted-foreground">
-                    define which fields users can override
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={addSchemaField}
-                  className="gap-1.5 text-xs"
-                >
-                  <Plus size={12} />
-                  Add Field
-                </Button>
-              </div>
-
-              {schemaFields.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic">
-                  No variable fields defined
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  {/* Column headers */}
-                  <div className="flex items-center gap-2 px-0.5">
-                    <span className="flex-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">JSON Path</span>
-                    <span className="w-36 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                      Input type <span className="normal-case font-normal">(for send form)</span>
-                    </span>
-                    <span className="w-28 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Label</span>
-                    <span className="w-16 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Max</span>
-                    <span className="w-6" />
-                  </div>
-                  {schemaFields.map((f, idx) => (
-                    <div key={f._id} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={f.path}
-                        onChange={(e) => updateSchemaField(idx, "path", e.target.value)}
-                        placeholder="body.contents[0].text"
-                        className="flex-1 border rounded-md text-xs py-1 px-2 focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                      />
-                      <select
-                        value={f.type}
-                        onChange={(e) => updateSchemaField(idx, "type", e.target.value)}
-                        className="w-36 border rounded-md text-xs py-1 px-2 focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                      >
-                        <option value="text">text</option>
-                        <option value="url">url</option>
-                        <option value="button_label">button_label</option>
-                      </select>
-                      <input
-                        type="text"
-                        value={f.label}
-                        onChange={(e) => updateSchemaField(idx, "label", e.target.value)}
-                        placeholder="label"
-                        className="w-28 border rounded-md text-xs py-1 px-2 focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
-                      <input
-                        type="number"
-                        value={f.max_len}
-                        onChange={(e) => updateSchemaField(idx, "max_len", e.target.value)}
-                        placeholder="max"
-                        className="w-16 border rounded-md text-xs py-1 px-2 focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
-                      <button
-                        onClick={() => removeSchemaField(idx)}
-                        className="flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Example Values — directly drives the live preview */}
-            {schemaFields.length > 0 && (
-              <div className="space-y-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-4">
-                <div>
-                  <p className="text-sm font-medium text-primary">Example Values → Live Preview</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Type sample data here — the preview on the right updates instantly
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  {schemaFields.map((f) => (
-                    <div key={f._id} className="flex items-center gap-3">
-                      <label className="text-xs font-medium w-32 flex-shrink-0 truncate" title={f.label || f.path}>
-                        {f.label || f.path || "—"}
-                      </label>
-                      <input
-                        type={f.type === "url" ? "url" : "text"}
-                        value={exampleVars[f.path] ?? ""}
-                        onChange={(e) =>
-                          setExampleVars((prev) => ({
-                            ...prev,
-                            [f.path]: e.target.value,
-                          }))
-                        }
-                        placeholder={
-                          f.type === "url" ? "https://example.com" :
-                          f.type === "button_label" ? "Button text" :
-                          `Example text…`
-                        }
-                        className="flex-1 border rounded-md text-xs py-1 px-2 focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Bottom bar */}
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="outline" onClick={onClose} disabled={saving}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => void handleSave()}
-                disabled={!name.trim() || saving}
-              >
-                {saving ? (
-                  <RefreshCw size={14} className="animate-spin mr-1" />
-                ) : null}
-                Save
-              </Button>
-            </div>
+        {/* Name + Description compact row */}
+        <div className="px-6 py-3 border-b flex-shrink-0 flex items-center gap-4">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <label className="text-xs font-medium whitespace-nowrap">Name *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Template name"
+              className="flex-1 min-w-0 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
           </div>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <label className="text-xs font-medium whitespace-nowrap">Description</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional description"
+              className="flex-1 min-w-0 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        </div>
 
-          {/* Right column — wide enough for the LINE card (~375px card + padding) */}
-          <div className="w-[440px] flex-shrink-0 p-4 space-y-3 overflow-y-auto">
-            <div>
-              <p className="text-sm font-medium">Preview</p>
-              <p className="text-xs text-muted-foreground">
-                Fill in <span className="font-medium">Example Values</span> below to see the card with real data
-              </p>
-            </div>
-            <div ref={previewWrapperRef}>
-              <FlexCardPreview
-                content={previewContent ?? JSON.stringify(template?.json_body ?? {})}
-                height={560}
-                scrollable
-              />
-            </div>
+        {/* CMS Schema Editor — fills remaining height */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <LONTemplateSchemaEditor
+            jsonBody={jsonBodyParsed ?? {}}
+            editableSchema={schemaFields}
+            exampleVars={exampleVars}
+            onJsonBodyChange={(body) => setJsonBodyText(JSON.stringify(body, null, 2))}
+            onSchemaChange={setSchemaFields}
+            onExampleVarsChange={setExampleVars}
+            previewWrapperRef={previewWrapperRef}
+          />
+        </div>
 
-            {/* Export */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Export
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleExportJson}
-                  className="gap-1.5 text-xs flex-1"
-                >
-                  <Download size={12} />
-                  JSON
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void handleExportJpg()}
-                  disabled={exportingJpg}
-                  className="gap-1.5 text-xs flex-1"
-                >
-                  {exportingJpg ? (
-                    <RefreshCw size={12} className="animate-spin" />
-                  ) : (
-                    <Camera size={12} />
-                  )}
-                  JPG
-                </Button>
-              </div>
-            </div>
+        {/* Footer bar */}
+        <div className="flex items-center justify-between px-6 py-3 border-t flex-shrink-0 bg-muted/20">
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExportJson}
+              className="gap-1.5 text-xs"
+            >
+              <Download size={12} />
+              Export JSON
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleExportJpg()}
+              disabled={exportingJpg}
+              className="gap-1.5 text-xs"
+            >
+              {exportingJpg ? (
+                <RefreshCw size={12} className="animate-spin" />
+              ) : (
+                <Camera size={12} />
+              )}
+              Export JPG
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            {jsonError && (
+              <p className="text-xs text-destructive self-center">{jsonError}</p>
+            )}
+            <Button variant="outline" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleSave()}
+              disabled={!name.trim() || saving}
+            >
+              {saving ? (
+                <RefreshCw size={14} className="animate-spin mr-1" />
+              ) : null}
+              Save
+            </Button>
           </div>
         </div>
       </DialogContent>

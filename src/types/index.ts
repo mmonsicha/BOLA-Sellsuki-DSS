@@ -59,6 +59,7 @@ export interface UnifiedContact {
   followed_at?: string | null;
   created_at: string;
   updated_at: string;
+  linked_oa_count?: number;
 }
 
 // ---- Phone Contact Detail ----
@@ -100,6 +101,8 @@ export interface PNPTemplate {
   variant: string;
   json_body: Record<string, unknown>;
   editable_schema: PNPTemplateEditableField[];
+  /** ID of the greeting template used for LIFF Track & Greet PNP sends. */
+  greeting_template_id: string;
   is_preset: boolean;
   preset_ref_id: string;
   created_by: string;
@@ -171,6 +174,7 @@ export interface BroadcastDeliveryLog {
 // ---- Auto Reply ----
 export type TriggerType = "follow" | "unfollow" | "keyword" | "postback" | "default";
 export type MatchMode = "exact" | "contains" | "prefix" | "regex";
+export type AutoReplyConditionType = "" | "lon_phone_contact" | "lon_subscriber";
 
 export interface AutoReply {
   id: string;
@@ -183,6 +187,7 @@ export interface AutoReply {
   keywords: string[];
   match_mode: MatchMode;
   postback_data: string;
+  condition_type: AutoReplyConditionType;
   quick_reply_id?: string;
   messages: Array<{ type: string; payload: unknown }>;
   created_at: string;

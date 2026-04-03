@@ -6,7 +6,7 @@ import { autoReplyApi } from "@/api/autoReply";
 import { quickReplyApi } from "@/api/richMenu";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { FlexMessagePicker } from "@/components/common/FlexMessagePicker";
-import type { AutoReply, QuickReply, TriggerType, MatchMode, Media } from "@/types";
+import type { AutoReply, QuickReply, TriggerType, MatchMode, Media, AutoReplyConditionType } from "@/types";
 import { MediaPickerDialog } from "@/pages/chat-inbox/MediaPickerDialog";
 import { toDisplayUrl } from "@/lib/mediaUtils";
 import { getWorkspaceId } from "@/lib/auth";
@@ -445,6 +445,7 @@ interface FormState {
   match_mode: MatchMode;
   keywords: string[];
   postback_data: string;
+  condition_type: AutoReplyConditionType;
   quick_reply_id: string;
   messages: MessageItem[];
 }
@@ -457,6 +458,7 @@ const defaultForm = (): FormState => ({
   match_mode: "contains",
   keywords: [],
   postback_data: "",
+  condition_type: "",
   quick_reply_id: "",
   messages: [{ type: "text", payload: { text: "" } }],
 });
@@ -470,6 +472,7 @@ function formFromAutoReply(ar: AutoReply): FormState {
     match_mode: ar.match_mode || "contains",
     keywords: ar.keywords || [],
     postback_data: ar.postback_data || "",
+    condition_type: ar.condition_type ?? "",
     quick_reply_id: ar.quick_reply_id || "",
     messages: (ar.messages as unknown as MessageItem[]) || [{ type: "text", payload: { text: "" } }],
   };
@@ -564,6 +567,7 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
           keywords: form.trigger === "keyword" ? form.keywords : [],
           match_mode: form.trigger === "keyword" ? form.match_mode : undefined,
           postback_data: form.trigger === "postback" ? form.postback_data : undefined,
+          condition_type: form.trigger === "follow" ? form.condition_type : "",
           quick_reply_id: form.quick_reply_id || undefined,
           messages: msgs,
         });
@@ -578,6 +582,7 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
           keywords: form.trigger === "keyword" ? form.keywords : [],
           match_mode: form.trigger === "keyword" ? form.match_mode : undefined,
           postback_data: form.trigger === "postback" ? form.postback_data : undefined,
+          condition_type: form.trigger === "follow" ? form.condition_type : "",
           quick_reply_id: form.quick_reply_id || undefined,
           messages: msgs,
         });
@@ -669,7 +674,10 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
                   key={opt.value}
                   type="button"
                   disabled={isEdit}
-                  onClick={() => set("trigger", opt.value)}
+                  onClick={() => {
+                    set("trigger", opt.value);
+                    if (opt.value !== "follow") set("condition_type", "");
+                  }}
                   title={opt.description}
                   className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border text-xs font-medium transition-all ${
                     form.trigger === opt.value
@@ -685,6 +693,32 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
               ))}
             </div>
           </Field>
+
+          {/* Condition selector — only for follow trigger */}
+          {form.trigger === "follow" && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700">Condition <span className="text-xs text-muted-foreground font-normal">(optional)</span></label>
+              <select
+                value={form.condition_type}
+                onChange={(e) => set("condition_type", e.target.value as AutoReplyConditionType)}
+                className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">No condition — fire for all followers</option>
+                <option value="lon_subscriber">LON Subscriber only</option>
+                <option value="lon_phone_contact">LON by Phone contact only</option>
+              </select>
+              {form.condition_type === "lon_phone_contact" && (
+                <p className="text-xs text-muted-foreground">
+                  Fires only for followers who have a phone contact record with a successful LON by Phone delivery.
+                </p>
+              )}
+              {form.condition_type === "lon_subscriber" && (
+                <p className="text-xs text-muted-foreground">
+                  Fires only for followers who are active LON Notification subscribers.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Keyword-specific fields */}
           {form.trigger === "keyword" && (

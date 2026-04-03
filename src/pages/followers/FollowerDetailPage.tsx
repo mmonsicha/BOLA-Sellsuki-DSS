@@ -176,7 +176,7 @@ function BehaviorSection({ followerId, workspaceId }: { followerId: string; work
   useEffect(() => {
     if (!workspaceId) return;
     analyticsApi
-      .getFollowerBehavior(workspaceId, followerId)
+      .getFollowerBehavior(followerId, workspaceId)
       .then(setBehavior)
       .catch(() => {})
       .finally(() => setLoading(false));

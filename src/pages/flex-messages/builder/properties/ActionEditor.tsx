@@ -7,23 +7,43 @@ interface ActionEditorProps {
   variables?: FlexMessageVariable[];
 }
 
+/** Sentinel URI value stored internally to mark a LIFF Track & Greet button. */
+const BOLA_PNP_LIFF_MARKER = "__BOLA_PNP_LIFF__";
+
 const ACTION_TYPES = [
   { value: "", label: "None" },
   { value: "uri", label: "Open URL" },
   { value: "message", label: "Send Message" },
   { value: "postback", label: "Postback" },
+  { value: "liff_greeting", label: "LIFF Track & Greet 🎯" },
 ] as const;
 
+/** Derive the display action type from the stored action value. */
+function deriveDisplayType(value: Record<string, unknown> | undefined): string {
+  if (!value) return "";
+  if (value.type === "uri" && value.uri === BOLA_PNP_LIFF_MARKER) return "liff_greeting";
+  return (value.type as string) || "";
+}
+
 export function ActionEditor({ value, onChange, variables = [] }: ActionEditorProps) {
-  const actionType = (value?.type as string) || "";
+  // Displayed action type (may differ from stored type for liff_greeting)
+  const displayActionType = deriveDisplayType(value);
 
   const handleTypeChange = (type: string) => {
     if (!type) {
       onChange(undefined);
       return;
     }
+    if (type === "liff_greeting") {
+      onChange({
+        type: "uri",
+        uri: BOLA_PNP_LIFF_MARKER,
+        label: (value?.label as string) || "ดูข้อมูลพิเศษสำหรับคุณ",
+      });
+      return;
+    }
     const base: Record<string, unknown> = { type, label: (value?.label as string) || "Action" };
-    if (type === "uri") base.uri = (value?.uri as string) || "https://example.com";
+    if (type === "uri") base.uri = (value?.uri as string && value.uri !== BOLA_PNP_LIFF_MARKER ? value.uri : "https://example.com");
     if (type === "message") base.text = (value?.text as string) || "Hello";
     if (type === "postback") {
       base.data = (value?.data as string) || "action=tap";
@@ -41,7 +61,7 @@ export function ActionEditor({ value, onChange, variables = [] }: ActionEditorPr
     <div className="space-y-2">
       <label className="text-xs font-medium text-muted-foreground">Action</label>
       <select
-        value={actionType}
+        value={displayActionType}
         onChange={(e) => handleTypeChange(e.target.value)}
         className="w-full border rounded px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring"
       >
@@ -50,8 +70,9 @@ export function ActionEditor({ value, onChange, variables = [] }: ActionEditorPr
         ))}
       </select>
 
-      {actionType && (
+      {displayActionType && (
         <div className="space-y-2 pl-2 border-l-2 border-muted">
+          {/* Label field — shown for all action types including liff_greeting */}
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Label</label>
             <input
@@ -62,7 +83,21 @@ export function ActionEditor({ value, onChange, variables = [] }: ActionEditorPr
             />
           </div>
 
-          {actionType === "uri" && (
+          {/* LIFF Track & Greet info panel */}
+          {displayActionType === "liff_greeting" && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 space-y-1">
+              <p className="text-xs font-medium text-blue-700">LIFF Track & Greet</p>
+              <p className="text-xs text-blue-600">
+                BOLA จะ inject LIFF URL อัตโนมัติเมื่อส่ง PNP
+              </p>
+              <p className="text-xs text-muted-foreground">
+                หมายเหตุ: greeting_template_id กำหนดที่ระดับ Template
+              </p>
+            </div>
+          )}
+
+          {/* Standard URI input — only for plain uri type (not liff_greeting) */}
+          {displayActionType === "uri" && (
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <label className="text-xs text-muted-foreground">URL</label>
@@ -81,7 +116,7 @@ export function ActionEditor({ value, onChange, variables = [] }: ActionEditorPr
             </div>
           )}
 
-          {actionType === "message" && (
+          {displayActionType === "message" && (
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <label className="text-xs text-muted-foreground">Message Text</label>
@@ -100,7 +135,7 @@ export function ActionEditor({ value, onChange, variables = [] }: ActionEditorPr
             </div>
           )}
 
-          {actionType === "postback" && (
+          {displayActionType === "postback" && (
             <>
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">Data</label>

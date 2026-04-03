@@ -44,6 +44,7 @@ import { LONTemplatesPage } from "@/pages/lon-templates/LONTemplatesPage";
 import { LONJobsPage } from "@/pages/lon-jobs/LONJobsPage";
 import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscribePage";
 import { RGBConsentPage } from "@/pages/lon/RGBConsentPage";
+import { PNPGreetingLIFFPage } from "@/pages/lon-by-phone/PNPGreetingLIFFPage";
 import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFormsPage";
 import { RegistrationFormBuilderPage } from "@/pages/registration-forms/RegistrationFormBuilderPage";
 import { RegistrationSubmissionsPage } from "@/pages/registration-forms/RegistrationSubmissionsPage";
@@ -191,6 +192,8 @@ function Router() {
   if (path.startsWith("/lon/subscribe/")) return <LONPublicSubscribePage />;
   // RGB LIFF consent page — opened inside LINE via LIFF link
   if (path === "/lon/rgb-consent") return <RGBConsentPage />;
+  // PNP Greeting LIFF page — captures LINE UID and resolves greeting token
+  if (path.startsWith("/lon/greeting")) return <PNPGreetingLIFFPage />;
   // Kratos mode: workspace chooser (public — Kratos session already proves identity)
   if (path === "/choose-workspace") return <ChooseWorkspacePage />;
 
