@@ -31,6 +31,10 @@ import {
   ChevronRight,
   Eye,
   Pencil,
+  History,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { lonJobApi } from "@/api/lonJob";
 import type { CreateLONJobRequest, UpdateLONJobRequest } from "@/api/lonJob";
@@ -42,7 +46,7 @@ import { FlexCardPreview } from "@/components/FlexCardPreview";
 import { applyTemplateVariables } from "@/utils/pnpTemplateUtils";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import { useToast } from "@/components/ui/toast";
-import type { LONJob, LineOA, PNPTemplate, Segment } from "@/types";
+import type { LONJob, LONJobRun, LineOA, PNPTemplate, Segment } from "@/types";
 import { getWorkspaceId } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -60,11 +64,13 @@ const MESSAGE_TYPE_COLORS: Record<PNPTemplate["message_type"], string> = {
 function formatSchedule(job: LONJob): string {
   const hh = String(job.schedule_hour).padStart(2, "0");
   const mm = String(job.schedule_minute).padStart(2, "0");
-  if (job.schedule_type === "weekly" && job.schedule_weekday != null) {
-    return `Every ${WEEKDAYS[job.schedule_weekday]} at ${hh}:${mm}`;
+  if (job.schedule_type === "weekly" && job.schedule_weekdays?.length > 0) {
+    const days = job.schedule_weekdays.map((d) => WEEKDAYS[d]).join(", ");
+    return `Every ${days} at ${hh}:${mm}`;
   }
-  if (job.schedule_type === "monthly" && job.schedule_day_of_month != null) {
-    return `Monthly on day ${job.schedule_day_of_month} at ${hh}:${mm}`;
+  if (job.schedule_type === "monthly" && job.schedule_days_of_month?.length > 0) {
+    const days = job.schedule_days_of_month.join(", ");
+    return `Monthly on day ${days} at ${hh}:${mm}`;
   }
   return `${job.schedule_type} at ${hh}:${mm}`;
 }
@@ -159,6 +165,109 @@ function TemplatePicker({ open, onClose, templates, loading, onSelect }: Templat
   );
 }
 
+// ─── Run History Modal ────────────────────────────────────────────────────────
+
+interface RunHistoryModalProps {
+  job: LONJob | null;
+  onClose: () => void;
+}
+
+function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
+  const [runs, setRuns] = useState<LONJobRun[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!job) return;
+    setLoading(true);
+    lonJobApi.runs(job.id, { page_size: 50 })
+      .then((res) => {
+        setRuns(res.data ?? []);
+        setTotal(res.total ?? 0);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [job]);
+
+  function runStatusBadge(status: LONJobRun["status"]) {
+    if (status === "success")
+      return (
+        <span className="flex items-center gap-1 text-green-700">
+          <CheckCircle2 size={13} /> Success
+        </span>
+      );
+    if (status === "partial")
+      return (
+        <span className="flex items-center gap-1 text-amber-600">
+          <AlertTriangle size={13} /> Partial
+        </span>
+      );
+    return (
+      <span className="flex items-center gap-1 text-destructive">
+        <XCircle size={13} /> Failed
+      </span>
+    );
+  }
+
+  return (
+    <Dialog open={job !== null} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History size={16} />
+            Run History — {job?.name}
+          </DialogTitle>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            <RefreshCw size={18} className="animate-spin mx-auto mb-2" />
+            Loading…
+          </div>
+        ) : runs.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            No runs yet. Trigger the job or wait for the scheduled time.
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">{total} run{total !== 1 ? "s" : ""} total</p>
+            <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-xs text-muted-foreground">
+                    <th className="text-left py-2 pr-4 font-medium">Executed At</th>
+                    <th className="text-left py-2 pr-4 font-medium">Status</th>
+                    <th className="text-right py-2 pr-4 font-medium">Sent</th>
+                    <th className="text-right py-2 font-medium">Failed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runs.map((run) => (
+                    <tr key={run.id} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="py-2.5 pr-4 text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(run.executed_at).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 pr-4 text-xs font-medium">
+                        {runStatusBadge(run.status)}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right text-xs font-semibold text-green-700">
+                        {run.sent_count}
+                      </td>
+                      <td className="py-2.5 text-right text-xs font-semibold text-destructive">
+                        {run.failed_count}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Job Form (Create / Edit) ─────────────────────────────────────────────────
 
 type JobFormData = {
@@ -166,8 +275,8 @@ type JobFormData = {
   description: string;
   line_oa_id: string;
   schedule_type: "weekly" | "monthly";
-  schedule_weekday: number;
-  schedule_day_of_month: number;
+  schedule_weekdays: number[];
+  schedule_days_of_month: number[];
   schedule_hour: number;
   schedule_minute: number;
   timezone: string;
@@ -182,8 +291,8 @@ const DEFAULT_FORM: JobFormData = {
   description: "",
   line_oa_id: "",
   schedule_type: "weekly",
-  schedule_weekday: 1, // Monday
-  schedule_day_of_month: 1,
+  schedule_weekdays: [1], // Monday
+  schedule_days_of_month: [1],
   schedule_hour: 9,
   schedule_minute: 0,
   timezone: "Asia/Bangkok",
@@ -192,6 +301,15 @@ const DEFAULT_FORM: JobFormData = {
   template_id: "",
   template_variables: {},
 };
+
+/** Toggle a value in an int array (add if absent, remove if present). Min 1 item. */
+function toggleDay(arr: number[], day: number): number[] {
+  if (arr.includes(day)) {
+    const next = arr.filter((d) => d !== day);
+    return next.length === 0 ? arr : next; // prevent empty selection
+  }
+  return [...arr, day].sort((a, b) => a - b);
+}
 
 interface JobFormDialogProps {
   open: boolean;
@@ -276,7 +394,6 @@ function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, title }: J
 
   async function handleSubmit() {
     setError("");
-    // Validate
     if (!form.name.trim()) { setError("Name is required."); return; }
     if (!form.line_oa_id) { setError("Please select a LINE OA."); return; }
     if (!form.template_id) { setError("Please pick a template."); return; }
@@ -374,40 +491,63 @@ function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, title }: J
                     ))}
                   </div>
                 </div>
-                {/* Weekday or day-of-month */}
+
+                {/* Weekday multi-select */}
                 {form.schedule_type === "weekly" ? (
                   <div className="space-y-1">
-                    <label className="text-xs font-medium">Day of Week</label>
+                    <label className="text-xs font-medium">
+                      Days of Week
+                      <span className="text-muted-foreground font-normal ml-1">(select multiple)</span>
+                    </label>
                     <div className="flex gap-1.5 flex-wrap">
-                      {WEEKDAYS.map((day, i) => (
-                        <button
-                          key={day}
-                          onClick={() => set("schedule_weekday", i)}
-                          className={cn(
-                            "w-10 h-10 rounded-full border text-xs font-medium transition-colors",
-                            form.schedule_weekday === i
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "border-border text-muted-foreground hover:bg-muted/40"
-                          )}
-                        >
-                          {day}
-                        </button>
-                      ))}
+                      {WEEKDAYS.map((day, i) => {
+                        const selected = form.schedule_weekdays.includes(i);
+                        return (
+                          <button
+                            key={day}
+                            onClick={() => set("schedule_weekdays", toggleDay(form.schedule_weekdays, i))}
+                            className={cn(
+                              "w-10 h-10 rounded-full border text-xs font-medium transition-colors",
+                              selected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border text-muted-foreground hover:bg-muted/40"
+                            )}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
+                  /* Monthly multi-select grid */
                   <div className="space-y-1">
-                    <label className="text-xs font-medium">Day of Month (1–28)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={28}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      value={form.schedule_day_of_month}
-                      onChange={(e) => set("schedule_day_of_month", Math.min(28, Math.max(1, Number(e.target.value))))}
-                    />
+                    <label className="text-xs font-medium">
+                      Days of Month
+                      <span className="text-muted-foreground font-normal ml-1">(select multiple, max 28)</span>
+                    </label>
+                    <div className="grid grid-cols-7 gap-1">
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => {
+                        const selected = form.schedule_days_of_month.includes(d);
+                        return (
+                          <button
+                            key={d}
+                            onClick={() => set("schedule_days_of_month", toggleDay(form.schedule_days_of_month, d))}
+                            className={cn(
+                              "h-8 rounded border text-xs font-medium transition-colors",
+                              selected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border text-muted-foreground hover:bg-muted/40"
+                            )}
+                          >
+                            {d}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
+
                 {/* Time */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -631,6 +771,7 @@ export function LONJobsPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<LONJob | null>(null);
+  const [runsTarget, setRunsTarget] = useState<LONJob | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<LONJob | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -666,8 +807,8 @@ export function LONJobsPage() {
       name: form.name,
       description: form.description,
       schedule_type: form.schedule_type,
-      schedule_weekday: form.schedule_type === "weekly" ? form.schedule_weekday : undefined,
-      schedule_day_of_month: form.schedule_type === "monthly" ? form.schedule_day_of_month : undefined,
+      schedule_weekdays: form.schedule_type === "weekly" ? form.schedule_weekdays : [],
+      schedule_days_of_month: form.schedule_type === "monthly" ? form.schedule_days_of_month : [],
       schedule_hour: form.schedule_hour,
       schedule_minute: form.schedule_minute,
       timezone: form.timezone,
@@ -688,8 +829,8 @@ export function LONJobsPage() {
       name: form.name,
       description: form.description,
       schedule_type: form.schedule_type,
-      schedule_weekday: form.schedule_type === "weekly" ? form.schedule_weekday : undefined,
-      schedule_day_of_month: form.schedule_type === "monthly" ? form.schedule_day_of_month : undefined,
+      schedule_weekdays: form.schedule_type === "weekly" ? form.schedule_weekdays : [],
+      schedule_days_of_month: form.schedule_type === "monthly" ? form.schedule_days_of_month : [],
       schedule_hour: form.schedule_hour,
       schedule_minute: form.schedule_minute,
       timezone: form.timezone,
@@ -756,8 +897,8 @@ export function LONJobsPage() {
       description: editTarget.description,
       line_oa_id: editTarget.line_oa_id,
       schedule_type: editTarget.schedule_type,
-      schedule_weekday: editTarget.schedule_weekday ?? 1,
-      schedule_day_of_month: editTarget.schedule_day_of_month ?? 1,
+      schedule_weekdays: editTarget.schedule_weekdays?.length ? editTarget.schedule_weekdays : [1],
+      schedule_days_of_month: editTarget.schedule_days_of_month?.length ? editTarget.schedule_days_of_month : [1],
       schedule_hour: editTarget.schedule_hour,
       schedule_minute: editTarget.schedule_minute,
       timezone: editTarget.timezone,
@@ -767,6 +908,16 @@ export function LONJobsPage() {
       template_variables: editTarget.template_variables ?? {},
     } satisfies Partial<JobFormData>;
   }, [editTarget]);
+
+  function lastRunStatusBadge(status: string) {
+    if (status === "success")
+      return <Badge variant="success" className="text-xs">Last run OK</Badge>;
+    if (status === "partial")
+      return <Badge className="text-xs border-transparent bg-amber-100 text-amber-800">Last run partial</Badge>;
+    if (status === "failed")
+      return <Badge variant="destructive" className="text-xs">Last run failed</Badge>;
+    return null;
+  }
 
   return (
     <AppLayout title="LON Jobs">
@@ -830,9 +981,7 @@ export function LONJobsPage() {
                         >
                           {job.status}
                         </Badge>
-                        {job.last_run_status === "failed" && (
-                          <Badge variant="destructive" className="text-xs">Last run failed</Badge>
-                        )}
+                        {lastRunStatusBadge(job.last_run_status)}
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
@@ -889,6 +1038,15 @@ export function LONJobsPage() {
                           variant="ghost"
                           size="sm"
                           className="h-8 px-2 text-xs gap-1"
+                          onClick={() => setRunsTarget(job)}
+                          title="Run history"
+                        >
+                          <History size={13} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs gap-1"
                           onClick={() => setEditTarget(job)}
                           title="Edit"
                         >
@@ -930,6 +1088,12 @@ export function LONJobsPage() {
         initialData={editInitialData}
         lineOAs={lineOAs}
         title="Edit LON Job"
+      />
+
+      {/* Run History Modal */}
+      <RunHistoryModal
+        job={runsTarget}
+        onClose={() => setRunsTarget(null)}
       />
 
       {/* Delete Confirmation */}

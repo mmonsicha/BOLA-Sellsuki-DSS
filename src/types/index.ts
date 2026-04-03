@@ -704,8 +704,8 @@ export interface LONJob {
   name: string;
   description: string;
   schedule_type: LONJobScheduleType;
-  schedule_weekday?: number; // 0=Sun..6=Sat
-  schedule_day_of_month?: number; // 1–31
+  schedule_weekdays: number[]; // 0=Sun..6=Sat (multiple days)
+  schedule_days_of_month: number[]; // 1–31 (multiple days)
   schedule_hour: number; // 0–23
   schedule_minute: number; // 0–59
   timezone: string;
@@ -716,11 +716,21 @@ export interface LONJob {
   status: LONJobStatus;
   last_run_at: string | null;
   next_run_at: string | null;
-  last_run_status: string;
+  last_run_status: string; // "success" | "partial" | "failed" | ""
   total_runs: number;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface LONJobRun {
+  id: string;
+  lon_job_id: string;
+  workspace_id: string;
+  executed_at: string;
+  status: "success" | "partial" | "failed";
+  sent_count: number;
+  failed_count: number;
 }
 
 // ---- CSV Import Preview ----

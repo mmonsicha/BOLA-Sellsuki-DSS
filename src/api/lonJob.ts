@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { LONJob } from "@/types";
+import type { LONJob, LONJobRun } from "@/types";
 import { getWorkspaceId } from "@/lib/auth";
 
 export interface ListLONJobsParams {
@@ -14,13 +14,18 @@ export interface ListLONJobsResponse {
   total: number;
 }
 
+export interface ListLONJobRunsResponse {
+  data: LONJobRun[];
+  total: number;
+}
+
 export interface CreateLONJobRequest {
   line_oa_id: string;
   name: string;
   description?: string;
   schedule_type: "weekly" | "monthly";
-  schedule_weekday?: number;
-  schedule_day_of_month?: number;
+  schedule_weekdays: number[];      // multiple days
+  schedule_days_of_month: number[]; // multiple days
   schedule_hour: number;
   schedule_minute: number;
   timezone?: string;
@@ -34,8 +39,8 @@ export interface UpdateLONJobRequest {
   name?: string;
   description?: string;
   schedule_type?: "weekly" | "monthly";
-  schedule_weekday?: number;
-  schedule_day_of_month?: number;
+  schedule_weekdays?: number[];
+  schedule_days_of_month?: number[];
   schedule_hour?: number;
   schedule_minute?: number;
   timezone?: string;
@@ -70,4 +75,7 @@ export const lonJobApi = {
 
   trigger: (id: string) =>
     api.post<{ status: string }>(`/v1/lon-jobs/${id}/trigger`, {}),
+
+  runs: (id: string, params?: { page?: number; page_size?: number }) =>
+    api.get<ListLONJobRunsResponse>(`/v1/lon-jobs/${id}/runs`, params),
 };

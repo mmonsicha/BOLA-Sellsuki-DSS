@@ -31,7 +31,7 @@ variables:
 
     VITE_API_URL: 'https://bola-api.staging-th.bearyweb.com'
     VITE_PUBLIC_API_URL: 'https://bola-api.staging-th.bearyweb.com'
-    VITE_SHARED_LIFF_ID: '2009403660-gx1CeQ6A'
+    VITE_SHARED_LIFF_ID: '2003898277-9X5qbUcC'
     APP_URL: 'bola-web.staging-th.bearyweb.com'
     CLOUDFRONT_DISTRIBUTION_ID: 'E3J776N4WE9KH0'
     AWS_CERTIFICATE_ID: '702bb7c8-85c9-4fe0-83f9-31c204527ddc'
