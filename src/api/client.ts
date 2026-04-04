@@ -7,9 +7,11 @@ const PUBLIC_PATHS = ["/v1/auth/login", "/auth/accept-invite"];
 
 class ApiClient {
   private baseURL: string;
+  private credentialsMode: RequestCredentials;
 
-  constructor(baseURL: string) {
+  constructor(baseURL: string, credentialsMode: RequestCredentials = "include") {
     this.baseURL = baseURL.replace(/\/$/, "");
+    this.credentialsMode = credentialsMode;
   }
 
   private async request<T>(
@@ -54,7 +56,7 @@ class ApiClient {
     const res = await fetch(url, {
       method,
       headers,
-      credentials: "include",
+      credentials: this.credentialsMode,
       body: body ? JSON.stringify(body) : undefined,
     });
 
@@ -102,9 +104,17 @@ class ApiClient {
     return this.request<T>("PATCH", path, body);
   }
 
-  delete<T>(path: string) {
-    return this.request<T>("DELETE", path);
+  delete<T>(path: string, body?: unknown) {
+    return this.request<T>("DELETE", path, body);
   }
 }
 
 export const api = new ApiClient(BASE_URL);
+
+// Public API client — uses VITE_PUBLIC_API_URL (backend cloudflare tunnel) to bypass
+// Chrome's Private Network Access restriction when the page is served from a public origin
+// (e.g. cloudflare tunnel) and the backend is on a loopback/private address.
+// Falls back to BASE_URL when VITE_PUBLIC_API_URL is not set (local dev via Vite proxy).
+const PUBLIC_API_BASE =
+  (import.meta.env.VITE_PUBLIC_API_URL as string | undefined)?.replace(/\/$/, "") || BASE_URL;
+export const publicApi = new ApiClient(PUBLIC_API_BASE, "omit");

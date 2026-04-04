@@ -58,7 +58,7 @@ export function LONPublicSubscribePage() {
         setOAInfo(info);
         // After we have OA info, try LIFF if we have a liff_id
         if (liffId) {
-          attemptLIFFFlow(liffId);
+          void attemptLIFFFlow(liffId);
         }
       })
       .catch(() => setOAError(true))
@@ -122,7 +122,7 @@ export function LONPublicSubscribePage() {
     setErrorMsg("");
     setSubmitting(true);
     try {
-      await lonApi.subscribeByPhone({
+      await lonApi.publicSubscribeByPhone({
         line_oa_id: lineOAId,
         phone_number: cleaned,
         source_form_id: undefined,
@@ -255,7 +255,7 @@ export function LONPublicSubscribePage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-3">
             <div className="space-y-1.5">
               <label className="text-sm font-medium flex items-center gap-1.5">
                 <Phone size={13} />

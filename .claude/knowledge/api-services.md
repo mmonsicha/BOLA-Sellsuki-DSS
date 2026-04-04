@@ -6,11 +6,15 @@ All API service modules live in `src/api/`. Each file corresponds to one backend
 
 ```typescript
 export const api = new ApiClient(BASE_URL);
+export const publicApi = new ApiClient(PUBLIC_API_BASE, "omit");
 ```
 
 - `BASE_URL` = `VITE_API_URL` env var (empty = use Vite dev proxy, which routes to `localhost:8081`)
-- All requests include `Authorization: Bearer <token>` if `bola_token` exists in localStorage
-- 401 response: clears auth state, redirects to `/login` (local_jwt) or Kratos login (kratos mode)
+- `PUBLIC_API_BASE` = `VITE_PUBLIC_API_URL` env var (backend Cloudflare tunnel URL for public endpoints). Falls back to `BASE_URL` if not set.
+- `api` — authenticated client: includes `Authorization: Bearer <token>`, `credentials: "include"` (cookies), `workspace_id` query param injected automatically
+- `publicApi` — unauthenticated client: `credentials: "omit"` (compatible with `Access-Control-Allow-Origin: *`), no auth headers, no workspace_id injection. Use for public endpoints like `/v1/public/lon/*`.
+- `publicApi` is required when the frontend is served from a **public HTTPS origin** (e.g. Cloudflare tunnel) and the backend is on a loopback/private address — Chrome's Private Network Access blocks `credentials: "include"` requests to private IPs from public origins.
+- 401 response (api only): clears auth state, redirects to `/login` (local_jwt) or Kratos login (kratos mode)
 - Methods: `api.get<T>(path, params?)`, `api.post<T>(path, body?)`, `api.put<T>(path, body?)`, `api.patch<T>(path, body?)`, `api.delete<T>(path)`
 
 All API paths are prefixed with `/v1/workspaces/${workspaceId}/...` where `workspaceId = getWorkspaceId()`.
@@ -90,11 +94,18 @@ Standard CRUD for flex message templates.
 - `revokeSubscriber(id)` — DELETE `/v1/lon-subscribers/:id`
 - `recordSubscriberAccess(id)` — POST `/v1/lon-subscribers/:id/access-log` (fire-and-forget; fires audit `lon_subscriber.view_phone`)
 - `listDeliveryLogs(params)` — GET `/v1/lon-delivery-logs`
-- `subscribeByPhone(params)` — POST `/v1/lon/subscribe-by-phone`
-- `bulkSubscribeByPhone(params)` — POST `/v1/lon/bulk-subscribe-by-phone`
-- `getPublicOAInfo(lineOAId)` — GET `/v1/public/lon/oa-info`
-- `liffConsent(params)` — POST `/v1/public/lon/liff-consent`
+- `subscribeByPhone(params)` — POST `/v1/lon/subscribe-by-phone` (admin auth required)
+- `bulkSubscribeByPhone(params)` — POST `/v1/lon/bulk-subscribe-by-phone` (admin auth required)
+- `getPublicOAInfo(lineOAId)` — GET `/v1/public/lon/oa-info` (uses `publicApi`)
+- `liffConsent(params)` — POST `/v1/public/lon/liff-consent` (uses `publicApi`)
+- `publicSubscribeByPhone(params)` — POST `/v1/public/lon/subscribe-by-phone` (uses `publicApi`, no auth — for QR subscribe page)
 - `sendConsentRequest(params)` — POST `/v1/lon/send-consent-request`
+
+> **⚠️ LINE LON Consent Flow — Known Limitation (verified Apr 2026)**
+>
+> `liff.getNotificationToken()` has been removed from LIFF v2 SDK. The LIFF consent flow in `LONPublicSubscribePage` is broken for new users.
+> `publicSubscribeByPhone` only succeeds if the user has previously consented to notifications via LINE (LON token exists).
+> See `backend/.claude/knowledge/integrations.md` for full details and migration path.
 - `sendLONByPhone(params)` — POST `/v1/pnp/send` → returns `PNPDeliveryLog` (incl. `phone_hash`)
 - `listLONByPhoneLogs(params)` — GET `/v1/pnp/logs`
 

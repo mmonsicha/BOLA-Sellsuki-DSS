@@ -1,5 +1,5 @@
-import { api } from "./client";
-import type { LONSubscriber, LONSubscriberStats, LONDeliveryLog, PNPDeliveryLog, PNPTemplate } from "@/types";
+import { api, publicApi } from "./client";
+import type { LONSubscriber, LONSubscriberStats, LONDeliveryLog, PNPDeliveryLog, PNPTemplate, OnGreetingSentRecord } from "@/types";
 
 export interface ListLONSubscribersParams {
   line_oa_id: string;
@@ -23,10 +23,23 @@ export interface ListLONDeliveryLogsParams {
   line_oa_id: string;
   page?: number;
   page_size?: number;
+  search?: string;
+  from?: string;
+  to?: string;
 }
 
 export interface ListLONDeliveryLogsResponse {
   data: LONDeliveryLog[];
+  total: number;
+}
+
+export interface DeliveryLogStatsResponse {
+  total: number;
+  unique_users: number;
+  success: number;
+  failed: number;
+  revoked?: number;
+  expired?: number;
 }
 
 export interface BulkSubscribeItem {
@@ -96,10 +109,27 @@ export interface ListPNPLogsParams {
   line_oa_id: string;
   page?: number;
   page_size?: number;
+  search?: string;
+  from?: string;
+  to?: string;
 }
 
 export interface ListPNPLogsResponse {
   data: PNPDeliveryLog[];
+  total: number;
+}
+
+export interface ListOnGreetingSentParams {
+  line_oa_id: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface ListOnGreetingSentResponse {
+  data: OnGreetingSentRecord[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 export const lonApi = {
@@ -121,17 +151,25 @@ export const lonApi = {
   listDeliveryLogs: (params: ListLONDeliveryLogsParams) =>
     api.get<ListLONDeliveryLogsResponse>("/v1/lon-delivery-logs", params),
 
+  getDeliveryLogStats: (params: { line_oa_id: string; from?: string; to?: string }) =>
+    api.get<DeliveryLogStatsResponse>("/v1/lon-delivery-logs/stats", params),
+
   subscribeByPhone: (params: SubscribeByPhoneParams) =>
     api.post<LONSubscriber>("/v1/lon/subscribe-by-phone", params),
 
   bulkSubscribeByPhone: (params: BulkSubscribeByPhoneParams) =>
     api.post<BulkSubscribeByPhoneResult>("/v1/lon/bulk-subscribe-by-phone", params),
 
+  // Public endpoints — use publicApi (VITE_PUBLIC_API_URL) to avoid Chrome's
+  // Private Network Access block when the page is served from a public origin.
   getPublicOAInfo: (lineOAId: string) =>
-    api.get<LONPublicOAInfo>("/v1/public/lon/oa-info", { line_oa_id: lineOAId }),
+    publicApi.get<LONPublicOAInfo>("/v1/public/lon/oa-info", { line_oa_id: lineOAId }),
 
   liffConsent: (params: LIFFConsentParams) =>
-    api.post<{ id: string }>("/v1/public/lon/liff-consent", params),
+    publicApi.post<{ id: string }>("/v1/public/lon/liff-consent", params),
+
+  publicSubscribeByPhone: (params: SubscribeByPhoneParams) =>
+    publicApi.post<LONSubscriber>("/v1/public/lon/subscribe-by-phone", params),
 
   sendConsentRequest: (params: SendConsentRequestParams) =>
     api.post<SendConsentRequestResult>("/v1/lon/send-consent-request", params),
@@ -142,6 +180,9 @@ export const lonApi = {
   listLONByPhoneLogs: (params: ListPNPLogsParams) =>
     api.get<ListPNPLogsResponse>("/v1/pnp/logs", params),
 
+  getPNPLogStats: (params: { line_oa_id: string; from?: string; to?: string }) =>
+    api.get<DeliveryLogStatsResponse>("/v1/pnp/logs/stats", params),
+
   bulkSendLONByPhone: (body: BulkSendLONByPhoneParams) =>
     api.post<import("@/types").BulkSendLONByPhoneResponse>("/v1/pnp/bulk-send", body),
 
@@ -150,6 +191,15 @@ export const lonApi = {
 
   getConfig: () =>
     api.get<{ shared_liff_id: string }>("/v1/pnp/config", undefined),
+
+  listOnGreetingSent: (params: ListOnGreetingSentParams) =>
+    api.get<ListOnGreetingSentResponse>("/v1/pnp/on-greeting-sent", params),
+
+  deleteOnGreetingSent: (templateId: string, phoneHash: string) =>
+    api.delete<void>("/v1/pnp/on-greeting-sent", { template_id: templateId, phone_hash: phoneHash }),
+
+  deleteAllOnGreetingSent: (lineOaId: string) =>
+    api.delete<{ deleted: number }>(`/v1/pnp/on-greeting-sent/all?line_oa_id=${lineOaId}`),
 };
 
 export const pnpTemplateApi = {
@@ -165,6 +215,12 @@ export const pnpTemplateApi = {
     json_body?: Record<string, unknown>;
     editable_schema?: Array<{ path: string; type: string; label: string; max_len?: number }>;
     greeting_template_id?: string;
+    greeting_line_oa_id?: string;
+    on_greeting_message_type?: "none" | "flex" | "pnp_template";
+    on_greeting_payload?: Record<string, unknown>;
+    on_greeting_line_oa_id?: string;
+    on_greeting_send_once?: boolean;
+    on_greeting_redirect_url?: string;
   }) =>
     api.put<PNPTemplate>(`/v1/pnp-templates/${id}`, body),
   delete: (id: string) =>
