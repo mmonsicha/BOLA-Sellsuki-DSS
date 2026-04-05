@@ -37,12 +37,12 @@ export function ComponentTreeNode({
   const Icon = meta?.icon;
   const label = meta?.getLabel(node) || nodeType;
   const isSelected = path === selectedPath;
-  const hasContents = Array.isArray(node.contents) && (node.contents as Node[]).length > 0;
+  const canHaveContents = Array.isArray(node.contents); // has contents array (may be empty)
   const isBubble = nodeType === "bubble";
   const isCarousel = nodeType === "carousel";
 
   // Determine if this node is expandable
-  const isExpandable = hasContents || isBubble;
+  const isExpandable = canHaveContents || isBubble;
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -186,7 +186,7 @@ export function ComponentTreeNode({
         </div>
       )}
 
-      {expanded && !isBubble && !isCarousel && hasContents && (
+      {expanded && !isBubble && !isCarousel && canHaveContents && (
         <div className="relative">
           <div
             className="absolute top-0 bottom-0 border-l border-border/30 pointer-events-none"
