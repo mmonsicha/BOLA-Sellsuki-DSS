@@ -264,6 +264,17 @@ function BubbleSectionNode({
           {sectionName}
         </span>
         <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
+          {/* + button on the section row — adds directly under this section */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRequestAdd(path, Array.isArray(node.contents) ? (node.contents as Node[]).length : 0);
+            }}
+            className="p-0.5 hover:bg-primary/20 hover:text-primary rounded"
+            title={`Add component to ${sectionName}`}
+          >
+            <Plus size={10} />
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); onRemoveComponent(path); }}
             className="p-0.5 hover:bg-destructive/20 hover:text-destructive rounded"
@@ -298,7 +309,7 @@ function BubbleSectionNode({
             onClick={() => onRequestAdd(path, (node.contents as Node[]).length)}
           >
             <Plus size={10} />
-            <span className="italic">Add component</span>
+            <span className="italic">Add to {sectionName}</span>
           </div>
         </div>
       )}
