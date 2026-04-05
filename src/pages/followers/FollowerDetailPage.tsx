@@ -428,7 +428,7 @@ export function FollowerDetailPage() {
       <div className="space-y-6 max-w-2xl">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <button onClick={() => { window.location.href = "/followers"; }} className="text-muted-foreground hover:text-foreground">
+          <button onClick={() => { window.location.href = "/contacts"; }} className="text-muted-foreground hover:text-foreground">
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-3">

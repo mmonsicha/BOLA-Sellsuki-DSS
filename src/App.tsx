@@ -7,7 +7,6 @@ import { isAuthenticated } from "@/lib/auth";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { LineOAPage } from "@/pages/line-oa/LineOAPage";
 import { LineOADetailPage } from "@/pages/line-oa/LineOADetailPage";
-import { FollowersPage } from "@/pages/followers/FollowersPage";
 import { FollowerDetailPage } from "@/pages/followers/FollowerDetailPage";
 import { ContactsPage } from "@/pages/customers/CustomersPage";
 import { PhoneContactDetailPage } from "@/pages/customers/PhoneContactDetailPage";
@@ -81,7 +80,9 @@ function resolveProtectedRoute(path: string, segments: string[]): React.ReactEle
   }
   if (segments[0] === "followers") {
     if (segments[1]) return <FollowerDetailPage />;
-    return <FollowersPage />;
+    // Redirect bare /followers to /contacts (ContactsPage is the unified list)
+    window.location.href = "/contacts";
+    return <ContactsPage />;
   }
   if (segments[0] === "broadcasts") {
     if (segments[1] === "new") return <BroadcastWizardPage />;
