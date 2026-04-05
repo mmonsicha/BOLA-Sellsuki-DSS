@@ -56,6 +56,8 @@ All API paths are prefixed with `/v1/workspaces/${workspaceId}/...` where `works
 - `createSegment(workspaceId, data)` — create
 - `updateSegment(workspaceId, id, data)` — update
 - `deleteSegment(workspaceId, id)` — delete
+- `previewCount(body)` — `POST /v1/segments/preview-count` — count matching members (debounced in SegmentBuilderPage)
+- `previewList(body)` — `POST /v1/segments/preview-list` — paginated list of matching members (infinite scroll in SegmentBuilderPage)
 
 ## Broadcasts (`src/api/broadcast.ts`)
 
