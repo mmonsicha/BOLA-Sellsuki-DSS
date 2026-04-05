@@ -347,7 +347,7 @@ function ContactPickerModal({ open, onClose, workspaceId, lineOAId, onConfirm }:
                     <p className="text-sm font-medium truncate">{displayName(c)}</p>
                     <p className="text-xs text-muted-foreground">{c.phone}</p>
                   </div>
-                  <Badge variant="secondary" className="text-xs flex-shrink-0">{c.contact_status}</Badge>
+                  <Badge variant="secondary" className="text-xs flex-shrink-0">{c.contact_status === "phone_only" ? "phone" : c.contact_status}</Badge>
                 </label>
               ))}
             </div>

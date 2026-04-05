@@ -33,15 +33,28 @@ export function PNPGreetingLIFFPage() {
 
   async function initFlow() {
     try {
-      const liffId = (import.meta.env.VITE_SHARED_LIFF_ID as string | undefined) ?? "";
+      // Per-OA LIFF ID: LINE encodes original query params into liff.state before redirecting
+      // to the LIFF endpoint URL. We need liff_id BEFORE liff.init(), so parse it from
+      // both the current URL params and the liff.state param.
+      const urlParams = new URLSearchParams(window.location.search);
+      let liffId = urlParams.get("liff_id") ?? "";
+      if (!liffId) {
+        // LINE puts original params in liff.state as a URI-encoded query string
+        const liffState = urlParams.get("liff.state") ?? "";
+        if (liffState) {
+          const stateParams = new URLSearchParams(liffState);
+          liffId = stateParams.get("liff_id") ?? "";
+        }
+      }
+      if (!liffId) {
+        liffId = (import.meta.env.VITE_SHARED_LIFF_ID as string | undefined) ?? "";
+      }
       if (!liffId) {
         setErrorMsg("ไม่พบ LIFF App ID กรุณาติดต่อผู้ดูแลระบบ");
         setStatus("error");
         return;
       }
 
-      // init() must run first — it processes liff.state and restores query params
-      // (e.g. ?token=xxx arrives encoded as liff.state before init runs)
       await liff.init({ liffId });
 
       if (!liff.isInClient()) {
