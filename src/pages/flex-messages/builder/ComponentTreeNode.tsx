@@ -113,7 +113,11 @@ export function ComponentTreeNode({
 
       {/* Children */}
       {expanded && isBubble && (
-        <div>
+        <div className="relative">
+          <div
+            className="absolute top-0 bottom-0 border-l border-border/30 pointer-events-none"
+            style={{ left: `${depth * 12 + 11}px` }}
+          />
           {BUBBLE_SECTIONS.map((section) => {
             const sectionNode = node[section] as Node | undefined;
             const sectionPath = path ? `${path}.${section}` : section;
@@ -183,7 +187,11 @@ export function ComponentTreeNode({
       )}
 
       {expanded && !isBubble && !isCarousel && hasContents && (
-        <div>
+        <div className="relative">
+          <div
+            className="absolute top-0 bottom-0 border-l border-border/30 pointer-events-none"
+            style={{ left: `${depth * 12 + 11}px` }}
+          />
           {(node.contents as Node[]).map((child, i) => (
             <ComponentTreeNode
               key={i}
@@ -286,7 +294,11 @@ function BubbleSectionNode({
       </div>
 
       {expanded && hasContents && (
-        <div>
+        <div className="relative">
+          <div
+            className="absolute top-0 bottom-0 border-l border-border/30 pointer-events-none"
+            style={{ left: `${depth * 12 + 11}px` }}
+          />
           {(node.contents as Node[]).map((child, i) => (
             <ComponentTreeNode
               key={i}
