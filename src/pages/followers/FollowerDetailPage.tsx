@@ -3,9 +3,10 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, Plus, X, CheckCircle, XCircle, Activity } from "lucide-react";
+import { ArrowLeft, RefreshCw, Plus, X, CheckCircle, XCircle, Activity, Send } from "lucide-react";
 import type { Follower, FollowerBehaviorSummary } from "@/types";
 import { followerApi } from "@/api/follower";
+import type { FollowerActivity } from "@/api/follower";
 import { analyticsApi } from "@/api/analytics";
 import { getWorkspaceId } from "@/lib/auth";
 
@@ -167,6 +168,64 @@ function engagementColor(score: number): string {
   if (score >= 61) return "bg-green-100 text-green-800";
   if (score >= 31) return "bg-yellow-100 text-yellow-800";
   return "bg-gray-100 text-gray-600";
+}
+
+function FollowerActivitySection({ followerId }: { followerId: string }) {
+  const [activity, setActivity] = useState<FollowerActivity | null>(null);
+
+  useEffect(() => {
+    followerApi.getFollowerActivity(followerId)
+      .then(setActivity)
+      .catch(() => {});
+  }, [followerId]);
+
+  if (!activity) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Send size={16} />
+          Messaging Activity
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">Broadcasts Received</div>
+            <div className="font-semibold">{activity.total_broadcasts.toLocaleString()}</div>
+          </div>
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">LON Messages</div>
+            <div className="font-semibold">{activity.lon_count.toLocaleString()}</div>
+          </div>
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">PNP Total</div>
+            <div className="font-semibold">{activity.pnp_total.toLocaleString()}</div>
+          </div>
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">PNP Success</div>
+            <div className="font-semibold">{activity.pnp_success.toLocaleString()}</div>
+          </div>
+        </div>
+        {activity.recent_broadcasts.length > 0 && (
+          <div>
+            <div className="text-sm font-medium mb-2">Recent Broadcasts</div>
+            <div className="space-y-2">
+              {activity.recent_broadcasts.map((dl) => (
+                <div key={dl.id} className="flex items-center justify-between text-xs border rounded-md px-3 py-2">
+                  <span className="text-muted-foreground">{dl.created_at ? new Date(dl.created_at).toLocaleString() : "-"}</span>
+                  <Badge variant={dl.status === "success" ? "success" : dl.status === "failed" ? "destructive" : "secondary"} className="text-xs">
+                    {dl.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function BehaviorSection({ followerId, workspaceId }: { followerId: string; workspaceId: string }) {
@@ -496,6 +555,9 @@ export function FollowerDetailPage() {
             />
           </CardContent>
         </Card>
+
+        {/* Messaging Activity */}
+        <FollowerActivitySection followerId={id} />
 
         {/* Behavior Summary */}
         {workspaceId && <BehaviorSection followerId={id} workspaceId={workspaceId} />}

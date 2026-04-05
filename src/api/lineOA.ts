@@ -27,6 +27,16 @@ export interface UpdateLineOABody {
   liff_id?: string;
 }
 
+export interface MessageQuota {
+  quota_type: "limited" | "none";
+  /** Monthly message limit; -1 means unlimited. */
+  limit: number;
+  /** Messages sent this calendar month. */
+  total_usage: number;
+  /** limit - total_usage; -1 when unlimited. */
+  remaining: number;
+}
+
 export const lineOAApi = {
   list: (params: ListLineOAsParams) =>
     api.get<{ data: LineOA[] }>("/v1/line-oas", params),
@@ -48,4 +58,7 @@ export const lineOAApi = {
       `/v1/line-oas/${id}/outbound-webhook`,
       body,
     ),
+
+  getMessageQuota: (id: string) =>
+    api.get<MessageQuota>(`/v1/line-oas/${id}/message-quota`),
 };

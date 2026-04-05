@@ -64,6 +64,7 @@ const BASE_NAV_SECTIONS: NavSection[] = [
       { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
       { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
       { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
+      { label: "Message Logs", href: "/message-logs", icon: FileText },
       { label: "LON by Phone", href: "/lon-by-phone", icon: PhoneCall },
       { label: "LON Jobs", href: "/lon-jobs", icon: CalendarDays },
       { label: "LON Templates", href: "/lon-templates", icon: LayoutTemplate },

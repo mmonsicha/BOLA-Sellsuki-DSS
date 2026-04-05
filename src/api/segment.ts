@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Segment } from "@/types";
+import type { Segment, PaginatedResponse, PreviewSegmentListItem } from "@/types";
 
 export interface PreviewCountBody {
   workspace_id: string;
@@ -41,4 +41,7 @@ export const segmentApi = {
 
   previewCount: (body: PreviewCountBody) =>
     api.post<{ count: number }>("/v1/segments/preview-count", body),
+
+  previewList: (body: PreviewCountBody & { page?: number; page_size?: number }) =>
+    api.post<PaginatedResponse<PreviewSegmentListItem>>("/v1/segments/preview-list", body),
 };

@@ -17,9 +17,10 @@ interface PropertyEditorProps {
   selectedPath: string | null;
   onUpdateProperty: (path: string, updates: Record<string, unknown>) => void;
   variables?: FlexMessageVariable[];
+  showGreetingConfig?: boolean;
 }
 
-export function PropertyEditor({ content, selectedPath, onUpdateProperty, variables = [] }: PropertyEditorProps) {
+export function PropertyEditor({ content, selectedPath, onUpdateProperty, variables = [], showGreetingConfig }: PropertyEditorProps) {
   const { node, nodeType } = useMemo(() => {
     if (!selectedPath) return { node: null, nodeType: "" };
     try {
@@ -57,7 +58,7 @@ export function PropertyEditor({ content, selectedPath, onUpdateProperty, variab
 
       {/* Type-specific form */}
       {nodeType === "text" && <TextProperties node={node} onChange={handleChange} variables={variables} />}
-      {nodeType === "button" && <ButtonProperties node={node} onChange={handleChange} variables={variables} />}
+      {nodeType === "button" && <ButtonProperties node={node} onChange={handleChange} variables={variables} showGreetingConfig={showGreetingConfig} />}
       {nodeType === "image" && <ImageProperties node={node} onChange={handleChange} variables={variables} />}
       {nodeType === "box" && <BoxProperties node={node} onChange={handleChange} />}
       {nodeType === "separator" && <SeparatorProperties node={node} onChange={handleChange} />}

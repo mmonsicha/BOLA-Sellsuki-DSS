@@ -21,6 +21,7 @@ import {
   Download,
   Webhook,
   Info,
+  BarChart2,
 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { lineOAApi } from "@/api/lineOA";
@@ -190,6 +191,11 @@ export function LineOADetailPage() {
   const [webhookSecret, setWebhookSecret] = useState("");
   const [webhookEvents, setWebhookEvents] = useState<string[]>([]);
   const [savingWebhook, setSavingWebhook] = useState(false);
+
+  // Message quota
+  const [quota, setQuota] = useState<{ quota_type: string; limit: number; total_usage: number; remaining: number } | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState(false);
+  const [quotaError, setQuotaError] = useState("");
 
   // Follower sync
   const [syncStatus, setSyncStatus] = useState<FollowerSyncStatus | null>(null);
@@ -373,6 +379,20 @@ export function LineOADetailPage() {
       toast.error(err instanceof Error ? err.message : "Failed to save outbound webhook.");
     } finally {
       setSavingWebhook(false);
+    }
+  };
+
+  const handleFetchQuota = async () => {
+    if (!oa) return;
+    setQuotaLoading(true);
+    setQuotaError("");
+    try {
+      const result = await lineOAApi.getMessageQuota(oa.id);
+      setQuota(result);
+    } catch (err) {
+      setQuotaError(err instanceof Error ? err.message : "Failed to fetch quota");
+    } finally {
+      setQuotaLoading(false);
     }
   };
 
@@ -1001,7 +1021,108 @@ export function LineOADetailPage() {
           </CardContent>
         </Card>
 
-        {/* ── Card 6: Danger Zone ───────────────────────────────────────────── */}
+        {/* ── Card 6: Message Quota ────────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BarChart2 size={16} />
+              Messaging API Quota
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Monthly message quota and current usage for this LINE OA.
+              Data is fetched live from the LINE Messaging API.
+            </p>
+
+            {!quota && !quotaLoading && !quotaError && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { void handleFetchQuota(); }}
+                className="gap-2"
+              >
+                <BarChart2 size={14} />
+                Check Quota
+              </Button>
+            )}
+
+            {quotaLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <RefreshCw size={14} className="animate-spin" />
+                Fetching quota from LINE API...
+              </div>
+            )}
+
+            {quotaError && (
+              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                {quotaError}
+              </div>
+            )}
+
+            {quota && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="rounded-lg border bg-muted/40 px-3 py-3 space-y-1">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Limit</p>
+                    <p className="text-lg font-semibold">
+                      {quota.limit === -1 ? "∞" : quota.limit.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground capitalize">{quota.quota_type}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/40 px-3 py-3 space-y-1">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Used this month</p>
+                    <p className="text-lg font-semibold">{quota.total_usage.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">messages sent</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/40 px-3 py-3 space-y-1">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Remaining</p>
+                    <p className={`text-lg font-semibold ${quota.remaining !== -1 && quota.remaining < 1000 ? "text-destructive" : ""}`}>
+                      {quota.remaining === -1 ? "∞" : quota.remaining.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">messages left</p>
+                  </div>
+                </div>
+
+                {quota.quota_type === "limited" && quota.limit > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Usage this month</span>
+                      <span>{Math.round((quota.total_usage / quota.limit) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          quota.total_usage / quota.limit >= 0.9
+                            ? "bg-destructive"
+                            : quota.total_usage / quota.limit >= 0.7
+                              ? "bg-yellow-500"
+                              : "bg-primary"
+                        }`}
+                        style={{ width: `${Math.min((quota.total_usage / quota.limit) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { void handleFetchQuota(); }}
+                    disabled={quotaLoading}
+                    className="gap-2 text-xs text-muted-foreground"
+                  >
+                    <RefreshCw size={12} className={quotaLoading ? "animate-spin" : ""} />
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Card 7: Danger Zone ───────────────────────────────────────────── */}
         <Card className="border-destructive/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base text-destructive">

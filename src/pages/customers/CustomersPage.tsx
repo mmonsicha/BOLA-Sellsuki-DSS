@@ -4,6 +4,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 import { CsvImportWizard } from "@/components/contacts/CsvImportWizard";
 import { cn } from "@/lib/utils";
@@ -11,7 +21,8 @@ import type { Follower, UnifiedContact, LineOA } from "@/types";
 import { followerApi } from "@/api/follower";
 import { lineOAApi } from "@/api/lineOA";
 import { getWorkspaceId } from "@/lib/auth";
-import { Upload, Users, Phone, Search, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
+import { maskPhone } from "@/lib/phone";
+import { Upload, Users, Phone, Search, ChevronLeft, ChevronRight, BookOpen, Trash2 } from "lucide-react";
 
 const WORKSPACE_ID = getWorkspaceId() ?? "";
 const PAGE_SIZE = 20;
@@ -31,11 +42,11 @@ function getDisplayLabel(contact: UnifiedContact): string {
   if (contact.display_name) return contact.display_name;
   const name = [contact.first_name, contact.last_name].filter(Boolean).join(" ");
   if (name) return name;
-  return contact.phone ?? contact.line_user_id ?? contact.id;
+  return contact.phone ? maskPhone(contact.phone) : (contact.line_user_id ?? contact.id);
 }
 
 function getSubLabel(contact: UnifiedContact): string | null {
-  if (contact.phone) return contact.phone;
+  if (contact.phone) return maskPhone(contact.phone);
   return null;
 }
 
@@ -69,6 +80,15 @@ export function ContactsPage() {
   // Import modal
   const [importOpen, setImportOpen] = useState(false);
 
+  // Bulk delete (phone_only tab)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Delete all
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [deleteAlling, setDeleteAlling] = useState(false);
+
   // ---- Load LINE OAs ----
   useEffect(() => {
     const load = async () => {
@@ -95,6 +115,7 @@ export function ContactsPage() {
   // ---- Reset page on tab / OA / search change ----
   useEffect(() => {
     setPage(1);
+    setSelectedIds(new Set());
   }, [activeTab, selectedLineOAId]);
 
   // ---- Load data ----
@@ -137,6 +158,68 @@ export function ContactsPage() {
   }, [activeTab, selectedLineOAId, search, page]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // ---- Selection helpers ----
+  const allCurrentIds = unifiedContacts.map((c) => c.id);
+  const allSelected = allCurrentIds.length > 0 && allCurrentIds.every((id) => selectedIds.has(id));
+  const someSelected = allCurrentIds.some((id) => selectedIds.has(id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        allCurrentIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        allCurrentIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDeleteAll = async () => {
+    setDeleteAlling(true);
+    try {
+      await followerApi.deleteAllPhoneContacts();
+      setSelectedIds(new Set());
+      setDeleteAllOpen(false);
+      setTotal(0);
+      setUnifiedContacts([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete all contacts");
+    } finally {
+      setDeleteAlling(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      await followerApi.bulkDeletePhoneContacts(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      setBulkDeleteOpen(false);
+      // Reload current page
+      setPage((p) => p);
+      // Force reload by toggling a dummy state — easiest is to re-trigger effect
+      setSearch((s) => s);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete contacts");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   return (
     <AppLayout title="Contacts">
@@ -204,20 +287,44 @@ export function ContactsPage() {
           >
             <span className="flex items-center gap-1.5">
               <Phone size={14} />
-              Phone Only
+              Phone
             </span>
           </button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, phone…"
-            value={searchInput}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9"
-          />
+        {/* Search + action bar */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, phone…"
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          {activeTab === "phone_only" && selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="flex-shrink-0 flex items-center gap-1.5"
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              <Trash2 size={14} />
+              ลบ {selectedIds.size} รายการ
+            </Button>
+          )}
+          {activeTab === "phone_only" && total > 0 && selectedIds.size === 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-shrink-0 flex items-center gap-1.5 text-destructive border-destructive/40 hover:bg-destructive/10"
+              onClick={() => setDeleteAllOpen(true)}
+            >
+              <Trash2 size={14} />
+              ลบทั้งหมด ({total})
+            </Button>
+          )}
         </div>
 
         {/* Error */}
@@ -319,49 +426,82 @@ export function ContactsPage() {
             </Card>
           ) : (
             <div className="grid gap-3">
+              {/* Select-all row */}
+              <div className="flex items-center gap-3 px-1">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 accent-[#06C755] cursor-pointer"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all on this page"
+                />
+                <span className="text-xs text-muted-foreground">
+                  {selectedIds.size > 0 ? `เลือกแล้ว ${selectedIds.size} รายการ` : "เลือกทั้งหมดในหน้านี้"}
+                </span>
+              </div>
+
               {unifiedContacts.map((contact) => (
                 <Card
                   key={contact.id}
-                  className="cursor-pointer hover:bg-muted/40 transition-colors"
-                  onClick={() => window.location.href = `/contacts/phone/${contact.id}`}
+                  className={cn(
+                    "transition-colors",
+                    selectedIds.has(contact.id) ? "border-line/40 bg-line/5" : "hover:bg-muted/40"
+                  )}
                 >
                   <CardContent className="flex items-center gap-4 p-4">
-                    {/* Avatar / initials */}
-                    <div className="w-10 h-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
-                      {contact.picture_url ? (
-                        <img
-                          src={contact.picture_url}
-                          alt={getDisplayLabel(contact)}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground font-medium text-sm">
-                          {getInitials(contact)}
-                        </div>
-                      )}
-                    </div>
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium truncate">{getDisplayLabel(contact)}</span>
-                        <Badge variant="secondary">Phone Only</Badge>
-                        {contact.linked_oa_count != null && contact.linked_oa_count > 0 && (
-                          <Badge variant="outline" className="text-xs text-line border-line/40">
-                            {contact.linked_oa_count} OA{contact.linked_oa_count > 1 ? "s" : ""} linked
-                          </Badge>
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 accent-[#06C755] cursor-pointer flex-shrink-0"
+                      checked={selectedIds.has(contact.id)}
+                      onChange={() => toggleSelect(contact.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Select ${getDisplayLabel(contact)}`}
+                    />
+
+                    {/* Clickable area */}
+                    <div
+                      className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer"
+                      onClick={() => window.location.href = `/contacts/phone/${contact.id}`}
+                    >
+                      {/* Avatar / initials */}
+                      <div className="w-10 h-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
+                        {contact.picture_url ? (
+                          <img
+                            src={contact.picture_url}
+                            alt={getDisplayLabel(contact)}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground font-medium text-sm">
+                            {getInitials(contact)}
+                          </div>
                         )}
                       </div>
-                      {getSubLabel(contact) && getSubLabel(contact) !== getDisplayLabel(contact) && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {getSubLabel(contact)}
-                        </p>
-                      )}
-                    </div>
-                    {/* Date */}
-                    <div className="text-xs text-muted-foreground flex-shrink-0">
-                      {contact.created_at
-                        ? new Date(contact.created_at).toLocaleDateString()
-                        : "—"}
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium truncate">{getDisplayLabel(contact)}</span>
+                          <Badge variant="secondary">Phone</Badge>
+                          {contact.linked_oa_count != null && contact.linked_oa_count > 0 && (
+                            <Badge variant="outline" className="text-xs text-line border-line/40">
+                              {contact.linked_oa_count} OA{contact.linked_oa_count > 1 ? "s" : ""} linked
+                            </Badge>
+                          )}
+                        </div>
+                        {getSubLabel(contact) && getSubLabel(contact) !== getDisplayLabel(contact) && (
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {getSubLabel(contact)}
+                          </p>
+                        )}
+                      </div>
+                      {/* Date */}
+                      <div className="text-xs text-muted-foreground flex-shrink-0">
+                        {contact.created_at
+                          ? new Date(contact.created_at).toLocaleDateString()
+                          : "—"}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -405,6 +545,52 @@ export function ContactsPage() {
         onClose={() => setImportOpen(false)}
         lineOAId={selectedLineOAId}
       />
+
+      {/* Delete All confirm dialog */}
+      <AlertDialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบ Contact ทั้งหมด?</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณกำลังจะลบ <span className="font-semibold">ทั้งหมด {total} รายการ</span> ออกจากระบบถาวร
+              รวมถึง OA linkage ทั้งหมด ไม่สามารถกู้คืนได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteAlling}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void handleDeleteAll(); }}
+              disabled={deleteAlling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteAlling ? "กำลังลบ…" : `ลบทั้งหมด ${total} รายการ`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete confirm dialog */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบ Contact ที่เลือก?</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณกำลังจะลบ <span className="font-semibold">{selectedIds.size} รายการ</span> ออกจากระบบถาวร
+              รวมถึง OA linkage ทั้งหมด ไม่สามารถกู้คืนได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void handleBulkDelete(); }}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? "กำลังลบ…" : `ลบ ${selectedIds.size} รายการ`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

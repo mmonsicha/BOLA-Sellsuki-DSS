@@ -3,12 +3,12 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, X, RefreshCw, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
+import { ArrowLeft, Plus, X, RefreshCw, AlertCircle, CheckCircle, HelpCircle, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { segmentApi } from "@/api/segment";
 import { lineOAApi } from "@/api/lineOA";
 import { useToast } from "@/components/ui/toast";
 import { getWorkspaceId } from "@/lib/auth";
-import type { LineOA, Segment } from "@/types";
+import type { LineOA, Segment, PreviewSegmentListItem } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -369,6 +369,15 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
   const [previewLoading, setPreviewLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Preview list state
+  const [showPreviewList, setShowPreviewList] = useState(false);
+  const [previewItems, setPreviewItems] = useState<PreviewSegmentListItem[]>([]);
+  const [previewListPage, setPreviewListPage] = useState(1);
+  const [previewListTotal, setPreviewListTotal] = useState(0);
+  const [previewListLoading, setPreviewListLoading] = useState(false);
+  const [previewListHasMore, setPreviewListHasMore] = useState(true);
+  const previewListSentinelRef = useRef<HTMLDivElement>(null);
+
   // Load workspace + LINE OAs + (if edit mode) existing segment
   useEffect(() => {
     const load = async () => {
@@ -466,6 +475,80 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [fetchPreview]);
+
+  // Reset preview list when conditions change
+  useEffect(() => {
+    setPreviewItems([]);
+    setPreviewListPage(1);
+    setPreviewListTotal(0);
+    setPreviewListHasMore(true);
+  }, [sourceType, selectedLineOAId, conditions, matchOperator]);
+
+  // Fetch preview list page
+  const fetchPreviewList = useCallback(
+    (page: number) => {
+      const isContactMode = sourceType === "contact";
+      const hasConditions = conditions.length > 0;
+      const hasOA = !!selectedLineOAId;
+      if (!workspaceId || !hasConditions || (!isContactMode && !hasOA)) return;
+
+      setPreviewListLoading(true);
+      segmentApi
+        .previewList({
+          workspace_id: workspaceId,
+          line_oa_id: isContactMode ? "" : selectedLineOAId,
+          source_type: sourceType,
+          rule: {
+            operator: matchOperator,
+            conditions: conditions.map((c) => ({
+              field: c.field,
+              operator: c.operator,
+              value: c.value,
+              ...(c.key ? { key: c.key } : {}),
+            })),
+          },
+          page,
+          page_size: 20,
+        })
+        .then((res) => {
+          setPreviewItems((prev) => (page === 1 ? res.data : [...prev, ...res.data]));
+          setPreviewListTotal(res.total);
+          setPreviewListHasMore(page * 20 < res.total);
+        })
+        .catch(() => {
+          if (page === 1) setPreviewItems([]);
+        })
+        .finally(() => setPreviewListLoading(false));
+    },
+    [sourceType, selectedLineOAId, workspaceId, conditions, matchOperator]
+  );
+
+  // Fetch first page when showPreviewList turns on
+  useEffect(() => {
+    if (showPreviewList && previewItems.length === 0 && conditions.length > 0) {
+      fetchPreviewList(1);
+    }
+  }, [showPreviewList, fetchPreviewList, previewItems.length, conditions.length]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    if (!showPreviewList) return;
+    const sentinel = previewListSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && previewListHasMore && !previewListLoading) {
+          const nextPage = previewListPage + 1;
+          setPreviewListPage(nextPage);
+          fetchPreviewList(nextPage);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [showPreviewList, previewListHasMore, previewListLoading, previewListPage, fetchPreviewList]);
 
   // Condition handlers
   const handleAddCondition = () => {
@@ -844,22 +927,106 @@ export function SegmentBuilderPage({ mode, segmentId }: SegmentBuilderPageProps)
                   </span>
                 )}
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-muted-foreground"
-                onClick={fetchPreview}
-                disabled={
-                  previewLoading ||
-                  conditions.length === 0 ||
-                  (sourceType === "follower" && !selectedLineOAId)
-                }
-              >
-                <RefreshCw size={13} />
-                Refresh
-              </Button>
+              <div className="flex items-center gap-1">
+                {previewCount !== null && previewCount > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground"
+                    onClick={() => {
+                      setShowPreviewList((prev) => !prev);
+                    }}
+                  >
+                    <Users size={13} />
+                    {showPreviewList ? "Hide list" : "Show list"}
+                    {showPreviewList ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-muted-foreground"
+                  onClick={fetchPreview}
+                  disabled={
+                    previewLoading ||
+                    conditions.length === 0 ||
+                    (sourceType === "follower" && !selectedLineOAId)
+                  }
+                >
+                  <RefreshCw size={13} />
+                  Refresh
+                </Button>
+              </div>
             </div>
+
+            {/* Preview list */}
+            {showPreviewList && (
+              <div className="mt-4 border-t pt-4">
+                {previewListLoading && previewItems.length === 0 ? (
+                  <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                    <RefreshCw size={14} className="animate-spin" />
+                    Loading...
+                  </div>
+                ) : previewItems.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    No matching {sourceType === "contact" ? "contacts" : "followers"} found
+                  </div>
+                ) : (
+                  <div className="max-h-[400px] overflow-y-auto space-y-1">
+                    {previewItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-muted/50 transition-colors"
+                      >
+                        {/* Avatar */}
+                        {item.picture_url ? (
+                          <img
+                            src={item.picture_url}
+                            alt=""
+                            className="h-8 w-8 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                            <Users size={14} className="text-muted-foreground" />
+                          </div>
+                        )}
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">
+                            {item.display_name || item.phone || "Unknown"}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {[item.phone, item.email].filter(Boolean).join(" · ") || "—"}
+                          </div>
+                        </div>
+                        {/* Status badge */}
+                        {item.follow_status && (
+                          <Badge
+                            variant={item.follow_status === "following" ? "success" : "secondary"}
+                            className="shrink-0 text-xs"
+                          >
+                            {item.follow_status}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                    <div ref={previewListSentinelRef} className="h-1" />
+                    {previewListLoading && (
+                      <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
+                        <RefreshCw size={13} className="animate-spin" />
+                      </div>
+                    )}
+                    {!previewListHasMore && previewItems.length > 0 && (
+                      <div className="text-center py-2 text-xs text-muted-foreground">
+                        All {previewListTotal} {sourceType === "contact" ? "contacts" : "followers"} loaded
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

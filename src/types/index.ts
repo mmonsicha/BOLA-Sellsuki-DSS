@@ -71,6 +71,8 @@ export interface PhoneContactFollowerDetail {
   line_user_id: string;
   follower_id: string | null;
   is_follower: boolean;
+  follower_display_name?: string;
+  follower_picture_url?: string;
   linked_at: string;
 }
 
@@ -105,6 +107,18 @@ export interface PNPTemplate {
   editable_schema: PNPTemplateEditableField[];
   /** ID of the greeting template used for LIFF Track & Greet PNP sends. */
   greeting_template_id: string;
+  /** LINE OA ID that sends the greeting; empty means use the PNP sender OA. */
+  greeting_line_oa_id?: string;
+  /** Approach B: message type to send after user completes LIFF greeting. */
+  on_greeting_message_type?: "none" | "flex" | "pnp_template";
+  /** Approach B: flex JSON payload or {template_id: string} depending on on_greeting_message_type. */
+  on_greeting_payload?: Record<string, unknown>;
+  /** Approach B: LINE OA ID that pushes message 2; empty means use the template OA. */
+  on_greeting_line_oa_id?: string;
+  /** Approach B: when true, message 2 is sent only once per phone number. */
+  on_greeting_send_once?: boolean;
+  /** Approach B: if non-empty, LIFF page redirects here after greeting instead of closing. Supports {variable_key} placeholders. */
+  on_greeting_redirect_url?: string;
   is_preset: boolean;
   preset_ref_id: string;
   created_by: string;
@@ -133,6 +147,19 @@ export interface Segment {
   is_dynamic: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// ---- Segment Preview ----
+export interface PreviewSegmentListItem {
+  id: string;
+  display_name: string;
+  picture_url: string;
+  phone: string;
+  email?: string;
+  follow_status?: string;
+  tags?: string[];
+  first_name?: string;
+  last_name?: string;
 }
 
 // ---- Broadcast ----
@@ -174,9 +201,16 @@ export interface BroadcastDeliveryLog {
 }
 
 // ---- Auto Reply ----
-export type TriggerType = "follow" | "unfollow" | "keyword" | "postback" | "default";
+export type TriggerType = "follow" | "unfollow" | "keyword" | "postback" | "default" | "lon_subscribed" | "pnp_delivered";
 export type MatchMode = "exact" | "contains" | "prefix" | "regex";
 export type AutoReplyConditionType = "" | "lon_phone_contact" | "lon_subscriber";
+/** How a pnp_delivered rule sends message 2. */
+export type AutoReplySendMethod = "pnp_hash" | "push" | "auto";
+
+export interface AutoReplyTriggerConfig {
+  /** Applies to pnp_delivered trigger: delivery channel for message 2. */
+  send_method?: AutoReplySendMethod;
+}
 
 export interface AutoReply {
   id: string;
@@ -190,6 +224,7 @@ export interface AutoReply {
   match_mode: MatchMode;
   postback_data: string;
   condition_type: AutoReplyConditionType;
+  trigger_config: AutoReplyTriggerConfig;
   quick_reply_id?: string;
   messages: Array<{ type: string; payload: unknown }>;
   created_at: string;
@@ -592,6 +627,14 @@ export interface BulkSendPNPResult {
   phone_number: string;
   log?: PNPDeliveryLog;
   error?: string;
+}
+
+export interface OnGreetingSentRecord {
+  source_template_id: string;
+  source_template_name: string;
+  phone_hash: string;
+  masked_phone?: string;
+  sent_at: string;
 }
 
 export interface BulkSendLONByPhoneResponse {

@@ -3,8 +3,20 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Phone, Link2, UserCheck, UserX } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Phone, Link2, UserCheck, UserX, Trash2, Unlink, Send } from "lucide-react";
+import { maskPhone } from "@/lib/phone";
 import { followerApi } from "@/api/follower";
+import type { PhoneContactActivity } from "@/api/follower";
 import type { PhoneContactDetail } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -33,10 +45,67 @@ const sourceBadgeClass: Record<string, string> = {
   manual: "bg-gray-100 text-gray-700 border-0",
 };
 
+function PhoneContactActivitySection({ contactId }: { contactId: string }) {
+  const [activity, setActivity] = useState<PhoneContactActivity | null>(null);
+
+  useEffect(() => {
+    followerApi.getPhoneContactActivity(contactId)
+      .then(setActivity)
+      .catch(() => {});
+  }, [contactId]);
+
+  if (!activity) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Send size={16} />
+          Messaging Activity
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-3 gap-3 text-sm">
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">Broadcasts</div>
+            <div className="font-semibold">{activity.total_broadcasts.toLocaleString()}</div>
+          </div>
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">LON Messages</div>
+            <div className="font-semibold">{activity.lon_count.toLocaleString()}</div>
+          </div>
+          <div className="bg-muted/40 rounded-lg p-3">
+            <div className="text-muted-foreground text-xs mb-1">PNP</div>
+            <div className="font-semibold">{activity.pnp_success.toLocaleString()} <span className="text-xs text-muted-foreground">/ {activity.pnp_total}</span></div>
+          </div>
+        </div>
+        {activity.recent_broadcasts.length > 0 && (
+          <div>
+            <div className="text-sm font-medium mb-2">Recent Broadcasts</div>
+            <div className="space-y-2">
+              {activity.recent_broadcasts.map((dl) => (
+                <div key={dl.id} className="flex items-center justify-between text-xs border rounded-md px-3 py-2">
+                  <span className="text-muted-foreground">{dl.created_at ? new Date(dl.created_at).toLocaleString() : "-"}</span>
+                  <Badge variant={dl.status === "success" ? "success" : dl.status === "failed" ? "destructive" : "secondary"} className="text-xs">
+                    {dl.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProps) {
   const [contact, setContact] = useState<PhoneContactDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [unlinkingOAId, setUnlinkingOAId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -47,23 +116,62 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
       .finally(() => setLoading(false));
   }, [contactId]);
 
+  const handleUnlink = async (lineOAId: string) => {
+    setUnlinkingOAId(lineOAId);
+    try {
+      await followerApi.unlinkPhoneContactFollower(contactId, lineOAId);
+      const fresh = await followerApi.getPhoneContact(contactId);
+      setContact(fresh);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to unlink");
+    } finally {
+      setUnlinkingOAId(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await followerApi.deletePhoneContact(contactId);
+      window.history.back();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete contact");
+      setDeleting(false);
+      setDeleteOpen(false);
+    }
+  };
+
   const fullName = contact
-    ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") || contact.phone
+    ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") || maskPhone(contact.phone)
     : "";
 
   return (
     <AppLayout title="Contact Detail">
       <div className="space-y-4 max-w-3xl">
         {/* Back */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 -ml-2 text-muted-foreground"
-          onClick={() => window.history.back()}
-        >
-          <ArrowLeft size={16} />
-          Back to Contacts
-        </Button>
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 -ml-2 text-muted-foreground"
+            onClick={() => window.history.back()}
+          >
+            <ArrowLeft size={16} />
+            Back to Contacts
+          </Button>
+
+          {contact && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-destructive border-destructive/40 hover:bg-destructive/10"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 size={14} />
+              Delete Contact
+            </Button>
+          )}
+        </div>
 
         {/* Loading */}
         {loading && (
@@ -109,7 +217,7 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
                   </div>
                   <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground">
                     <Phone size={13} />
-                    <span className="font-mono">{contact.phone}</span>
+                    <span className="font-mono">{maskPhone(contact.phone)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Imported {formatDate(contact.created_at)}
@@ -141,14 +249,19 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
                   <div className="divide-y">
                     {contact.linked_oas.map((oa) => (
                       <div key={oa.id} className="flex items-start gap-3 py-3">
-                        {/* Status icon */}
-                        <div
-                          className={cn(
-                            "mt-0.5 flex-shrink-0",
-                            oa.is_follower ? "text-line" : "text-muted-foreground"
+                        {/* Status icon / follower avatar */}
+                        <div className="mt-0.5 flex-shrink-0">
+                          {oa.is_follower && oa.follower_picture_url ? (
+                            <img
+                              src={oa.follower_picture_url}
+                              alt={oa.follower_display_name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className={cn(oa.is_follower ? "text-line" : "text-muted-foreground")}>
+                              {oa.is_follower ? <UserCheck size={16} /> : <UserX size={16} />}
+                            </div>
                           )}
-                        >
-                          {oa.is_follower ? <UserCheck size={16} /> : <UserX size={16} />}
                         </div>
 
                         {/* Detail */}
@@ -158,9 +271,15 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
                             {oa.is_follower ? (
                               <span className="text-xs text-line font-medium">Follower</span>
                             ) : (
-                              <span className="text-xs text-muted-foreground">Phone Only</span>
+                              <span className="text-xs text-muted-foreground">Phone</span>
                             )}
                           </div>
+                          {oa.is_follower && oa.follower_display_name && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground">LINE Name:</span>
+                              <span className="text-xs font-medium text-foreground">{oa.follower_display_name}</span>
+                            </div>
+                          )}
                           {oa.line_oa_basic_id && (
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs text-muted-foreground">Basic ID:</span>
@@ -177,6 +296,20 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
                             Linked {formatDate(oa.linked_at)}
                           </p>
                         </div>
+
+                        {/* Unlink button — only when LINE UID is set */}
+                        {oa.line_user_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 text-xs text-muted-foreground hover:text-destructive flex-shrink-0"
+                            disabled={unlinkingOAId === oa.line_oa_id}
+                            onClick={() => void handleUnlink(oa.line_oa_id)}
+                          >
+                            <Unlink size={12} />
+                            {unlinkingOAId === oa.line_oa_id ? "Unlinking…" : "Unlink"}
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -185,7 +318,33 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
             </Card>
           </>
         )}
+
+        {/* Messaging Activity */}
+        {contact && <PhoneContactActivitySection contactId={contact.id} />}
       </div>
+
+      {/* Delete confirm dialog */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบ Contact นี้?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium">{fullName}</span> ({contact ? maskPhone(contact.phone) : ""}) จะถูกลบออกจากระบบถาวร
+              รวมถึง OA linkage ทั้งหมด ไม่สามารถกู้คืนได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void handleDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "กำลังลบ…" : "ลบ"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -29,18 +30,39 @@ export function FlexMessagePicker({
 }: FlexMessagePickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const selected = flexMessages.find((fm) => fm.id === value);
   const filtered = flexMessages.filter(
     (fm) =>
-      fm.name.toLowerCase().includes(search.toLowerCase()) ||
-      fm.description.toLowerCase().includes(search.toLowerCase())
+      (fm.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (fm.description ?? "").toLowerCase().includes(search.toLowerCase())
   );
+
+  // Calculate dropdown position every time it opens
+  useEffect(() => {
+    if (open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const dropdownHeight = Math.min(288, spaceBelow - 8); // max-h-72 = 288px
+
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        maxHeight: Math.max(dropdownHeight, 120),
+        zIndex: 9999,
+      });
+    }
+  }, [open]);
 
   return (
     <div className="relative">
       {/* Trigger button */}
       <button
+        ref={triggerRef}
         type="button"
         className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-background text-left disabled:bg-muted disabled:cursor-not-allowed"
         onClick={() => setOpen((o) => !o)}
@@ -61,11 +83,17 @@ export function FlexMessagePicker({
         <ChevronDown size={14} className="flex-shrink-0 text-muted-foreground ml-2" />
       </button>
 
-      {/* Dropdown panel */}
-      {open && (
+      {/* Dropdown panel — rendered via portal to escape dialog overflow:hidden */}
+      {open && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute z-20 mt-1 w-full bg-background border rounded-md shadow-lg max-h-72 overflow-y-auto">
+          {/* Backdrop */}
+          <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => setOpen(false)} />
+
+          {/* Dropdown */}
+          <div
+            className="bg-background border rounded-md shadow-lg overflow-y-auto"
+            style={dropdownStyle}
+          >
             {/* Search */}
             <div className="p-2 border-b sticky top-0 bg-background">
               <input
@@ -107,7 +135,7 @@ export function FlexMessagePicker({
                   <Badge variant="outline" className="text-xs capitalize">
                     {getFlexType(fm.content)}
                   </Badge>
-                  {fm.variables.length > 0 && (
+                  {(fm.variables ?? []).length > 0 && (
                     <span className="text-xs text-muted-foreground">
                       {fm.variables.length} var{fm.variables.length > 1 ? "s" : ""}
                     </span>
@@ -122,7 +150,8 @@ export function FlexMessagePicker({
               </p>
             )}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

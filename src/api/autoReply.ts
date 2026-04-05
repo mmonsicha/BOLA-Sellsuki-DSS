@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { AutoReply, TriggerType, MatchMode, AutoReplyConditionType } from "@/types";
+import type { AutoReply, TriggerType, MatchMode, AutoReplyConditionType, AutoReplyTriggerConfig } from "@/types";
 
 export const autoReplyApi = {
   list: (params: { line_oa_id: string; page?: number; page_size?: number }) =>
@@ -19,6 +19,8 @@ export const autoReplyApi = {
     match_mode?: MatchMode;
     postback_data?: string;
     condition_type?: AutoReplyConditionType;
+    trigger_config?: AutoReplyTriggerConfig;
+    quick_reply_id?: string;
     messages: Array<{ type: string; payload: unknown }>;
   }) => api.post<AutoReply>("/v1/auto-replies", body),
 
@@ -30,6 +32,8 @@ export const autoReplyApi = {
     match_mode: MatchMode;
     postback_data: string;
     condition_type: AutoReplyConditionType;
+    trigger_config: AutoReplyTriggerConfig;
+    quick_reply_id: string;
     messages: Array<{ type: string; payload: unknown }>;
   }>) => api.put<AutoReply>(`/v1/auto-replies/${id}`, body),
 

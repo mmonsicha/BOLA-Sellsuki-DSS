@@ -31,6 +31,7 @@ export interface LONTemplateSchemaEditorProps {
   onSchemaChange: (schema: SchemaDraft[]) => void;
   onExampleVarsChange: (vars: Record<string, string>) => void;
   previewWrapperRef?: React.RefObject<HTMLDivElement>;
+  showGreetingConfig?: boolean;
 }
 
 interface SuggestedField {
@@ -69,22 +70,28 @@ function getSuggestedFields(jsonBody: Record<string, unknown>, path: string): Su
 
   if (type === "button" || type === "uri") {
     const action = n.action as Record<string, unknown> | undefined;
-    if (action?.label !== undefined) {
-      fields.push({ path: `${path}.action.label`, type: "button_label", hint: "Button label" });
-    }
-    if (action?.uri !== undefined) {
-      fields.push({ path: `${path}.action.uri`, type: "url", hint: "Button URL" });
+    const isLiffGreeting = action?.uri === "__BOLA_PNP_LIFF__";
+    if (!isLiffGreeting) {
+      if (action?.label !== undefined) {
+        fields.push({ path: `${path}.action.label`, type: "button_label", hint: "Button label" });
+      }
+      if (action?.uri !== undefined) {
+        fields.push({ path: `${path}.action.uri`, type: "url", hint: "Button URL" });
+      }
     }
   }
 
   // Also check action directly on button-type components
   if (n.action && fields.length === 0) {
     const a = n.action as Record<string, unknown>;
-    if (a.label !== undefined) {
-      fields.push({ path: `${path}.action.label`, type: "button_label", hint: "Button label" });
-    }
-    if (a.uri !== undefined) {
-      fields.push({ path: `${path}.action.uri`, type: "url", hint: "Button URL" });
+    const isLiffGreeting = a.uri === "__BOLA_PNP_LIFF__";
+    if (!isLiffGreeting) {
+      if (a.label !== undefined) {
+        fields.push({ path: `${path}.action.label`, type: "button_label", hint: "Button label" });
+      }
+      if (a.uri !== undefined) {
+        fields.push({ path: `${path}.action.uri`, type: "url", hint: "Button URL" });
+      }
     }
   }
 
@@ -112,6 +119,7 @@ export function LONTemplateSchemaEditor({
   onSchemaChange,
   onExampleVarsChange,
   previewWrapperRef,
+  showGreetingConfig,
 }: LONTemplateSchemaEditorProps) {
   // Ref so applyChange always reads the latest jsonBody without stale-closure issues
   const jsonBodyRef = useRef(jsonBody);
@@ -489,7 +497,7 @@ export function LONTemplateSchemaEditor({
         </div>
 
         {/* Center: Interactive preview */}
-        <div className="flex-1 min-w-0 overflow-hidden flex flex-col" ref={previewWrapperRef}>
+        <div className="w-[420px] flex-shrink-0 overflow-hidden flex flex-col" ref={previewWrapperRef}>
           <LONInteractivePreview
             jsonBody={jsonBody}
             selectedPath={selectedPath}
@@ -499,7 +507,7 @@ export function LONTemplateSchemaEditor({
         </div>
 
         {/* Right: Tabbed panel */}
-        <div className="w-72 flex-shrink-0 border-l flex flex-col min-h-0">
+        <div className="flex-1 min-w-0 border-l flex flex-col min-h-0">
           {/* Tab bar */}
           <div className="flex border-b flex-shrink-0">
             <button
@@ -550,6 +558,7 @@ export function LONTemplateSchemaEditor({
                   selectedPath={selectedPath}
                   onUpdateProperty={handleUpdateProperty}
                   variables={[]}
+                  showGreetingConfig={showGreetingConfig}
                 />
               )
             ) : (

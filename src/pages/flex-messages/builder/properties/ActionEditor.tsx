@@ -5,6 +5,7 @@ interface ActionEditorProps {
   value: Record<string, unknown> | undefined;
   onChange: (action: Record<string, unknown> | undefined) => void;
   variables?: FlexMessageVariable[];
+  showGreetingConfig?: boolean; // kept for API compat, no longer controls dropdowns
 }
 
 /** Sentinel URI value stored internally to mark a LIFF Track & Greet button. */
@@ -83,15 +84,12 @@ export function ActionEditor({ value, onChange, variables = [] }: ActionEditorPr
             />
           </div>
 
-          {/* LIFF Track & Greet info panel */}
+          {/* LIFF Track & Greet panel — info only */}
           {displayActionType === "liff_greeting" && (
             <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 space-y-1">
-              <p className="text-xs font-medium text-blue-700">LIFF Track & Greet</p>
+              <p className="text-xs font-medium text-blue-700">LIFF Track & Greet 🎯</p>
               <p className="text-xs text-blue-600">
                 BOLA จะ inject LIFF URL อัตโนมัติเมื่อส่ง PNP
-              </p>
-              <p className="text-xs text-muted-foreground">
-                หมายเหตุ: greeting_template_id กำหนดที่ระดับ Template
               </p>
             </div>
           )}

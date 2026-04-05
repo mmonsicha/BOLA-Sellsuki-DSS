@@ -16,8 +16,8 @@ import liff from "@line/liff";
  *  4. if !liff.isLoggedIn() → liff.login()
  *  5. liff.getProfile() → { userId }
  *  6. POST /v1/pnp/resolve-link-token { token, line_uid: userId }
+ *     Backend handles: phone↔UID linking + on_greeting message 2 (if configured on template)
  *  7. liff.closeWindow()
- *     (if closeWindow fails — show success message)
  */
 
 type PageStatus = "loading" | "error" | "success";
@@ -55,8 +55,10 @@ export function PNPGreetingLIFFPage() {
         return;
       }
 
-      // Read token AFTER liff.init() — liff.state has been decoded and applied to URL
-      const token = new URLSearchParams(window.location.search).get("token") ?? "";
+      // Read params AFTER liff.init() — liff.state has been decoded and applied to URL
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token") ?? "";
+
       if (!token) {
         setErrorMsg("ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว");
         setStatus("error");
@@ -66,23 +68,29 @@ export function PNPGreetingLIFFPage() {
       const profile = await liff.getProfile();
       const lineUid = profile.userId;
 
-      // Use raw fetch with credentials: "omit" (no BOLA session needed for this public endpoint).
-      // VITE_PUBLIC_API_URL points directly at the backend tunnel to bypass the Vite dev proxy,
-      // which can drop connections when accessed from mobile devices via cloudflare tunnel.
       const publicApiBase = (import.meta.env.VITE_PUBLIC_API_URL as string | undefined)
         || (import.meta.env.VITE_API_URL as string | undefined)
         || "";
+
+      // Resolve link token: links phone ↔ LINE UID in the backend.
+      // The backend will also trigger any configured on_greeting message 2 asynchronously.
       const res = await fetch(`${publicApiBase}/v1/pnp/resolve-link-token`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "omit",
         body: JSON.stringify({ token, line_uid: lineUid }),
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json() as { ok: boolean; redirect_url?: string };
+
+      // If the template configured a redirect URL, navigate there instead of closing.
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+        return;
       }
 
       setStatus("success");

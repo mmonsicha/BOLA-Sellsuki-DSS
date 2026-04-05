@@ -18,7 +18,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { toDisplayUrl } from "@/lib/mediaUtils";
+import { toDisplayUrl, toCopyableUrl } from "@/lib/mediaUtils";
 import { getWorkspaceId } from "@/lib/auth";
 
 const WORKSPACE_ID = getWorkspaceId() ?? "";
@@ -207,7 +207,7 @@ function MediaCard({ m, onDelete, onEdit, onPreview, deletingId }: MediaCardProp
                 ))}
               </>
             )}
-            {m.url && <CopyButton url={m.url} />}
+            {m.url && <CopyButton url={toCopyableUrl(m.url)} />}
           </div>
         </div>
 

@@ -41,7 +41,7 @@ const WORKSPACE_ID = getWorkspaceId() ?? "";
 // ─── Infographic Component ─────────────────────────────────────────────────────
 
 function HowItWorksInfographic() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <Card className="overflow-hidden border-2">
@@ -627,7 +627,6 @@ export function LONByPhonePage() {
       setBulkResults(res.results ?? []);
       setShowBulkResults(true);
       setSelectedContacts([]);
-      void handleRefreshLogs();
     } catch (err) {
       setSendError(err instanceof Error ? err.message : "Bulk send failed.");
     } finally {
@@ -684,20 +683,6 @@ export function LONByPhonePage() {
     }
   }
 
-  function handleRefreshLogs() {
-    if (!selectedLineOAId) return;
-    setLogsLoading(true);
-    lonApi
-      .listLONByPhoneLogs({
-        line_oa_id: selectedLineOAId,
-        page,
-        page_size: PAGE_SIZE,
-      })
-      .then((res) => setLogs(res.data ?? []))
-      .catch(console.error)
-      .finally(() => setLogsLoading(false));
-  }
-
   return (
     <AppLayout title="LON by Phone">
       <div className="space-y-5">
@@ -739,7 +724,6 @@ export function LONByPhonePage() {
           selectedId={selectedLineOAId}
           onChange={(id) => {
             setSelectedLineOAId(id);
-            setPage(1);
           }}
           showAll={false}
         />
@@ -931,9 +915,14 @@ export function LONByPhonePage() {
                 </div>
               )}
               {sendSuccess && (
-                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
-                  <CheckCircle2 size={14} />
-                  Message sent successfully!
+                <div className="flex flex-col gap-1.5 text-sm rounded-md border border-green-200 bg-green-50 px-3 py-2">
+                  <div className="flex items-center gap-2 text-green-700 font-medium">
+                    <CheckCircle2 size={14} />
+                    Message sent successfully!
+                  </div>
+                  <p className="text-xs text-green-600 pl-5">
+                    LON subscriber is being registered in the background — you can send notifications directly next time.
+                  </p>
                 </div>
               )}
 

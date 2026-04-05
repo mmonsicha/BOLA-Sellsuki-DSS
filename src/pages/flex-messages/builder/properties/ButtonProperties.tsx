@@ -9,13 +9,14 @@ interface ButtonPropertiesProps {
   node: Node;
   onChange: (updates: Record<string, unknown>) => void;
   variables?: FlexMessageVariable[];
+  showGreetingConfig?: boolean;
 }
 
-export function ButtonProperties({ node, onChange, variables = [] }: ButtonPropertiesProps) {
+export function ButtonProperties({ node, onChange, variables = [], showGreetingConfig }: ButtonPropertiesProps) {
   return (
     <div className="space-y-3">
       {/* Action (primary for buttons) */}
-      <ActionEditor value={node.action as Record<string, unknown>} onChange={(v) => onChange({ action: v })} variables={variables} />
+      <ActionEditor value={node.action as Record<string, unknown>} onChange={(v) => onChange({ action: v })} variables={variables} showGreetingConfig={showGreetingConfig} />
 
       {/* Style */}
       <div className="space-y-1">

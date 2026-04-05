@@ -39,12 +39,14 @@ import { RichMenuAssignmentsPage } from "@/pages/rich-menus/RichMenuAssignmentsP
 import { QuickRepliesPage } from "@/pages/quick-replies/QuickRepliesPage";
 import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
 import { LONDeliveryLogsPage } from "@/pages/lon-delivery-logs/LONDeliveryLogsPage";
+import { MessageLogsPage } from "@/pages/message-logs/MessageLogsPage";
 import { LONByPhonePage } from "@/pages/lon-by-phone/LONByPhonePage";
 import { LONTemplatesPage } from "@/pages/lon-templates/LONTemplatesPage";
 import { LONJobsPage } from "@/pages/lon-jobs/LONJobsPage";
 import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscribePage";
 import { RGBConsentPage } from "@/pages/lon/RGBConsentPage";
 import { PNPGreetingLIFFPage } from "@/pages/lon-by-phone/PNPGreetingLIFFPage";
+import { LIFFDebugPage } from "@/pages/lon-by-phone/LIFFDebugPage";
 import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFormsPage";
 import { RegistrationFormBuilderPage } from "@/pages/registration-forms/RegistrationFormBuilderPage";
 import { RegistrationSubmissionsPage } from "@/pages/registration-forms/RegistrationSubmissionsPage";
@@ -140,6 +142,7 @@ function resolveProtectedRoute(path: string, segments: string[]): React.ReactEle
   // LON — authenticated pages
   if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
   if (path.startsWith("/lon-delivery-logs")) return <LONDeliveryLogsPage />;
+  if (path.startsWith("/message-logs")) return <MessageLogsPage />;
   if (path.startsWith("/lon-by-phone")) return <LONByPhonePage />;
   if (path.startsWith("/lon-templates")) return <LONTemplatesPage />;
   if (path.startsWith("/lon-jobs")) return <LONJobsPage />;
@@ -194,6 +197,8 @@ function Router() {
   if (path === "/lon/rgb-consent") return <RGBConsentPage />;
   // PNP Greeting LIFF page — captures LINE UID and resolves greeting token
   if (path.startsWith("/lon/greeting")) return <PNPGreetingLIFFPage />;
+  // LIFF Debug page — step-by-step manual test page (dev only)
+  if (path.startsWith("/lon/liff-debug")) return <LIFFDebugPage />;
   // Kratos mode: workspace chooser (public — Kratos session already proves identity)
   if (path === "/choose-workspace") return <ChooseWorkspacePage />;
 
