@@ -808,24 +808,6 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs, pnpTem
                       </span>
                     </label>
                   </div>
-
-                  {/* Redirect URL */}
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Redirect URL</span>
-                      <span className="text-xs text-muted-foreground">(optional)</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={onGreetingRedirectURL}
-                      onChange={(e) => setOnGreetingRedirectURL(e.target.value)}
-                      placeholder="https://shop.com/order/{order_id}"
-                      className="w-full border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      หลังจาก user กด LIFF แล้ว redirect ไปที่ URL นี้แทนการปิด LIFF — รองรับ <code className="bg-muted px-1 rounded">{"{variable_key}"}</code> จาก template_variables ที่ส่งตอน send PNP
-                    </p>
-                  </div>
                 </>
               )}
 
@@ -834,6 +816,24 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs, pnpTem
                   No message 2 will be sent when users complete the LIFF greeting.
                 </p>
               )}
+
+              {/* Redirect URL — shown for all message types including none */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Redirect URL</span>
+                  <span className="text-xs text-muted-foreground">(optional)</span>
+                </div>
+                <input
+                  type="text"
+                  value={onGreetingRedirectURL}
+                  onChange={(e) => setOnGreetingRedirectURL(e.target.value)}
+                  placeholder="https://shop.com/order/{order_id}"
+                  className="w-full border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                />
+                <p className="text-xs text-muted-foreground">
+                  หลังจาก user กด LIFF แล้ว redirect ไปที่ URL นี้แทนการปิด LIFF — รองรับ <code className="bg-muted px-1 rounded">{"{variable_key}"}</code> จาก template_variables ที่ส่งตอน send PNP
+                </p>
+              </div>
             </div>
           )}
         </div>}
