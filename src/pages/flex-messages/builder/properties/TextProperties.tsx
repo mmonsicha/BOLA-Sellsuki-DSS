@@ -3,9 +3,19 @@ import { SizeSelect } from "./shared/SizeSelect";
 import { SpacingSelect } from "./shared/SpacingSelect";
 import { ActionEditor } from "./ActionEditor";
 import { FieldInsertButton } from "./shared/FieldInsertButton";
+import { Plus, Trash2, Type } from "lucide-react";
 import type { FlexMessageVariable } from "@/api/flexMessage";
 
 type Node = Record<string, unknown>;
+type SpanNode = {
+  type: "span";
+  text: string;
+  color?: string;
+  size?: string;
+  weight?: string;
+  decoration?: string;
+  style?: string;
+};
 
 interface TextPropertiesProps {
   node: Node;
@@ -14,43 +24,226 @@ interface TextPropertiesProps {
 }
 
 export function TextProperties({ node, onChange, variables = [] }: TextPropertiesProps) {
-  // Text nodes may use span-based rich text (contents: [{type:"span", text:"..."}])
-  // instead of a plain text field. In that case, read/write the first span's text.
   const isSpanBased = node.text === undefined && Array.isArray(node.contents);
-  const textValue = isSpanBased
-    ? (node.contents as Array<{ text?: string }>).map((s) => s.text || "").join("")
-    : (node.text as string) || "";
+  const spans = isSpanBased ? (node.contents as SpanNode[]) : [];
+  const textValue = isSpanBased ? "" : (node.text as string) || "";
 
-  function handleTextChange(newText: string) {
-    if (isSpanBased) {
-      const contents = (node.contents as Array<Record<string, unknown>>).map((span, idx) =>
-        idx === 0 ? { ...span, text: newText } : span
-      );
-      onChange({ contents });
-    } else {
-      onChange({ text: newText });
-    }
+  // ── Span helpers ──────────────────────────────────────────────────────────
+  function updateSpan(index: number, updates: Partial<SpanNode>) {
+    const next = spans.map((s, i) =>
+      i === index ? { ...s, ...updates } : s
+    );
+    onChange({ contents: next });
+  }
+
+  function addSpan() {
+    onChange({ contents: [...spans, { type: "span", text: "New text" }] });
+  }
+
+  function removeSpan(index: number) {
+    const next = spans.filter((_, i) => i !== index);
+    onChange({ contents: next });
+  }
+
+  function convertToPlain() {
+    const joined = spans.map((s) => s.text || "").join("");
+    const { contents: _c, ...rest } = node;
+    void _c;
+    onChange({ ...rest, text: joined, contents: undefined });
+  }
+
+  function convertToSpans() {
+    const { text: _t, ...rest } = node;
+    void _t;
+    onChange({
+      ...rest,
+      text: undefined,
+      contents: [{ type: "span", text: textValue || "Your text here" }],
+    });
   }
 
   return (
     <div className="space-y-3">
-      {/* Text content */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-muted-foreground">Text Content</label>
-          <FieldInsertButton
-            variables={variables}
-            onInsert={(name) => handleTextChange(textValue + `{${name}}`)}
+      {/* ── Span-based editor ──────────────────────────────────────────── */}
+      {isSpanBased ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-muted-foreground">
+              Spans ({spans.length})
+            </label>
+            <button
+              onClick={convertToPlain}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+              title="Merge all spans into plain text"
+            >
+              Convert to plain
+            </button>
+          </div>
+
+          {spans.map((span, i) => (
+            <div key={i} className="border rounded p-2 space-y-2 bg-muted/20">
+              {/* Span header */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Span {i + 1}
+                </span>
+                <button
+                  onClick={() => removeSpan(i)}
+                  className="p-0.5 hover:bg-destructive/20 hover:text-destructive rounded"
+                  title="Remove span"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+
+              {/* Text */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-muted-foreground">Text</label>
+                  <FieldInsertButton
+                    variables={variables}
+                    onInsert={(name) =>
+                      updateSpan(i, { text: (span.text || "") + `{${name}}` })
+                    }
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={span.text || ""}
+                  onChange={(e) => updateSpan(i, { text: e.target.value })}
+                  className="w-full border rounded px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+              {/* Color */}
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={span.color || "#333333"}
+                    onChange={(e) => updateSpan(i, { color: e.target.value })}
+                    className="w-7 h-7 rounded border cursor-pointer p-0.5 shrink-0"
+                  />
+                  <input
+                    type="text"
+                    value={span.color || ""}
+                    onChange={(e) =>
+                      updateSpan(i, { color: e.target.value || undefined })
+                    }
+                    placeholder="inherit"
+                    className="flex-1 border rounded px-2 py-1 text-xs font-mono bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              {/* Size + Weight row */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Size</label>
+                  <select
+                    value={span.size || ""}
+                    onChange={(e) =>
+                      updateSpan(i, { size: e.target.value || undefined })
+                    }
+                    className="w-full border rounded px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Inherit</option>
+                    {["xxs","xs","sm","md","lg","xl","xxl","3xl","4xl","5xl"].map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Weight</label>
+                  <select
+                    value={span.weight || ""}
+                    onChange={(e) =>
+                      updateSpan(i, { weight: e.target.value || undefined })
+                    }
+                    className="w-full border rounded px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Inherit</option>
+                    <option value="regular">Regular</option>
+                    <option value="bold">Bold</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Decoration + Style row */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Decoration</label>
+                  <select
+                    value={span.decoration || ""}
+                    onChange={(e) =>
+                      updateSpan(i, { decoration: e.target.value || undefined })
+                    }
+                    className="w-full border rounded px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">None</option>
+                    <option value="underline">Underline</option>
+                    <option value="line-through">Strikethrough</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Style</label>
+                  <select
+                    value={span.style || ""}
+                    onChange={(e) =>
+                      updateSpan(i, { style: e.target.value || undefined })
+                    }
+                    className="w-full border rounded px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Normal</option>
+                    <option value="italic">Italic</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Add span */}
+          <button
+            onClick={addSpan}
+            className="w-full flex items-center justify-center gap-1 py-1.5 text-xs border border-dashed rounded hover:bg-muted/30 transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <Plus size={12} />
+            Add span
+          </button>
+        </div>
+      ) : (
+        /* ── Plain text editor ──────────────────────────────────────────── */
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-muted-foreground">
+              Text Content
+            </label>
+            <div className="flex items-center gap-2">
+              <FieldInsertButton
+                variables={variables}
+                onInsert={(name) => onChange({ text: textValue + `{${name}}` })}
+              />
+              <button
+                onClick={convertToSpans}
+                className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
+                title="Convert to span-based rich text"
+              >
+                <Type size={11} />
+                Rich
+              </button>
+            </div>
+          </div>
+          <textarea
+            value={textValue}
+            onChange={(e) => onChange({ text: e.target.value })}
+            rows={3}
+            className="w-full border rounded px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-y"
           />
         </div>
-        <textarea
-          value={textValue}
-          onChange={(e) => handleTextChange(e.target.value)}
-          rows={3}
-          className="w-full border rounded px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-y"
-        />
-      </div>
+      )}
 
+      {/* ── Common text node properties (apply to both modes) ───────────── */}
       <SizeSelect value={node.size as string} onChange={(v) => onChange({ size: v })} label="Size" />
 
       {/* Weight */}

@@ -7,6 +7,8 @@ import { ImageProperties } from "./properties/ImageProperties";
 import { BoxProperties } from "./properties/BoxProperties";
 import { SeparatorProperties } from "./properties/SeparatorProperties";
 import { BubbleProperties } from "./properties/BubbleProperties";
+import { IconProperties } from "./properties/IconProperties";
+import { VideoProperties } from "./properties/VideoProperties";
 import { Settings2 } from "lucide-react";
 import type { FlexMessageVariable } from "@/api/flexMessage";
 
@@ -63,9 +65,11 @@ export function PropertyEditor({ content, selectedPath, onUpdateProperty, variab
       {nodeType === "box" && <BoxProperties node={node} onChange={handleChange} />}
       {nodeType === "separator" && <SeparatorProperties node={node} onChange={handleChange} />}
       {nodeType === "bubble" && <BubbleProperties node={node} onChange={handleChange} />}
+      {nodeType === "icon" && <IconProperties node={node} onChange={handleChange} variables={variables} />}
+      {nodeType === "video" && <VideoProperties node={node} onChange={handleChange} variables={variables} />}
 
       {/* Fallback for unknown types */}
-      {!["text", "button", "image", "box", "separator", "bubble"].includes(nodeType) && (
+      {!["text", "button", "image", "box", "separator", "bubble", "icon", "video"].includes(nodeType) && (
         <p className="text-xs text-muted-foreground italic">
           No visual editor for "{nodeType}" type. Use Code mode to edit.
         </p>
