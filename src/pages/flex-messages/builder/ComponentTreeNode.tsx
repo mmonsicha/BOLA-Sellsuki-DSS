@@ -66,7 +66,7 @@ export function ComponentTreeNode({
       >
         {/* Expand/collapse */}
         {isExpandable ? (
-          <button onClick={handleToggle} className="p-0.5 hover:bg-muted rounded shrink-0">
+          <button onClick={handleToggle} className="w-5 flex items-center justify-center hover:bg-muted rounded shrink-0">
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </button>
         ) : (
@@ -262,7 +262,7 @@ function BubbleSectionNode({
         style={{ paddingLeft: `${depth * 12 + 4}px` }}
       >
         {hasContents ? (
-          <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} className="p-0.5 hover:bg-muted rounded shrink-0">
+          <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} className="w-5 flex items-center justify-center hover:bg-muted rounded shrink-0">
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </button>
         ) : (
