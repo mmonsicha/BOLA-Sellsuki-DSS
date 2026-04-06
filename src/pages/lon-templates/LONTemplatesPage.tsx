@@ -356,7 +356,7 @@ interface TemplateEditorModalProps {
 
 type OnGreetingMsgType = "none" | "flex" | "pnp_template";
 
-function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs, pnpTemplates }: TemplateEditorModalProps) {
+function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs }: TemplateEditorModalProps) {
   const toast = useToast();
   const previewWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -436,7 +436,7 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs, pnpTem
     }
   }, [open, template]);
 
-  // Load flex messages once when the modal opens
+  // Load flex messages when modal opens
   useEffect(() => {
     if (!open) return;
     setFlexMessagesLoading(true);
@@ -446,6 +446,21 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs, pnpTem
       .catch(console.error)
       .finally(() => setFlexMessagesLoading(false));
   }, [open]);
+
+  // Load non-preset PNP templates for selected OA (refreshes when OA changes)
+  const [availablePnpTemplates, setAvailablePnpTemplates] = useState<PNPTemplate[]>([]);
+  const effectiveOAId = onGreetingLineOAId || template?.line_oa_id || "";
+  useEffect(() => {
+    if (!open || !effectiveOAId) return;
+    pnpTemplateApi
+      .list({ line_oa_id: effectiveOAId })
+      .then((res) =>
+        setAvailablePnpTemplates(
+          (res.data ?? []).filter((t) => !t.is_preset && t.id !== template?.id)
+        )
+      )
+      .catch(console.error);
+  }, [open, effectiveOAId, template?.id]);
 
   const jsonBodyParsed = useMemo(() => {
     try {
@@ -522,7 +537,7 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs, pnpTem
         ...(greetingTemplateID ? { greeting_template_id: greetingTemplateID } : {}),
         ...(greetingLineOAID ? { greeting_line_oa_id: greetingLineOAID } : {}),
         on_greeting_message_type: onGreetingMsgType,
-        on_greeting_payload: onGreetingPayload,
+        on_greeting_payload: onGreetingPayload ?? null,
         on_greeting_line_oa_id: onGreetingLineOAId || undefined,
         on_greeting_send_once: onGreetingSendOnce,
         on_greeting_redirect_url: onGreetingRedirectURL || undefined,
@@ -744,29 +759,58 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs, pnpTem
                 </div>
               )}
 
-              {/* PNP Template picker */}
+              {/* PNP Template picker — OA first, then template filtered by OA */}
               {onGreetingMsgType === "pnp_template" && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    PNP Template
-                  </label>
-                  <PNPTemplatePicker
-                    value={onGreetingTemplateId}
-                    onChange={(id) => { setOnGreetingTemplateId(id); setOnGreetingPickerError(""); }}
-                    templates={pnpTemplates.filter((t) => t.id !== template?.id)}
-                  />
-                  {onGreetingPickerError && (
-                    <p className="text-xs text-destructive">{onGreetingPickerError}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    The selected template will be rendered without variables and pushed to the user.
-                  </p>
+                <div className="space-y-3">
+                  {/* 1. LINE OA selector */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Send from OA</span>
+                    {lineOAs.length > 0 ? (
+                      <select
+                        value={onGreetingLineOAId}
+                        onChange={(e) => { setOnGreetingLineOAId(e.target.value); setOnGreetingTemplateId(""); }}
+                        className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                      >
+                        <option value="">— Same OA as this template —</option>
+                        {lineOAs.map((oa) => (
+                          <option key={oa.id} value={oa.id}>
+                            {oa.name} ({oa.basic_id || oa.id})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={onGreetingLineOAId}
+                        onChange={(e) => { setOnGreetingLineOAId(e.target.value); setOnGreetingTemplateId(""); }}
+                        placeholder="LINE OA ID (optional)"
+                        className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                      />
+                    )}
+                  </div>
+                  {/* 2. Template picker filtered by OA */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      PNP Template
+                    </label>
+                    <PNPTemplatePicker
+                      value={onGreetingTemplateId}
+                      onChange={(id) => { setOnGreetingTemplateId(id); setOnGreetingPickerError(""); }}
+                      templates={availablePnpTemplates}
+                    />
+                    {onGreetingPickerError && (
+                      <p className="text-xs text-destructive">{onGreetingPickerError}</p>
+                    )}
+                    {availablePnpTemplates.length === 0 && effectiveOAId && (
+                      <p className="text-xs text-muted-foreground italic">No custom templates found for this OA.</p>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {onGreetingMsgType !== "none" && (
+              {onGreetingMsgType !== "none" && onGreetingMsgType !== "pnp_template" && (
                 <>
-                  {/* LINE OA selector */}
+                  {/* LINE OA selector for flex type */}
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Send from OA</span>
                     {lineOAs.length > 0 ? (
@@ -775,7 +819,7 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs, pnpTem
                         onChange={(e) => setOnGreetingLineOAId(e.target.value)}
                         className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                       >
-                        <option value="">— Default (template OA) —</option>
+                        <option value="">— Same OA as this template —</option>
                         {lineOAs.map((oa) => (
                           <option key={oa.id} value={oa.id}>
                             {oa.name} ({oa.basic_id || oa.id})
@@ -792,7 +836,11 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs, pnpTem
                       />
                     )}
                   </div>
+                </>
+              )}
 
+              {onGreetingMsgType !== "none" && (
+                <>
                   {/* Send once toggle */}
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Send Once</span>

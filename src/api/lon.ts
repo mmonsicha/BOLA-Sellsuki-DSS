@@ -217,7 +217,7 @@ export const pnpTemplateApi = {
     greeting_template_id?: string;
     greeting_line_oa_id?: string;
     on_greeting_message_type?: "none" | "flex" | "pnp_template";
-    on_greeting_payload?: Record<string, unknown>;
+    on_greeting_payload?: Record<string, unknown> | null;
     on_greeting_line_oa_id?: string;
     on_greeting_send_once?: boolean;
     on_greeting_redirect_url?: string;
