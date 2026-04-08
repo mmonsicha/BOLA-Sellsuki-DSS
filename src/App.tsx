@@ -46,6 +46,7 @@ import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscri
 import { RGBConsentPage } from "@/pages/lon/RGBConsentPage";
 import { PNPGreetingLIFFPage } from "@/pages/lon-by-phone/PNPGreetingLIFFPage";
 import { LIFFDebugPage } from "@/pages/lon-by-phone/LIFFDebugPage";
+import { LIFFUIDCapturePage } from "@/pages/liff/LIFFUIDCapturePage";
 import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFormsPage";
 import { RegistrationFormBuilderPage } from "@/pages/registration-forms/RegistrationFormBuilderPage";
 import { RegistrationSubmissionsPage } from "@/pages/registration-forms/RegistrationSubmissionsPage";
@@ -198,6 +199,7 @@ function Router() {
   if (path === "/lon/rgb-consent") return <RGBConsentPage />;
   // PNP Greeting LIFF page — captures LINE UID and resolves greeting token
   if (path.startsWith("/lon/greeting")) return <PNPGreetingLIFFPage />;
+  if (path.startsWith("/liff/uid-capture")) return <LIFFUIDCapturePage />;
   // LIFF Debug page — step-by-step manual test page (dev only)
   if (path.startsWith("/lon/liff-debug")) return <LIFFDebugPage />;
   // Kratos mode: workspace chooser (public — Kratos session already proves identity)

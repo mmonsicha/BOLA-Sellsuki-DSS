@@ -6,7 +6,7 @@ import { autoReplyApi } from "@/api/autoReply";
 import { quickReplyApi } from "@/api/richMenu";
 import { flexMessageApi, type FlexMessage } from "@/api/flexMessage";
 import { FlexMessagePicker } from "@/components/common/FlexMessagePicker";
-import type { AutoReply, QuickReply, TriggerType, MatchMode, Media, AutoReplyConditionType, AutoReplySendMethod } from "@/types";
+import type { AutoReply, QuickReply, TriggerType, MatchMode, Media, AutoReplyConditionType } from "@/types";
 import { MediaPickerDialog } from "@/pages/chat-inbox/MediaPickerDialog";
 import { toDisplayUrl } from "@/lib/mediaUtils";
 import { getWorkspaceId } from "@/lib/auth";
@@ -14,19 +14,11 @@ import { getWorkspaceId } from "@/lib/auth";
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; description: string; icon: string }[] = [
-  { value: "keyword",        label: "Keyword",        description: "Message matches a keyword",                                  icon: "🔑" },
-  { value: "follow",         label: "Follow",         description: "User follows the LINE OA",                                  icon: "➕" },
-  { value: "unfollow",       label: "Unfollow",       description: "User unfollows the LINE OA",                                icon: "➖" },
-  { value: "postback",       label: "Postback",       description: "User taps a Flex / template button",                       icon: "🔘" },
-  { value: "default",        label: "Default",        description: "Catch-all — no other rule matched",                        icon: "🔀" },
-  { value: "lon_subscribed", label: "LON Subscribed", description: "User becomes a new LON subscriber via phone number",        icon: "📲" },
-  { value: "pnp_delivered",  label: "PNP Delivered",  description: "Fires once per LON Job run after successful PNP delivery",  icon: "📨" },
-];
-
-const SEND_METHOD_OPTIONS: { value: AutoReplySendMethod; label: string; description: string }[] = [
-  { value: "pnp_hash", label: "PNP (phone hash)", description: "ส่งผ่าน LINE PNP API — ไม่ต้อง follow OA, รองรับ Flex เท่านั้น" },
-  { value: "push",     label: "Push",             description: "ส่งผ่าน Messaging API — ต้อง follow OA และมี LINE UID" },
-  { value: "auto",     label: "Auto",             description: "ลอง PNP ก่อน ถ้าไม่ได้ค่อย push" },
+  { value: "keyword",          label: "Keyword",          description: "Message matches a keyword",                                    icon: "🔑" },
+  { value: "follow",           label: "Follow",           description: "User follows the LINE OA",                                    icon: "➕" },
+  { value: "postback",         label: "Postback",         description: "User taps a Flex / template button",                         icon: "🔘" },
+  { value: "default",          label: "Default",          description: "Catch-all — no other rule matched",                           icon: "🔀" },
+  { value: "liff_uid_capture", label: "LIFF UID Capture", description: "User opens the LIFF page and their LINE UID is captured",     icon: "📱" },
 ];
 
 const MATCH_MODE_OPTIONS: { value: MatchMode; label: string }[] = [
@@ -452,7 +444,7 @@ interface FormState {
   keywords: string[];
   postback_data: string;
   condition_type: AutoReplyConditionType;
-  send_method: AutoReplySendMethod; // for pnp_delivered trigger
+  send_once: boolean; // for liff_uid_capture trigger
   quick_reply_id: string;
   messages: MessageItem[];
 }
@@ -466,7 +458,7 @@ const defaultForm = (): FormState => ({
   keywords: [],
   postback_data: "",
   condition_type: "",
-  send_method: "pnp_hash",
+  send_once: false,
   quick_reply_id: "",
   messages: [{ type: "text", payload: { text: "" } }],
 });
@@ -481,7 +473,7 @@ function formFromAutoReply(ar: AutoReply): FormState {
     keywords: ar.keywords || [],
     postback_data: ar.postback_data || "",
     condition_type: ar.condition_type ?? "",
-    send_method: ar.trigger_config?.send_method || "pnp_hash",
+    send_once: ar.trigger_config?.send_once ?? false,
     quick_reply_id: ar.quick_reply_id || "",
     messages: (ar.messages as unknown as MessageItem[]) || [{ type: "text", payload: { text: "" } }],
   };
@@ -578,8 +570,8 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
     try {
       const msgs = form.messages.map((m) => ({ type: m.type, payload: m.payload }));
       let saved: AutoReply;
-      const triggerConfig = form.trigger === "pnp_delivered"
-        ? { send_method: form.send_method }
+      const triggerConfig = form.trigger === "liff_uid_capture"
+        ? { send_once: form.send_once }
         : undefined;
 
       if (isEdit && existing) {
@@ -814,77 +806,40 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
             </div>
           )}
 
-          {/* LON Subscribed — info hint */}
-          {form.trigger === "lon_subscribed" && (
-            <div className="pl-3 border-l-2 border-green-200 space-y-2">
-              <div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">
-                <span className="mt-0.5 flex-shrink-0">📲</span>
+          {/* LIFF UID Capture — info + send_once toggle */}
+          {form.trigger === "liff_uid_capture" && (
+            <div className="pl-3 border-l-2 border-blue-200 space-y-3">
+              <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                <span className="mt-0.5 flex-shrink-0">📱</span>
                 <span>
-                  <strong>LON Subscribed</strong> fires automatically when a user opens the LIFF link
-                  from a LON by Phone message. Delivered via LINE Notification Messaging — no OA follow required.
-                </span>
-              </div>
-              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                <span className="mt-0.5 flex-shrink-0">⚠️</span>
-                <span>
-                  <strong>Flex Message required.</strong> When sending via PNP (no LON consent),
-                  only <strong>Flex Messages</strong> are supported by the LINE API.
-                  Add at least one <strong>Flex</strong> message type to this rule.
-                  Text / image / sticker messages will be skipped on the PNP path.
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* PNP Delivered — send method config */}
-          {form.trigger === "pnp_delivered" && (
-            <div className="pl-3 border-l-2 border-orange-200 space-y-3">
-              <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
-                <span className="mt-0.5 flex-shrink-0">📨</span>
-                <span>
-                  <strong>PNP Delivered</strong> fires <strong>ครั้งเดียวต่อ LON Job run</strong> หลังจากส่ง PNP สำเร็จให้กับเบอร์นั้น
-                  ใช้ส่ง "message 2" (โปรโมชั่นพิเศษ) เฉพาะคนที่ได้รับ message 1 ในรอบ job เดียวกัน
+                  <strong>LIFF UID Capture</strong> fires when a user opens your LIFF page and their LINE UID
+                  is captured. Unlike webhook triggers, this uses the <strong>Push API</strong> (no reply token
+                  available in LIFF). Configure the LIFF endpoint URL in the LINE OA settings page.
                 </span>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">
-                  Send method <span className="text-red-500">*</span>
-                </label>
-                <div className="space-y-1.5">
-                  {SEND_METHOD_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => set("send_method", opt.value)}
-                      className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
-                        form.send_method === opt.value
-                          ? "border-orange-500 bg-orange-50 text-orange-800"
-                          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700"
-                      }`}
-                    >
-                      <span className={`mt-0.5 h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${
-                        form.send_method === opt.value ? "border-orange-500 bg-orange-500" : "border-gray-300"
-                      }`} />
-                      <div>
-                        <div className="text-xs font-semibold">{opt.label}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{opt.description}</div>
-                      </div>
-                    </button>
-                  ))}
+              {/* Send once toggle */}
+              <div className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Send once per user</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    When enabled, this rule fires only the first time a user's UID is captured. Disable to send every time.
+                  </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => set("send_once", !form.send_once)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 ml-4 ${
+                    form.send_once ? "bg-green-500" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      form.send_once ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
               </div>
-
-              {(form.send_method === "pnp_hash" || form.send_method === "auto") && (
-                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  <span className="mt-0.5 flex-shrink-0">⚠️</span>
-                  <span>
-                    <strong>Flex Message required</strong> สำหรับ PNP path.
-                    LINE PNP API รองรับเฉพาะ Flex Message — text / image / sticker จะถูก skip.
-                    ใส่ Flex อย่างน้อย 1 อันใน reply messages ด้านล่าง.
-                  </span>
-                </div>
-              )}
             </div>
           )}
 

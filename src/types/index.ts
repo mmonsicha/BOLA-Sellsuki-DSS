@@ -201,7 +201,7 @@ export interface BroadcastDeliveryLog {
 }
 
 // ---- Auto Reply ----
-export type TriggerType = "follow" | "unfollow" | "keyword" | "postback" | "default" | "lon_subscribed" | "pnp_delivered";
+export type TriggerType = "follow" | "unfollow" | "keyword" | "postback" | "default" | "lon_subscribed" | "pnp_delivered" | "liff_uid_capture";
 export type MatchMode = "exact" | "contains" | "prefix" | "regex";
 export type AutoReplyConditionType = "" | "lon_phone_contact" | "lon_subscriber";
 /** How a pnp_delivered rule sends message 2. */
@@ -210,6 +210,8 @@ export type AutoReplySendMethod = "pnp_hash" | "push" | "auto";
 export interface AutoReplyTriggerConfig {
   /** Applies to pnp_delivered trigger: delivery channel for message 2. */
   send_method?: AutoReplySendMethod;
+  /** Applies to liff_uid_capture trigger: when true, fires at most once per user per rule. */
+  send_once?: boolean;
 }
 
 export interface AutoReply {

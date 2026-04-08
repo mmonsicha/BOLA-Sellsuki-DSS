@@ -40,6 +40,7 @@ export function ActionEditor({ value, onChange, variables = [] }: ActionEditorPr
         type: "uri",
         uri: BOLA_PNP_LIFF_MARKER,
         label: (value?.label as string) || "ดูข้อมูลพิเศษสำหรับคุณ",
+        __greetingRedirectURL: (value?.__greetingRedirectURL as string) || "",
       });
       return;
     }
@@ -84,13 +85,38 @@ export function ActionEditor({ value, onChange, variables = [] }: ActionEditorPr
             />
           </div>
 
-          {/* LIFF Track & Greet panel — info only */}
+          {/* LIFF Track & Greet panel — info + redirect URL config */}
           {displayActionType === "liff_greeting" && (
-            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 space-y-1">
-              <p className="text-xs font-medium text-blue-700">LIFF Track & Greet 🎯</p>
-              <p className="text-xs text-blue-600">
-                BOLA จะ inject LIFF URL อัตโนมัติเมื่อส่ง PNP
-              </p>
+            <div className="space-y-2">
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 space-y-1">
+                <p className="text-xs font-medium text-blue-700">LIFF Track & Greet 🎯</p>
+                <p className="text-xs text-blue-600">
+                  BOLA จะ inject LIFF URL อัตโนมัติเมื่อส่ง PNP — capture LINE UID และ link กับเบอร์โทร
+                </p>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-muted-foreground">
+                    Redirect URL <span className="text-muted-foreground/60">(optional)</span>
+                  </label>
+                  <FieldInsertButton
+                    variables={variables}
+                    onInsert={(name) =>
+                      handleField("__greetingRedirectURL", ((value?.__greetingRedirectURL as string) || "") + `{${name}}`)
+                    }
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={(value?.__greetingRedirectURL as string) || ""}
+                  onChange={(e) => handleField("__greetingRedirectURL", e.target.value)}
+                  placeholder="https://shop.com/order/{order_id}"
+                  className="w-full border rounded px-2 py-1 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  เมื่อตั้งค่า LIFF จะ redirect ไปที่ URL นี้แทนการปิดหน้าต่าง รองรับ <code className="bg-muted px-0.5 rounded">{"{variable_key}"}</code>
+                </p>
+              </div>
             </div>
           )}
 

@@ -821,6 +821,45 @@ export function LineOADetailPage() {
                     </Button>
                   </div>
                 </div>
+
+                {/* LIFF UID Capture endpoint URL */}
+                <div className="pt-2 border-t space-y-3">
+                  <div>
+                    <p className="text-sm font-medium mb-0.5">LIFF UID Capture Endpoint</p>
+                    <p className="text-xs text-muted-foreground">
+                      Use this URL as the <strong>LIFF endpoint URL</strong> when creating a LIFF app in the{" "}
+                      <a
+                        href="https://developers.line.biz/console/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline underline-offset-2"
+                      >
+                        LINE Developers Console
+                      </a>
+                      . When a user opens the LIFF page, their LINE UID is captured and any matching{" "}
+                      <strong>LIFF UID Capture</strong> auto-reply rules will be triggered.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${window.location.origin}/liff/uid-capture?line_oa_id=${oa.id}`}
+                      className="flex-1 border rounded-md px-3 py-2 text-sm bg-muted text-muted-foreground cursor-default focus:outline-none font-mono"
+                    />
+                    <CopyButton text={`${window.location.origin}/liff/uid-capture?line_oa_id=${oa.id}`} />
+                  </div>
+                  <div className="rounded-md bg-muted/60 border px-4 py-3 text-xs text-muted-foreground space-y-1">
+                    <p className="font-medium text-foreground">Setup steps:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                      <li>Go to <strong>LINE Developers Console</strong> → your channel → <strong>LIFF</strong> tab</li>
+                      <li>Create a new LIFF app (or select an existing one)</li>
+                      <li>Set the <strong>Endpoint URL</strong> to the URL above</li>
+                      <li>Copy the generated <strong>LIFF ID</strong> and share the LIFF link with users</li>
+                      <li>Create an <strong>Auto Reply</strong> rule with trigger <strong>LIFF UID Capture</strong> for this OA</li>
+                    </ol>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           );
