@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import type { Follower, UnifiedContact, LineOA } from "@/types";
 import { followerApi } from "@/api/follower";
 import { lineOAApi } from "@/api/lineOA";
-import { getWorkspaceId } from "@/lib/auth";
+import { getWorkspaceId, getToken } from "@/lib/auth";
 import { maskPhone } from "@/lib/phone";
 import { Upload, Users, Phone, Search, ChevronLeft, ChevronRight, BookOpen, Trash2 } from "lucide-react";
 
@@ -139,7 +139,7 @@ export function ContactsPage() {
           const res = await followerApi.listUnified({
             workspace_id: WORKSPACE_ID,
             line_oa_id: selectedLineOAId || undefined,
-            contact_status: "phone_only",
+            contact_status: "phone",
             search: search || undefined,
             page,
             page_size: PAGE_SIZE,
@@ -231,7 +231,16 @@ export function ContactsPage() {
           </p>
           <div className="flex items-center gap-2">
             <a
-              href={`${(import.meta.env.VITE_API_URL || "").replace(/\/$/, "")}/v1/contacts/swagger`}
+              href={(() => {
+                const base = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+                const token = getToken() || "";
+                const wsId = getWorkspaceId() || "";
+                const params = new URLSearchParams();
+                if (token) params.set("token", token);
+                if (wsId) params.set("workspace_id", wsId);
+                const qs = params.toString();
+                return `${base}/v1/contacts/swagger${qs ? `?${qs}` : ""}`;
+              })()}
               target="_blank"
               rel="noopener noreferrer"
             >

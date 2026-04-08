@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, Plus, X, CheckCircle, XCircle, Activity, Send } from "lucide-react";
+import { ArrowLeft, RefreshCw, Plus, X, CheckCircle, XCircle, Activity, Send, Phone } from "lucide-react";
 import type { Follower, FollowerBehaviorSummary } from "@/types";
 import { followerApi } from "@/api/follower";
 import type { FollowerActivity } from "@/api/follower";
@@ -343,12 +343,16 @@ export function FollowerDetailPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const f = (res as any).data ?? res;
         setFollower(f);
+        // Prefer contact_profile data when available (unified metadata store)
+        const cp = f.contact_profile;
         setForm({
-          email: f.email || "",
+          email: cp?.email || f.email || "",
           phone: f.phone || "",
-          note: f.note || "",
-          tags: f.tags || [],
-          custom_fields: f.custom_fields || {},
+          note: cp?.note || f.note || "",
+          tags: cp?.tags?.length ? cp.tags : (f.tags || []),
+          custom_fields: (cp && Object.keys(cp.custom_fields || {}).length > 0)
+            ? cp.custom_fields
+            : (f.custom_fields || {}),
         });
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load follower"))
@@ -497,6 +501,41 @@ export function FollowerDetailPage() {
           </Card>
         )}
 
+        {/* Linked Phone Contact (read-only) */}
+        {follower.linked_contact && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Phone size={16} />
+                Linked Phone Contact
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                {(follower.linked_contact.first_name || follower.linked_contact.last_name) && (
+                  <>
+                    <span className="text-muted-foreground">Name</span>
+                    <span>
+                      {[follower.linked_contact.first_name, follower.linked_contact.last_name]
+                        .filter(Boolean)
+                        .join(" ")}
+                    </span>
+                  </>
+                )}
+                {follower.linked_contact.phone && (
+                  <>
+                    <span className="text-muted-foreground">Phone</span>
+                    <span className="font-mono">{follower.linked_contact.phone}</span>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This contact was linked via PNP. Phone is imported — edit in the Contacts tab.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Editable Fields */}
         <Card>
           <CardHeader><CardTitle>Contact & Notes</CardTitle></CardHeader>
@@ -518,8 +557,13 @@ export function FollowerDetailPage() {
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="+66812345678"
+                placeholder={follower.linked_contact?.phone || "+66812345678"}
               />
+              {follower.linked_contact?.phone && !form.phone && (
+                <p className="text-xs text-muted-foreground">
+                  Linked contact phone: <span className="font-mono">{follower.linked_contact.phone}</span>
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Note</label>

@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Phone, Link2, UserCheck, UserX, Trash2, Unlink, Send } from "lucide-react";
+import { ArrowLeft, Phone, Link2, UserCheck, UserX, Trash2, Unlink, Send, Plus, X, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { maskPhone } from "@/lib/phone";
 import { followerApi } from "@/api/follower";
 import type { PhoneContactActivity } from "@/api/follower";
@@ -107,11 +107,29 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
   const [deleting, setDeleting] = useState(false);
   const [unlinkingOAId, setUnlinkingOAId] = useState<string | null>(null);
 
+  // Contact profile form state
+  const [profileForm, setProfileForm] = useState({ email: "", note: "", tags: [] as string[], custom_fields: {} as Record<string, string> });
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [newTag, setNewTag] = useState("");
+  const [newFieldKey, setNewFieldKey] = useState("");
+  const [newFieldValue, setNewFieldValue] = useState("");
+
   useEffect(() => {
     setLoading(true);
     followerApi
       .getPhoneContact(contactId)
-      .then(setContact)
+      .then((c) => {
+        setContact(c);
+        const cp = c.contact_profile;
+        setProfileForm({
+          email: cp?.email ?? "",
+          note: cp?.note ?? "",
+          tags: cp?.tags ?? [],
+          custom_fields: cp?.custom_fields ?? {},
+        });
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load contact"))
       .finally(() => setLoading(false));
   }, [contactId]);
@@ -138,6 +156,24 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
       setError(err instanceof Error ? err.message : "Failed to delete contact");
       setDeleting(false);
       setDeleteOpen(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!contact) return;
+    setSaveError(null);
+    setSaveSuccess(false);
+    setSaving(true);
+    try {
+      const updated = await followerApi.updatePhoneContactProfile(contact.id, profileForm);
+      setContact(updated);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save");
+      setTimeout(() => setSaveError(null), 4000);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -314,6 +350,159 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+            {/* Contact Profile */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Contact Profile</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Email */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Email</label>
+                  <input
+                    type="email"
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, email: e.target.value }))}
+                    className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="contact@example.com"
+                  />
+                </div>
+
+                {/* Note */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Note</label>
+                  <textarea
+                    rows={2}
+                    value={profileForm.note}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, note: e.target.value }))}
+                    className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                    placeholder="Internal notes about this contact…"
+                  />
+                </div>
+
+                {/* Tags */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Tags</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {profileForm.tags.map((tag) => (
+                      <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs">
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => setProfileForm((f) => ({ ...f, tags: f.tags.filter((t) => t !== tag) }))}
+                          className="hover:text-blue-900"
+                        >
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newTag.trim()) {
+                          e.preventDefault();
+                          if (!profileForm.tags.includes(newTag.trim())) {
+                            setProfileForm((f) => ({ ...f, tags: [...f.tags, newTag.trim()] }));
+                          }
+                          setNewTag("");
+                        }
+                      }}
+                      className="flex-1 border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="Add tag and press Enter"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (newTag.trim() && !profileForm.tags.includes(newTag.trim())) {
+                          setProfileForm((f) => ({ ...f, tags: [...f.tags, newTag.trim()] }));
+                        }
+                        setNewTag("");
+                      }}
+                    >
+                      <Plus size={14} />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Custom Fields */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Custom Fields</label>
+                  <div className="space-y-1.5 mb-2">
+                    {Object.entries(profileForm.custom_fields).map(([k, v]) => (
+                      <div key={k} className="flex items-center gap-2 text-sm">
+                        <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{k}</span>
+                        <span className="flex-1 text-muted-foreground truncate">{v}</span>
+                        <button
+                          type="button"
+                          onClick={() => setProfileForm((f) => {
+                            const next = { ...f.custom_fields };
+                            delete next[k];
+                            return { ...f, custom_fields: next };
+                          })}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newFieldKey}
+                      onChange={(e) => setNewFieldKey(e.target.value)}
+                      className="w-1/3 border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="Key"
+                    />
+                    <input
+                      type="text"
+                      value={newFieldValue}
+                      onChange={(e) => setNewFieldValue(e.target.value)}
+                      className="flex-1 border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="Value"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (newFieldKey.trim()) {
+                          setProfileForm((f) => ({ ...f, custom_fields: { ...f.custom_fields, [newFieldKey.trim()]: newFieldValue } }));
+                          setNewFieldKey("");
+                          setNewFieldValue("");
+                        }
+                      }}
+                    >
+                      <Plus size={14} />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Save button + status */}
+                <div className="flex items-center gap-3 pt-1">
+                  <Button onClick={() => void handleSaveProfile()} disabled={saving} size="sm">
+                    {saving ? <RefreshCw size={14} className="animate-spin mr-1.5" /> : null}
+                    {saving ? "Saving…" : "Save Profile"}
+                  </Button>
+                  {saveSuccess && (
+                    <span className="flex items-center gap-1 text-sm text-green-600">
+                      <CheckCircle size={14} /> Saved
+                    </span>
+                  )}
+                  {saveError && (
+                    <span className="flex items-center gap-1 text-sm text-destructive">
+                      <XCircle size={14} /> {saveError}
+                    </span>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </>

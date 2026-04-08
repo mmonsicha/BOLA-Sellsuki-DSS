@@ -40,9 +40,22 @@ export interface Follower {
   followed_at: string | null;
   created_at: string;
   updated_at: string;
+  linked_contact?: {
+    phone_contact_id: string;
+    first_name: string;
+    last_name: string;
+    phone: string;
+  } | null;
+  contact_profile?: {
+    id: string;
+    email: string;
+    note: string;
+    tags: string[];
+    custom_fields: Record<string, string>;
+  } | null;
 }
 
-export type ContactStatus = "follower" | "phone_only" | "subscriber" | "linked";
+export type ContactStatus = "follower" | "phone" | "phone_only" | "subscriber" | "linked";
 
 export interface UnifiedContact {
   id: string;
@@ -85,6 +98,13 @@ export interface PhoneContactDetail {
   created_at: string;
   updated_at: string;
   linked_oas: PhoneContactFollowerDetail[];
+  contact_profile?: {
+    id: string;
+    email: string;
+    note: string;
+    tags: string[];
+    custom_fields: Record<string, string>;
+  } | null;
 }
 
 // ---- PNP Templates ----
@@ -641,6 +661,15 @@ export interface OnGreetingSentRecord {
 
 export interface BulkSendLONByPhoneResponse {
   results: BulkSendPNPResult[];
+}
+
+// ---- LIFF UID Capture Log ----
+export interface LIFFUIDCaptureLog {
+  id: string;
+  line_user_id: string;
+  display_name: string;
+  picture_url: string;
+  created_at: string;
 }
 
 // ---- Registration Form ----
