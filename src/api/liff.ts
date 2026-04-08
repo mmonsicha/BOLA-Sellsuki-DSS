@@ -1,4 +1,7 @@
-// liff.ts — Public LIFF endpoint API (no auth required, called from LIFF pages)
+// liff.ts — LIFF API: public endpoints (no auth) + admin endpoints (with auth)
+import { api } from "./client";
+import type { LIFFUIDCaptureLog } from "@/types";
+
 const BASE_URL =
   (import.meta.env.VITE_PUBLIC_API_URL as string | undefined) ||
   (import.meta.env.VITE_API_URL as string | undefined) ||
@@ -50,4 +53,10 @@ export const liffApi = {
     }
     return res.json() as Promise<{ ok: boolean; redirect_url?: string }>;
   },
+};
+
+// Admin LIFF API (requires authenticated admin session)
+export const liffAdminApi = {
+  listUIDCaptureLogs: (params: { line_oa_id: string; page?: number; page_size?: number }) =>
+    api.get<{ data: LIFFUIDCaptureLog[]; total: number }>("/v1/liff/uid-capture-logs", params),
 };

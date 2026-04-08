@@ -721,19 +721,19 @@ export function AutoReplyDialog({ open, lineOAId, existing, onClose, onSaved }: 
                 className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">No condition — fire for all followers</option>
-                <option value="lon_subscriber">LON Subscriber only</option>
-                <option value="lon_phone_contact">LON by Phone contact only</option>
+                {/* <option value="lon_subscriber">LON Subscriber only</option> */}
+                {/* <option value="lon_phone_contact">LON by Phone contact only</option> */}
               </select>
-              {form.condition_type === "lon_phone_contact" && (
+              {/* {form.condition_type === "lon_phone_contact" && (
                 <p className="text-xs text-muted-foreground">
                   Fires only for followers who have a phone contact record with a successful LON by Phone delivery.
                 </p>
-              )}
-              {form.condition_type === "lon_subscriber" && (
+              )} */}
+              {/* {form.condition_type === "lon_subscriber" && (
                 <p className="text-xs text-muted-foreground">
                   Fires only for followers who are active LON Notification subscribers.
                 </p>
-              )}
+              )} */}
             </div>
           )}
 

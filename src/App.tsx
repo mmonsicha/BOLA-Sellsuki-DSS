@@ -36,7 +36,7 @@ import { RichMenusPage } from "@/pages/rich-menus/RichMenusPage";
 import { RichMenuBuilderPage } from "@/pages/rich-menus/RichMenuBuilderPage";
 import { RichMenuAssignmentsPage } from "@/pages/rich-menus/RichMenuAssignmentsPage";
 import { QuickRepliesPage } from "@/pages/quick-replies/QuickRepliesPage";
-import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
+// import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
 import { LONDeliveryLogsPage } from "@/pages/lon-delivery-logs/LONDeliveryLogsPage";
 import { MessageLogsPage } from "@/pages/message-logs/MessageLogsPage";
 import { LONByPhonePage } from "@/pages/lon-by-phone/LONByPhonePage";
@@ -142,7 +142,7 @@ function resolveProtectedRoute(path: string, segments: string[]): React.ReactEle
   if (path.startsWith("/quick-replies")) return <QuickRepliesPage />;
 
   // LON — authenticated pages
-  if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
+  // if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
   if (path.startsWith("/lon-delivery-logs")) return <LONDeliveryLogsPage />;
   if (path.startsWith("/message-logs")) return <MessageLogsPage />;
   if (path.startsWith("/lon-by-phone")) return <LONByPhonePage />;

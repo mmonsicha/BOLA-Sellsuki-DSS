@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -45,8 +46,8 @@ export function LIFFUIDCapturePage() {
   const [status, setStatus] = useState<PageStatus>("loading");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Clear the default app title immediately so it doesn't flash before the OA name loads
-  useEffect(() => { document.title = ""; }, []);
+  // Set title to "--" so the browser never shows the app name or URL
+  useEffect(() => { document.title = "--"; }, []);
 
   useEffect(() => {
     void initFlow();
@@ -64,6 +65,8 @@ export function LIFFUIDCapturePage() {
       let redirectUrl = urlParams.get("redirect_url") ?? "";
       let appName = urlParams.get("app_name") ?? "";
 
+      console.log("[LIFF] initFlow start url=", window.location.href);
+
       const liffState = urlParams.get("liff.state") ?? "";
       if (liffState) {
         try {
@@ -77,6 +80,7 @@ export function LIFFUIDCapturePage() {
           if (!greetingToken) greetingToken = stateParams.get("token") ?? "";
           if (!redirectUrl) redirectUrl = stateParams.get("redirect_url") ?? "";
           if (!appName) appName = stateParams.get("app_name") ?? "";
+          console.log("[LIFF] parsed liff.state → liffId=", liffId, "lineOAId=", lineOAId, "token=", greetingToken ? "yes" : "no");
         } catch {
           // ignore parse errors
         }
@@ -88,7 +92,9 @@ export function LIFFUIDCapturePage() {
         return;
       }
 
+      console.log("[LIFF] calling liff.init liffId=", liffId);
       await liff.init({ liffId });
+      console.log("[LIFF] liff.init done, url now=", window.location.href);
 
       // Re-read ALL params after liff.init() — LINE SDK decodes liff.state into the URL at this point
       const params = new URLSearchParams(window.location.search);
@@ -97,6 +103,7 @@ export function LIFFUIDCapturePage() {
       if (!redirectUrl) redirectUrl = params.get("redirect_url") ?? "";
       if (!appName) appName = params.get("app_name") ?? "";
 
+      console.log("[LIFF] after init: lineOAId=", lineOAId, "token=", greetingToken ? "yes" : "no", "redirectUrl=", redirectUrl);
 
       if (!lineOAId) {
         setErrorMsg("ไม่พบ LINE OA ID กรุณาตรวจสอบการตั้งค่า");
@@ -111,27 +118,38 @@ export function LIFFUIDCapturePage() {
       }
 
       if (!liff.isLoggedIn()) {
+        console.log("[LIFF] not logged in → calling liff.login()");
         liff.login({ redirectUri: window.location.href });
         return;
       }
 
       const profile = await liff.getProfile();
+      console.log("[LIFF] got profile userId=", profile.userId);
 
       // Step 1: Capture LINE UID → fires liff_uid_capture auto-reply rules
+      console.log("[LIFF] calling uidCaptured lineOAId=", lineOAId);
       await liffApi.uidCaptured(lineOAId, profile.userId);
+      console.log("[LIFF] uidCaptured done");
 
-      // Step 2 (optional): Resolve PNP greeting token → links phone ↔ LINE UID
+      // Step 2 (optional): Resolve PNP greeting token → links phone ↔ LINE UID.
+      // Must be awaited before redirecting — a fire-and-forget fetch gets cancelled
+      // the instant window.location.href changes (especially in LINE WebView).
       if (greetingToken) {
-        // Fire-and-forget — don't block on the result; redirect URL comes from the LIFF URL param
-        liffApi.resolveGreetingToken(greetingToken, profile.userId).catch((err) => {
+        console.log("[LIFF] calling resolveGreetingToken");
+        try {
+          await liffApi.resolveGreetingToken(greetingToken, profile.userId);
+          console.log("[LIFF] resolveGreetingToken done");
+        } catch (err) {
           console.warn("[LIFFUIDCapture] resolveGreetingToken error (non-fatal):", err);
-        });
+          // non-fatal: continue to redirect even if linking failed
+        }
       }
 
       // Step 3: Redirect URL takes priority over closing LIFF
       // The redirect URL is embedded in the LIFF link by the backend at send time,
       // with template variables already substituted — no extra backend call needed.
       if (redirectUrl) {
+        console.log("[LIFF] redirecting to", redirectUrl);
         window.location.href = redirectUrl;
         return;
       }

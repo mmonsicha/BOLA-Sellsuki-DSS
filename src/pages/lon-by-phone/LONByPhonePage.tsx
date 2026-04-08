@@ -242,7 +242,7 @@ function ContactPickerModal({ open, onClose, workspaceId, lineOAId, onConfirm }:
     setSelected(new Set());
     setSearch("");
     followerApi
-      .listUnified({ workspace_id: workspaceId, contact_status: "phone_only", page_size: 200 })
+      .listUnified({ workspace_id: workspaceId, contact_status: "phone", page_size: 200 })
       .then((res) => {
         const all = (res.data ?? []).filter((c) => c.phone && c.phone.trim() !== "");
         setContacts(all);

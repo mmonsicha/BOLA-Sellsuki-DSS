@@ -7,16 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   RefreshCw,
   ScrollText,
   PhoneCall,
@@ -30,10 +20,10 @@ import {
   Users,
   X,
   MessageSquareHeart,
-  Trash2,
 } from "lucide-react";
-import type { LONDeliveryLog, PNPDeliveryLog, OnGreetingSentRecord, LineOA } from "@/types";
+import type { LONDeliveryLog, PNPDeliveryLog, LIFFUIDCaptureLog, LineOA } from "@/types";
 import { lonApi } from "@/api/lon";
+import { liffAdminApi } from "@/api/liff";
 import type { DeliveryLogStatsResponse } from "@/api/lon";
 import { lineOAApi } from "@/api/lineOA";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
@@ -330,14 +320,15 @@ function FilterBar({
   );
 }
 
-// ─── LON Subscribers Tab ──────────────────────────────────────────────────────
-
+// ─── LON Subscribers Tab (hidden — feature disabled) ─────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface LONLogsTabProps {
   lineOAs: LineOA[];
   selectedLineOAId: string;
   onOAChange: (id: string) => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function LONLogsTab({ lineOAs, selectedLineOAId, onOAChange }: LONLogsTabProps) {
   const [logs, setLogs] = useState<LONDeliveryLog[]>([]);
   const [total, setTotal] = useState(0);
@@ -763,7 +754,7 @@ function PNPLogsTab({ lineOAs, selectedLineOAId, onOAChange }: PNPLogsTabProps) 
   );
 }
 
-// ─── On Greeting Sent Tab ────────────────────────────────────────────────────
+// ─── On Greeting Sent Tab (LIFF UID Capture Logs) ───────────────────────────
 
 interface OnGreetingTabProps {
   lineOAs: LineOA[];
@@ -772,30 +763,24 @@ interface OnGreetingTabProps {
 }
 
 function OnGreetingTab({ lineOAs, selectedLineOAId, onOAChange }: OnGreetingTabProps) {
-  const [records, setRecords] = useState<OnGreetingSentRecord[]>([]);
+  const [records, setRecords] = useState<LIFFUIDCaptureLog[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // delete single
-  const [deleteTarget, setDeleteTarget] = useState<OnGreetingSentRecord | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  // delete all
-  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
-  const [deletingAll, setDeletingAll] = useState(false);
 
   const fetchRecords = useCallback(() => {
     if (!selectedLineOAId) return;
     setLoading(true);
-    lonApi
-      .listOnGreetingSent({ line_oa_id: selectedLineOAId, page, page_size: PAGE_SIZE })
+    liffAdminApi
+      .listUIDCaptureLogs({ line_oa_id: selectedLineOAId, page, page_size: PAGE_SIZE })
       .then((res) => {
         setRecords(res.data ?? []);
         setTotal(res.total ?? 0);
         setError(null);
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Failed to load on-greeting records");
+        setError(err instanceof Error ? err.message : "Failed to load UID capture logs");
         setRecords([]);
         setTotal(0);
       })
@@ -811,34 +796,6 @@ function OnGreetingTab({ lineOAs, selectedLineOAId, onOAChange }: OnGreetingTabP
     setPage(1);
   }
 
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await lonApi.deleteOnGreetingSent(deleteTarget.source_template_id, deleteTarget.phone_hash);
-      setDeleteTarget(null);
-      fetchRecords();
-    } catch {
-      setError("ลบไม่สำเร็จ");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  async function handleDeleteAll() {
-    setDeletingAll(true);
-    try {
-      await lonApi.deleteAllOnGreetingSent(selectedLineOAId);
-      setDeleteAllOpen(false);
-      setPage(1);
-      fetchRecords();
-    } catch {
-      setError("ลบทั้งหมดไม่สำเร็จ");
-    } finally {
-      setDeletingAll(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
       {/* Scorecard */}
@@ -847,7 +804,7 @@ function OnGreetingTab({ lineOAs, selectedLineOAId, onOAChange }: OnGreetingTabP
           <CardContent className="py-4 px-4">
             <div className="flex items-center gap-2 mb-1">
               <MessageSquareHeart size={16} className="text-foreground" />
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Sent</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Captured</span>
             </div>
             <div className="text-2xl font-bold tabular-nums">
               {loading ? "..." : total.toLocaleString()}
@@ -864,23 +821,9 @@ function OnGreetingTab({ lineOAs, selectedLineOAId, onOAChange }: OnGreetingTabP
           onChange={handleOAChange}
           showAll={false}
         />
-        <div className="flex items-center gap-2">
-          {total > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-destructive text-destructive hover:bg-destructive/10"
-              onClick={() => setDeleteAllOpen(true)}
-              disabled={loading}
-            >
-              <Trash2 size={14} className="mr-1" />
-              ลบทั้งหมด ({total})
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={fetchRecords} disabled={loading} className="flex-shrink-0">
-            <RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={fetchRecords} disabled={loading} className="flex-shrink-0">
+          <RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
+        </Button>
       </div>
 
       {error && (
@@ -898,41 +841,37 @@ function OnGreetingTab({ lineOAs, selectedLineOAId, onOAChange }: OnGreetingTabP
         <Card>
           <CardContent className="py-12 text-center">
             <MessageSquareHeart size={32} className="mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground text-sm">No on-greeting records found.</p>
+            <p className="text-muted-foreground text-sm">No UID capture logs found.</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
-          {records.map((rec, idx) => (
-            <Card key={`${rec.source_template_id}-${rec.phone_hash}-${idx}`}>
+          {records.map((rec) => (
+            <Card key={rec.id}>
               <CardContent className="py-3">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {rec.masked_phone ? (
-                        <span className="text-sm font-mono font-medium">{rec.masked_phone}</span>
-                      ) : (
-                        <span className="text-sm font-mono text-muted-foreground" title={rec.phone_hash}>
-                          {rec.phone_hash.slice(0, 8)}...
-                        </span>
-                      )}
-                      <Badge variant="secondary">{rec.source_template_name}</Badge>
+                <div className="flex items-center gap-3 min-w-0">
+                  {rec.picture_url ? (
+                    <img
+                      src={rec.picture_url}
+                      alt={rec.display_name || rec.line_user_id}
+                      className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {(rec.display_name || rec.line_user_id).charAt(0).toUpperCase()}
+                      </span>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {rec.display_name || <span className="font-mono text-muted-foreground">{rec.line_user_id}</span>}
+                    </div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
                       <Clock size={10} />
-                      {formatDate(rec.sent_at)}
-                      <span className="mx-1">&middot;</span>
-                      <span className="font-mono text-xs">{rec.source_template_id.slice(0, 8)}...</span>
+                      {formatDate(rec.created_at)}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
-                    onClick={() => setDeleteTarget(rec)}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -951,56 +890,6 @@ function OnGreetingTab({ lineOAs, selectedLineOAId, onOAChange }: OnGreetingTabP
           </div>
         </div>
       )}
-
-      {/* Delete single confirm */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
-            <AlertDialogDescription>
-              ลบ record การส่ง On Greeting ของ{" "}
-              <span className="font-medium">{deleteTarget?.masked_phone ?? deleteTarget?.phone_hash.slice(0, 12) + "..."}</span>
-              {" "}จาก template <span className="font-medium">{deleteTarget?.source_template_name}</span>?
-              <br />
-              <span className="text-xs">ผู้ใช้จะสามารถรับ On Greeting message ได้อีกครั้ง (ถ้า send_once เปิดอยู่)</span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => { void handleDelete(); }}
-              disabled={deleting}
-            >
-              {deleting ? "กำลังลบ..." : "ลบ"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete all confirm */}
-      <AlertDialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบทั้งหมด</AlertDialogTitle>
-            <AlertDialogDescription>
-              ลบ On Greeting records ทั้งหมด {total} รายการ ของ LINE OA นี้?
-              <br />
-              <span className="text-xs">ผู้ใช้ทุกคนจะสามารถรับ On Greeting message ได้อีกครั้ง</span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingAll}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => { void handleDeleteAll(); }}
-              disabled={deletingAll}
-            >
-              {deletingAll ? "กำลังลบ..." : `ลบทั้งหมด (${total})`}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
@@ -1029,12 +918,12 @@ export function LONDeliveryLogsPage() {
           History of LINE Notification Messaging delivery attempts.
         </p>
 
-        <Tabs defaultValue="subscribers">
+        <Tabs defaultValue="pnp">
           <TabsList>
-            <TabsTrigger value="subscribers">
+            {/* <TabsTrigger value="subscribers">
               <ScrollText size={14} className="mr-1.5" />
               LON Subscribers
-            </TabsTrigger>
+            </TabsTrigger> */}
             <TabsTrigger value="pnp">
               <PhoneCall size={14} className="mr-1.5" />
               LON by Phone
@@ -1045,13 +934,13 @@ export function LONDeliveryLogsPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="subscribers">
+          {/* <TabsContent value="subscribers">
             <LONLogsTab
               lineOAs={lineOAs}
               selectedLineOAId={selectedLineOAId}
               onOAChange={setSelectedLineOAId}
             />
-          </TabsContent>
+          </TabsContent> */}
 
           <TabsContent value="pnp">
             <PNPLogsTab

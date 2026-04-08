@@ -21,7 +21,7 @@ import {
   Inbox,
   LayoutTemplate,
   MessageCircleDashed,
-  Bell,
+  // Bell, // unused (LON Subscribers hidden)
   ScrollText,
   ClipboardList,
   BarChart2,
@@ -62,7 +62,7 @@ const BASE_NAV_SECTIONS: NavSection[] = [
       { label: "Auto Reply", href: "/auto-reply", icon: ChevronRight, tutorialId: "auto-reply" },
       { label: "Auto Push Messages", href: "/auto-push-messages", icon: Zap },
       { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
-      { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
+      // { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
       { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
       { label: "Message Logs", href: "/message-logs", icon: FileText },
       { label: "LON by Phone", href: "/lon-by-phone", icon: PhoneCall },

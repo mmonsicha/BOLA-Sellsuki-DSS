@@ -523,6 +523,12 @@ export function FollowersPage() {
 // ── FollowerCard ──────────────────────────────────────────────────────────────
 
 function FollowerCard({ follower }: { follower: Follower }) {
+  const linkedContact = follower.linked_contact;
+  const contactName = linkedContact
+    ? [linkedContact.first_name, linkedContact.last_name].filter(Boolean).join(" ")
+    : "";
+  const displayPhone = linkedContact?.phone || follower.phone;
+
   return (
     <Card
       className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -546,7 +552,7 @@ function FollowerCard({ follower }: { follower: Follower }) {
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          {/* Row 1: name + status badge */}
+          {/* Row 1: LINE name + status badge */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium truncate">
               {follower.display_name || follower.line_user_id}
@@ -561,21 +567,29 @@ function FollowerCard({ follower }: { follower: Follower }) {
             )}
           </div>
 
-          {/* Row 2: phone / email / note if set */}
-          {(follower.phone || follower.email) && (
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-              {[follower.phone, follower.email].filter(Boolean).join(" · ")}
+          {/* Row 2: real name from linked contact */}
+          {contactName && (
+            <p className="text-xs text-muted-foreground mt-0.5 truncate flex items-center gap-1">
+              <Phone size={10} className="flex-shrink-0" />
+              {contactName}
             </p>
           )}
 
-          {/* Row 3: status message */}
+          {/* Row 3: phone / email */}
+          {(displayPhone || follower.email) && (
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+              {[displayPhone, follower.email].filter(Boolean).join(" · ")}
+            </p>
+          )}
+
+          {/* Row 4: status message */}
           {follower.status_message && (
             <p className="text-xs text-muted-foreground mt-0.5 truncate italic">
               "{follower.status_message}"
             </p>
           )}
 
-          {/* Row 4: tags */}
+          {/* Row 5: tags */}
           {follower.tags?.length > 0 && (
             <div className="flex gap-1 mt-1.5 flex-wrap">
               {follower.tags.map((tag) => (
@@ -586,7 +600,7 @@ function FollowerCard({ follower }: { follower: Follower }) {
             </div>
           )}
 
-          {/* Row 5: custom fields */}
+          {/* Row 6: custom fields */}
           {follower.custom_fields && Object.keys(follower.custom_fields).length > 0 && (
             <div className="flex gap-1 mt-1 flex-wrap">
               {Object.entries(follower.custom_fields).map(([k, v]) => (
