@@ -5,6 +5,16 @@ const BASE_URL =
   "";
 
 export const liffApi = {
+  /** Returns minimal public info (name) of a LINE OA. Used to set the LIFF page title. */
+  getOAInfo: async (lineOAId: string): Promise<{ name: string }> => {
+    const res = await fetch(
+      `${BASE_URL}/v1/public/liff/oa-info?line_oa_id=${encodeURIComponent(lineOAId)}`,
+      { credentials: "omit" },
+    );
+    if (!res.ok) return { name: "" };
+    return res.json() as Promise<{ name: string }>;
+  },
+
   /** Called by the LIFF UID capture page after liff.getProfile() succeeds. */
   uidCaptured: async (lineOAId: string, lineUserId: string): Promise<void> => {
     const res = await fetch(`${BASE_URL}/v1/public/liff/uid-captured`, {

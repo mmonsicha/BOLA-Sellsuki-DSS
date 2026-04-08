@@ -59,6 +59,7 @@ export function LIFFUIDCapturePage() {
       let lineOAId = urlParams.get("line_oa_id") ?? "";
       let greetingToken = urlParams.get("token") ?? "";
       let redirectUrl = urlParams.get("redirect_url") ?? "";
+      let appName = urlParams.get("app_name") ?? "";
 
       const liffState = urlParams.get("liff.state") ?? "";
       if (liffState) {
@@ -68,9 +69,20 @@ export function LIFFUIDCapturePage() {
           if (!lineOAId) lineOAId = stateParams.get("line_oa_id") ?? "";
           if (!greetingToken) greetingToken = stateParams.get("token") ?? "";
           if (!redirectUrl) redirectUrl = stateParams.get("redirect_url") ?? "";
+          if (!appName) appName = stateParams.get("app_name") ?? "";
         } catch {
           // ignore parse errors
         }
+      }
+
+      // Set browser tab title: prefer app_name param, otherwise fetch from LINE OA name
+      if (appName) {
+        document.title = appName;
+      } else if (lineOAId) {
+        // Fire-and-forget — don't block LIFF init on title fetch
+        liffApi.getOAInfo(lineOAId).then(({ name }) => {
+          if (name) document.title = name;
+        }).catch(() => { /* non-fatal */ });
       }
 
       if (!liffId) {
