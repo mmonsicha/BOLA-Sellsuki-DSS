@@ -42,6 +42,32 @@ export const mediaApi = {
     if (!res.ok) throw new Error(`S3 upload failed: ${res.status}`);
   },
 
+  // uploadViaProxy uploads the file through the backend instead of directly to S3.
+  // Use this when direct S3 upload is blocked by CORS.
+  uploadViaProxy: async (id: string, file: Blob, mimeType: string, thumbnail = false): Promise<Media> => {
+    const baseURL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+    const ws = localStorage.getItem("bola_workspace");
+    const qs = new URLSearchParams();
+    if (thumbnail) qs.set("thumbnail", "true");
+    if (ws) qs.set("workspace_id", ws);
+    const url = `${baseURL}/v1/media/${id}/upload?${qs.toString()}`;
+
+    const headers: Record<string, string> = { "Content-Type": mimeType };
+    if (import.meta.env.VITE_AUTH_MODE !== "kratos") {
+      const token = localStorage.getItem("bola_token");
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: file,
+    });
+    if (!res.ok) throw new Error(`Proxy upload failed: ${res.status}`);
+    return res.json() as Promise<Media>;
+  },
+
   confirmUpload: (id: string) =>
     api.post<Media>(`/v1/media/${id}/confirm-upload`, {}),
 
