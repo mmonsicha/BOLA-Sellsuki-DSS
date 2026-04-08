@@ -4,6 +4,12 @@ const TOKEN_KEY = "bola_token";
 const WORKSPACE_KEY = "bola_workspace";
 const TOKEN_EXPIRY_KEY = "bola_token_expires_at";
 
+/** Dev-only convenience: allow running UI without going through login flow. */
+export function isAuthBypassed(): boolean {
+  const raw = import.meta.env.VITE_DISABLE_AUTH as string | undefined;
+  return raw === "true";
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -107,6 +113,7 @@ export function switchWorkspace(): void {
  * - kratos mode: has a selected workspace (session cookie validated on each API call)
  */
 export function isAuthenticated(): boolean {
+  if (isAuthBypassed()) return true;
   if (getAuthMode() === "kratos") {
     return Boolean(getWorkspaceId());
   }

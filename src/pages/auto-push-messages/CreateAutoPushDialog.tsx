@@ -1,7 +1,7 @@
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, X } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getWorkspaceId } from "@/lib/auth";
 import { autoPushMessageApi } from "@/api/autoPushMessage";
 import type { AutoPushMessage } from "@/api/autoPushMessage";
@@ -155,18 +155,16 @@ export function CreateAutoPushDialog({
     if (open) {
       void loadLineOAs();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, loadLineOAs]);
 
   // Load webhooks and segments when dialog opens or lineOAId changes
   useEffect(() => {
     if (open && lineOAId) {
       void loadSelectOptions();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, lineOAId]);
+  }, [open, lineOAId, loadSelectOptions]);
 
-  const loadLineOAs = async () => {
+  const loadLineOAs = useCallback(async () => {
     setLoadingLineOAs(true);
     try {
       const res = await lineOAApi.list({ workspace_id: getWorkspaceId() ?? "" });
@@ -176,9 +174,9 @@ export function CreateAutoPushDialog({
     } finally {
       setLoadingLineOAs(false);
     }
-  };
+  }, []);
 
-  const loadSelectOptions = async () => {
+  const loadSelectOptions = useCallback(async () => {
     setLoadingData(true);
     try {
       // Load webhook settings
@@ -201,7 +199,7 @@ export function CreateAutoPushDialog({
     } finally {
       setLoadingData(false);
     }
-  };
+  }, [lineOAId]);
 
   const handleLineOAChange = (newLineOAId: string) => {
     setLineOAId(newLineOAId);

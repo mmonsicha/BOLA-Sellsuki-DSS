@@ -4,6 +4,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || "";
 
 /** Public paths that should not trigger a redirect on 401. */
 const PUBLIC_PATHS = ["/v1/auth/login", "/auth/accept-invite"];
+const AUTH_BYPASS = (import.meta.env.VITE_DISABLE_AUTH as string | undefined) === "true";
 
 class ApiClient {
   private baseURL: string;
@@ -62,6 +63,11 @@ class ApiClient {
 
     // 401 on any protected endpoint → clear session and redirect appropriately
     if (res.status === 401 && !PUBLIC_PATHS.some((p) => path.includes(p))) {
+      if (AUTH_BYPASS) {
+        const errData = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+
       localStorage.removeItem("bola_token");
       localStorage.removeItem("bola_workspace");
       const authMode = import.meta.env.VITE_AUTH_MODE;

@@ -3,7 +3,7 @@ import { LoginPage } from "@/pages/auth/LoginPage";
 import { AcceptInvitePage } from "@/pages/auth/AcceptInvitePage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticated, isAuthBypassed } from "@/lib/auth";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { LineOAPage } from "@/pages/line-oa/LineOAPage";
 import { LineOADetailPage } from "@/pages/line-oa/LineOADetailPage";
@@ -221,7 +221,7 @@ function Router() {
   return (
     <>
       {/* TokenExpiryGuard only applies in local_jwt mode (Kratos uses session cookies) */}
-      {getAuthMode() === "local_jwt" && <TokenExpiryGuard />}
+      {getAuthMode() === "local_jwt" && !isAuthBypassed() && <TokenExpiryGuard />}
       {resolveProtectedRoute(path, segments)}
     </>
   );

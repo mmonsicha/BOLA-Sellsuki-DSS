@@ -287,7 +287,6 @@ export function FeedbackWidget() {
       document.removeEventListener("pointermove", onPointerMove);
       document.removeEventListener("pointerup", onPointerUp);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]); // re-run when open flips so we re-attach to the freshly mounted button
 
   // Reposition if window resizes
