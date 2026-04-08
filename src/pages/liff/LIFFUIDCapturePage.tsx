@@ -44,7 +44,6 @@ type PageStatus = "loading" | "error" | "success";
 export function LIFFUIDCapturePage() {
   const [status, setStatus] = useState<PageStatus>("loading");
   const [errorMsg, setErrorMsg] = useState("");
-  const [oaName, setOaName] = useState("");
 
   // Clear the default app title immediately so it doesn't flash before the OA name loads
   useEffect(() => { document.title = ""; }, []);
@@ -98,18 +97,6 @@ export function LIFFUIDCapturePage() {
       if (!redirectUrl) redirectUrl = params.get("redirect_url") ?? "";
       if (!appName) appName = params.get("app_name") ?? "";
 
-      // Set OA name for display + browser tab title
-      if (appName) {
-        setOaName(appName);
-        document.title = appName;
-      } else if (lineOAId) {
-        liffApi.getOAInfo(lineOAId).then(({ name }) => {
-          if (name) {
-            setOaName(name);
-            document.title = name;
-          }
-        }).catch(() => { /* non-fatal */ });
-      }
 
       if (!lineOAId) {
         setErrorMsg("ไม่พบ LINE OA ID กรุณาตรวจสอบการตั้งค่า");
@@ -170,10 +157,6 @@ export function LIFFUIDCapturePage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-sm shadow-md">
         <CardContent className="pt-8 pb-8 flex flex-col items-center gap-4 text-center">
-          {oaName && (
-            <p className="text-base font-semibold text-gray-800">{oaName}</p>
-          )}
-
           {status === "loading" && (
             <>
               <RefreshCw size={40} className="text-line animate-spin" />
