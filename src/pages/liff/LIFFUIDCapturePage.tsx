@@ -64,7 +64,11 @@ export function LIFFUIDCapturePage() {
       const liffState = urlParams.get("liff.state") ?? "";
       if (liffState) {
         try {
-          const stateParams = new URLSearchParams(decodeURIComponent(liffState));
+          // liff.state may contain a path prefix e.g. "/liff/uid-capture?foo=bar"
+          // Strip everything up to and including the first "?" before parsing
+          const decoded = decodeURIComponent(liffState);
+          const qIdx = decoded.indexOf("?");
+          const stateParams = new URLSearchParams(qIdx >= 0 ? decoded.slice(qIdx + 1) : decoded);
           if (!liffId) liffId = stateParams.get("liff_id") ?? "";
           if (!lineOAId) lineOAId = stateParams.get("line_oa_id") ?? "";
           if (!greetingToken) greetingToken = stateParams.get("token") ?? "";
@@ -75,20 +79,28 @@ export function LIFFUIDCapturePage() {
         }
       }
 
-      // Set browser tab title: prefer app_name param, otherwise fetch from LINE OA name
-      if (appName) {
-        document.title = appName;
-      } else if (lineOAId) {
-        // Fire-and-forget — don't block LIFF init on title fetch
-        liffApi.getOAInfo(lineOAId).then(({ name }) => {
-          if (name) document.title = name;
-        }).catch(() => { /* non-fatal */ });
-      }
-
       if (!liffId) {
         setErrorMsg("ไม่พบ LIFF ID กรุณาตรวจสอบการตั้งค่า");
         setStatus("error");
         return;
+      }
+
+      await liff.init({ liffId });
+
+      // Re-read ALL params after liff.init() — LINE SDK decodes liff.state into the URL at this point
+      const params = new URLSearchParams(window.location.search);
+      if (!lineOAId) lineOAId = params.get("line_oa_id") ?? "";
+      if (!greetingToken) greetingToken = params.get("token") ?? "";
+      if (!redirectUrl) redirectUrl = params.get("redirect_url") ?? "";
+      if (!appName) appName = params.get("app_name") ?? "";
+
+      // Set browser tab title now that we have the definitive lineOAId
+      if (appName) {
+        document.title = appName;
+      } else if (lineOAId) {
+        liffApi.getOAInfo(lineOAId).then(({ name }) => {
+          if (name) document.title = name;
+        }).catch(() => { /* non-fatal */ });
       }
 
       if (!lineOAId) {
@@ -96,8 +108,6 @@ export function LIFFUIDCapturePage() {
         setStatus("error");
         return;
       }
-
-      await liff.init({ liffId });
 
       if (!liff.isInClient()) {
         setErrorMsg("กรุณาเปิดลิงก์นี้ผ่าน LINE เท่านั้น");
@@ -109,11 +119,6 @@ export function LIFFUIDCapturePage() {
         liff.login({ redirectUri: window.location.href });
         return;
       }
-
-      // Re-read params AFTER liff.init() — LINE decodes liff.state and applies it to the URL
-      const params = new URLSearchParams(window.location.search);
-      if (!greetingToken) greetingToken = params.get("token") ?? "";
-      if (!redirectUrl) redirectUrl = params.get("redirect_url") ?? "";
 
       const profile = await liff.getProfile();
 
