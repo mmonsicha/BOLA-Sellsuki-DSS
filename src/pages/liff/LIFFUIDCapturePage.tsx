@@ -46,6 +46,9 @@ export function LIFFUIDCapturePage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [oaName, setOaName] = useState("");
 
+  // Clear the default app title immediately so it doesn't flash before the OA name loads
+  useEffect(() => { document.title = ""; }, []);
+
   useEffect(() => {
     void initFlow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
