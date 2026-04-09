@@ -1,4 +1,5 @@
 @tailwind base;
+@import "@uxuissk/design-system/styles.css";
 @tailwind components;
 @tailwind utilities;
 

@@ -1,35 +1,40 @@
-import { useState, useEffect, useRef } from "react";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { LineOAFilter } from "@/components/common/LineOAFilter";
+  AdvancedDataTable,
+  Badge,
+  Breadcrumb,
+  Card,
+  CardBody,
+  ConfirmDialog,
+  DSButton,
+  EmptyState,
+  FeaturePageScaffold,
+  FilterBar,
+  PageHeader,
+  Tabs,
+  toast,
+  type AdvancedColumn,
+  type BulkAction,
+  type FilterBarValue,
+} from "@uxuissk/design-system";
+import { BookOpen, Phone, Trash2, Upload, Users } from "lucide-react";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { CsvImportWizard } from "@/components/contacts/CsvImportWizard";
-import { cn } from "@/lib/utils";
-import type { Follower, UnifiedContact, LineOA } from "@/types";
 import { followerApi } from "@/api/follower";
 import { lineOAApi } from "@/api/lineOA";
 import { getWorkspaceId } from "@/lib/auth";
 import { maskPhone } from "@/lib/phone";
-import { Upload, Users, Phone, Search, ChevronLeft, ChevronRight, BookOpen, Trash2 } from "lucide-react";
+import type { Follower, LineOA, UnifiedContact } from "@/types";
 
 const WORKSPACE_ID = getWorkspaceId() ?? "";
-const PAGE_SIZE = 20;
 
 type ActiveTab = "followers" | "phone_only";
 
-// ---------- helpers ----------
+const followStatusVariant: Record<string, "success" | "secondary" | "destructive"> = {
+  following: "success",
+  unfollowed: "secondary",
+  blocked: "destructive",
+};
 
 function getInitials(contact: UnifiedContact): string {
   if (contact.display_name) return contact.display_name[0].toUpperCase();
@@ -46,91 +51,72 @@ function getDisplayLabel(contact: UnifiedContact): string {
 }
 
 function getSubLabel(contact: UnifiedContact): string | null {
-  if (contact.phone) return maskPhone(contact.phone);
-  return null;
+  return contact.phone ? maskPhone(contact.phone) : null;
 }
 
-const followStatusVariant: Record<string, "success" | "secondary" | "destructive"> = {
-  following: "success",
-  unfollowed: "secondary",
-  blocked: "destructive",
-};
-
 export function ContactsPage() {
-  // LINE OA list
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
-  const [selectedLineOAId, setSelectedLineOAId] = useState("");
-
-  // Tab
   const [activeTab, setActiveTab] = useState<ActiveTab>("followers");
-
-  // Data
   const [followers, setFollowers] = useState<Follower[]>([]);
   const [unifiedContacts, setUnifiedContacts] = useState<UnifiedContact[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Search (debounced)
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Import modal
   const [importOpen, setImportOpen] = useState(false);
-
-  // Bulk delete (phone_only tab)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [bulkDeleting, setBulkDeleting] = useState(false);
-
-  // Delete all
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
-  const [deleteAlling, setDeleteAlling] = useState(false);
 
-  // ---- Load LINE OAs ----
+  const [filterValue, setFilterValue] = useState<FilterBarValue>({
+    search: "",
+    filters: {
+      lineOa: null,
+    },
+  });
+  const [debouncedFilterValue, setDebouncedFilterValue] = useState(filterValue);
+
   useEffect(() => {
-    const load = async () => {
+    const timer = setTimeout(() => setDebouncedFilterValue(filterValue), 400);
+    return () => clearTimeout(timer);
+  }, [filterValue]);
+
+  useEffect(() => {
+    const loadLineOAs = async () => {
       try {
         const res = await lineOAApi.list({ workspace_id: WORKSPACE_ID });
         setLineOAs(res.data ?? []);
       } catch {
-        // non-fatal: filter just won't show
+        toast.warning("LINE OA filters are unavailable right now.");
       }
     };
-    void load();
+
+    void loadLineOAs();
   }, []);
 
-  // ---- Debounce search input ----
-  const handleSearchChange = (value: string) => {
-    setSearchInput(value);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      setSearch(value);
-      setPage(1);
-    }, 400);
-  };
-
-  // ---- Reset page on tab / OA / search change ----
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [activeTab, selectedLineOAId]);
+  }, [activeTab, debouncedFilterValue]);
 
-  // ---- Load data ----
   useEffect(() => {
+    const lineOaId = typeof debouncedFilterValue.filters.lineOa === "string"
+      ? debouncedFilterValue.filters.lineOa
+      : undefined;
+
     const load = async () => {
       setLoading(true);
       setError(null);
+
       try {
         if (activeTab === "followers") {
           const res = await followerApi.list({
             workspace_id: WORKSPACE_ID,
-            line_oa_id: selectedLineOAId || undefined,
-            search: search || undefined,
+            line_oa_id: lineOaId,
+            search: debouncedFilterValue.search || undefined,
             page,
-            page_size: PAGE_SIZE,
+            page_size: pageSize,
           });
           setFollowers(res.data ?? []);
           setTotal(res.total ?? 0);
@@ -138,11 +124,11 @@ export function ContactsPage() {
         } else {
           const res = await followerApi.listUnified({
             workspace_id: WORKSPACE_ID,
-            line_oa_id: selectedLineOAId || undefined,
+            line_oa_id: lineOaId,
             contact_status: "phone_only",
-            search: search || undefined,
+            search: debouncedFilterValue.search || undefined,
             page,
-            page_size: PAGE_SIZE,
+            page_size: pageSize,
           });
           setUnifiedContacts(res.data ?? []);
           setTotal(res.total ?? 0);
@@ -154,443 +140,268 @@ export function ContactsPage() {
         setLoading(false);
       }
     };
+
     void load();
-  }, [activeTab, selectedLineOAId, search, page]);
+  }, [activeTab, debouncedFilterValue, page, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const followerColumns = useMemo<AdvancedColumn<Follower>[]>(() => [
+    {
+      key: "display_name",
+      header: "Contact",
+      sortable: true,
+      render: (value: string, row) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-sky-50 text-sky-600">
+            {row.picture_url ? (
+              <img src={row.picture_url} alt={value} className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-sm font-semibold">{value?.[0]?.toUpperCase() ?? "?"}</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate font-semibold">{value}</div>
+            {row.tags?.length ? (
+              <div className="mt-1 flex flex-wrap gap-2">
+                {row.tags.slice(0, 3).map((tag) => (
+                  <Badge key={tag} variant="outline" size="sm">{tag}</Badge>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "follow_status",
+      header: "Status",
+      render: (value: string) => <Badge variant={followStatusVariant[value] ?? "secondary"} size="sm">{value}</Badge>,
+    },
+    {
+      key: "followed_at",
+      header: "Followed",
+      render: (value: string | null | undefined) => value ? new Date(value).toLocaleDateString() : "-",
+    },
+  ], []);
 
-  // ---- Selection helpers ----
-  const allCurrentIds = unifiedContacts.map((c) => c.id);
-  const allSelected = allCurrentIds.length > 0 && allCurrentIds.every((id) => selectedIds.has(id));
-  const someSelected = allCurrentIds.some((id) => selectedIds.has(id));
+  const phoneColumns = useMemo<AdvancedColumn<UnifiedContact>[]>(() => [
+    {
+      key: "display_name",
+      header: "Contact",
+      sortable: true,
+      render: (_value, row) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-sky-50 text-sky-600">
+            {row.picture_url ? (
+              <img src={row.picture_url} alt={getDisplayLabel(row)} className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-sm font-semibold">{getInitials(row)}</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate font-semibold">{getDisplayLabel(row)}</div>
+            {getSubLabel(row) && (
+              <div className="truncate text-sm text-[var(--text-secondary)]">{getSubLabel(row)}</div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "linked_oa_count",
+      header: "Links",
+      render: (value: number | null | undefined) => (
+        value && value > 0
+          ? <Badge variant="success" size="sm">{value} OA linked</Badge>
+          : <Badge variant="secondary" size="sm">Phone only</Badge>
+      ),
+    },
+    {
+      key: "created_at",
+      header: "Created",
+      render: (value: string | null | undefined) => value ? new Date(value).toLocaleDateString() : "-",
+    },
+  ], []);
 
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        allCurrentIds.forEach((id) => next.delete(id));
-        return next;
-      });
-    } else {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        allCurrentIds.forEach((id) => next.add(id));
-        return next;
-      });
-    }
-  };
+  const bulkActions: BulkAction[] = [
+    {
+      label: "Delete selected",
+      icon: <Trash2 size={14} />,
+      variant: "destructive",
+      onClick: () => setBulkDeleteOpen(true),
+    },
+  ];
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const totalFollowers = activeTab === "followers" ? total : followers.length;
+  const totalPhones = activeTab === "phone_only" ? total : unifiedContacts.length;
+
+  const filterOptions = lineOAs.map((oa) => ({ label: oa.name, value: oa.id }));
+  const currentLineOaId = typeof debouncedFilterValue.filters.lineOa === "string"
+    ? debouncedFilterValue.filters.lineOa
+    : "";
 
   const handleDeleteAll = async () => {
-    setDeleteAlling(true);
     try {
       await followerApi.deleteAllPhoneContacts();
       setSelectedIds(new Set());
       setDeleteAllOpen(false);
-      setTotal(0);
       setUnifiedContacts([]);
+      setTotal(0);
+      toast.success("All phone contacts were deleted.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete all contacts");
-    } finally {
-      setDeleteAlling(false);
     }
   };
 
   const handleBulkDelete = async () => {
-    setBulkDeleting(true);
     try {
-      await followerApi.bulkDeletePhoneContacts(Array.from(selectedIds));
+      await followerApi.bulkDeletePhoneContacts(Array.from(selectedIds).map(String));
       setSelectedIds(new Set());
       setBulkDeleteOpen(false);
-      // Reload current page
-      setPage((p) => p);
-      // Force reload by toggling a dummy state — easiest is to re-trigger effect
-      setSearch((s) => s);
+      setPage(1);
+      setDebouncedFilterValue((prev) => ({ ...prev }));
+      toast.success("Selected phone contacts were deleted.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete contacts");
-    } finally {
-      setBulkDeleting(false);
     }
   };
 
+  const emptyState = activeTab === "followers"
+    ? (
+      <EmptyState
+        icon={<Users size={44} />}
+        title="No followers yet"
+        description="Followers will appear here when they follow your LINE Official Account."
+      />
+    )
+    : (
+      <EmptyState
+        icon={<Phone size={44} />}
+        title="No phone contacts yet"
+        description="Import phone numbers to create a reusable contact list for campaigns and matching."
+        action={(
+          <DSButton variant="secondary" leftIcon={<Upload size={16} />} onClick={() => setImportOpen(true)}>
+            Import Phones
+          </DSButton>
+        )}
+      />
+    );
+
+  const tableNode = (
+    <Card elevation="none">
+      <CardBody>
+        {(activeTab === "followers" ? followers.length : unifiedContacts.length) === 0 && !loading && !error ? (
+          emptyState
+        ) : (
+          <AdvancedDataTable
+            rowKey="id"
+            columns={activeTab === "followers" ? followerColumns : phoneColumns}
+            data={activeTab === "followers" ? followers : unifiedContacts}
+            pagination={{ page, pageSize, totalCount: total }}
+            onPageChange={(nextPage, nextPageSize) => {
+              setPage(nextPage);
+              setPageSize(nextPageSize);
+            }}
+            selectable={activeTab === "phone_only"}
+            selectedRows={selectedIds}
+            onSelectionChange={(selected) => setSelectedIds(selected)}
+            bulkActions={activeTab === "phone_only" ? bulkActions : undefined}
+            loading={loading}
+            error={error ?? undefined}
+            emptyMessage="No contacts found"
+            emptyDescription="Try adjusting your search or LINE OA filter."
+            onRowClick={(row) => {
+              window.location.href = activeTab === "followers"
+                ? `/followers/${row.id}`
+                : `/contacts/phone/${row.id}`;
+            }}
+          />
+        )}
+      </CardBody>
+    </Card>
+  );
+
   return (
     <AppLayout title="Contacts">
-      <div className="space-y-4">
-        {/* Top bar */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            Manage your LINE contacts — followers, phone imports, and more.
-          </p>
-          <div className="flex items-center gap-2">
-            <a
-              href={`${(import.meta.env.VITE_API_URL || "").replace(/\/$/, "")}/v1/contacts/swagger`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="ghost" size="sm" className="flex items-center gap-1.5 text-muted-foreground">
-                <BookOpen size={14} />
-                API Docs
-              </Button>
-            </a>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-shrink-0 flex items-center gap-1.5"
-              onClick={() => setImportOpen(true)}
-            >
-              <Upload size={14} />
-              Import Phones
-            </Button>
-          </div>
-        </div>
-
-        {/* LINE OA filter */}
-        <LineOAFilter
-          lineOAs={lineOAs}
-          selectedId={selectedLineOAId}
-          onChange={(id) => { setSelectedLineOAId(id); setPage(1); }}
-          showAll
-        />
-
-        {/* Tabs */}
-        <div className="flex gap-1 border-b">
-          <button
-            onClick={() => setActiveTab("followers")}
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
-              activeTab === "followers"
-                ? "border-line text-line"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+      <FeaturePageScaffold
+        layout="list"
+        header={(
+          <PageHeader
+            title="Contacts"
+            subtitle="Manage followers, imported phone contacts, and matching flows from a single DS-first workspace."
+            breadcrumb={<Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Contacts" }]} />}
+            tabs={(
+              <Tabs
+                tabs={[
+                  { id: "followers", label: "All Followers", badge: String(totalFollowers) },
+                  { id: "phone_only", label: "Phone", badge: String(totalPhones) },
+                ]}
+                activeTab={activeTab}
+                onChange={(id) => setActiveTab(id as ActiveTab)}
+                variant="underline"
+              />
             )}
-          >
-            <span className="flex items-center gap-1.5">
-              <Users size={14} />
-              All Followers
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab("phone_only")}
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
-              activeTab === "phone_only"
-                ? "border-line text-line"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <span className="flex items-center gap-1.5">
-              <Phone size={14} />
-              Phone
-            </span>
-          </button>
-        </div>
-
-        {/* Search + action bar */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, phone…"
-              value={searchInput}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          {activeTab === "phone_only" && selectedIds.size > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="flex-shrink-0 flex items-center gap-1.5"
-              onClick={() => setBulkDeleteOpen(true)}
-            >
-              <Trash2 size={14} />
-              ลบ {selectedIds.size} รายการ
-            </Button>
-          )}
-          {activeTab === "phone_only" && total > 0 && selectedIds.size === 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-shrink-0 flex items-center gap-1.5 text-destructive border-destructive/40 hover:bg-destructive/10"
-              onClick={() => setDeleteAllOpen(true)}
-            >
-              <Trash2 size={14} />
-              ลบทั้งหมด ({total})
-            </Button>
-          )}
-        </div>
-
-        {/* Error */}
-        {error && (
-          <Card className="border-destructive">
-            <CardContent className="text-center py-8">
-              <p className="font-medium text-destructive">Error loading contacts</p>
-              <p className="text-sm text-muted-foreground mt-1">{error}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Loading skeleton */}
-        {loading && (
-          <Card>
-            <CardContent className="text-center py-12">
-              <p className="font-medium text-muted-foreground animate-pulse">Loading…</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* All Followers tab content */}
-        {!loading && !error && activeTab === "followers" && (
-          followers.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Users className="mx-auto mb-3 text-muted-foreground" size={36} />
-                <p className="font-medium">No followers yet</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Followers will appear here when they follow your LINE OA.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {followers.map((follower) => (
-                <Card
-                  key={follower.id}
-                  className="cursor-pointer hover:bg-muted/40 transition-colors"
-                  onClick={() => window.location.href = `/followers/${follower.id}`}
+            actions={(
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href={`${(import.meta.env.VITE_API_URL || "").replace(/\/$/, "")}/v1/contacts/swagger`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  <CardContent className="flex items-center gap-4 p-4">
-                    {/* Avatar */}
-                    <div className="w-10 h-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
-                      {follower.picture_url ? (
-                        <img
-                          src={follower.picture_url}
-                          alt={follower.display_name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground font-medium text-sm">
-                          {follower.display_name?.[0]?.toUpperCase() ?? "?"}
-                        </div>
-                      )}
-                    </div>
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium truncate">{follower.display_name}</span>
-                        <Badge variant={followStatusVariant[follower.follow_status] ?? "secondary"}>
-                          {follower.follow_status}
-                        </Badge>
-                      </div>
-                      {follower.tags?.length > 0 && (
-                        <div className="flex gap-1 mt-1 flex-wrap">
-                          {follower.tags.map((tag) => (
-                            <Badge key={tag} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    {/* Date */}
-                    <div className="text-xs text-muted-foreground flex-shrink-0">
-                      {follower.followed_at
-                        ? new Date(follower.followed_at).toLocaleDateString()
-                        : "—"}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
-        )}
-
-        {/* Phone Only tab content */}
-        {!loading && !error && activeTab === "phone_only" && (
-          unifiedContacts.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Phone className="mx-auto mb-3 text-muted-foreground" size={36} />
-                <p className="font-medium">No phone contacts yet</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Import phone numbers using the "Import Phones" button above.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {/* Select-all row */}
-              <div className="flex items-center gap-3 px-1">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 accent-[#06C755] cursor-pointer"
-                  checked={allSelected}
-                  ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
-                  onChange={toggleSelectAll}
-                  aria-label="Select all on this page"
-                />
-                <span className="text-xs text-muted-foreground">
-                  {selectedIds.size > 0 ? `เลือกแล้ว ${selectedIds.size} รายการ` : "เลือกทั้งหมดในหน้านี้"}
-                </span>
+                  <DSButton variant="ghost" leftIcon={<BookOpen size={16} />}>API Docs</DSButton>
+                </a>
+                <DSButton variant="outline" leftIcon={<Upload size={16} />} onClick={() => setImportOpen(true)}>
+                  Import Phones
+                </DSButton>
+                {activeTab === "phone_only" && total > 0 && (
+                  <DSButton variant="destructive" leftIcon={<Trash2 size={16} />} onClick={() => setDeleteAllOpen(true)}>
+                    Delete all
+                  </DSButton>
+                )}
               </div>
-
-              {unifiedContacts.map((contact) => (
-                <Card
-                  key={contact.id}
-                  className={cn(
-                    "transition-colors",
-                    selectedIds.has(contact.id) ? "border-line/40 bg-line/5" : "hover:bg-muted/40"
-                  )}
-                >
-                  <CardContent className="flex items-center gap-4 p-4">
-                    {/* Checkbox */}
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-gray-300 accent-[#06C755] cursor-pointer flex-shrink-0"
-                      checked={selectedIds.has(contact.id)}
-                      onChange={() => toggleSelect(contact.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={`Select ${getDisplayLabel(contact)}`}
-                    />
-
-                    {/* Clickable area */}
-                    <div
-                      className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer"
-                      onClick={() => window.location.href = `/contacts/phone/${contact.id}`}
-                    >
-                      {/* Avatar / initials */}
-                      <div className="w-10 h-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
-                        {contact.picture_url ? (
-                          <img
-                            src={contact.picture_url}
-                            alt={getDisplayLabel(contact)}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-muted-foreground font-medium text-sm">
-                            {getInitials(contact)}
-                          </div>
-                        )}
-                      </div>
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium truncate">{getDisplayLabel(contact)}</span>
-                          <Badge variant="secondary">Phone</Badge>
-                          {contact.linked_oa_count != null && contact.linked_oa_count > 0 && (
-                            <Badge variant="outline" className="text-xs text-line border-line/40">
-                              {contact.linked_oa_count} OA{contact.linked_oa_count > 1 ? "s" : ""} linked
-                            </Badge>
-                          )}
-                        </div>
-                        {getSubLabel(contact) && getSubLabel(contact) !== getDisplayLabel(contact) && (
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                            {getSubLabel(contact)}
-                          </p>
-                        )}
-                      </div>
-                      {/* Date */}
-                      <div className="text-xs text-muted-foreground flex-shrink-0">
-                        {contact.created_at
-                          ? new Date(contact.created_at).toLocaleDateString()
-                          : "—"}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
+            )}
+          />
         )}
-
-        {/* Pagination */}
-        {!loading && !error && total > PAGE_SIZE && (
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-sm text-muted-foreground">
-              Page {page} of {totalPages} ({total} total)
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                <ChevronLeft size={14} />
-                Prev
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-              >
-                Next
-                <ChevronRight size={14} />
-              </Button>
-            </div>
-          </div>
+        filters={(
+          <FilterBar
+            showSearch
+            searchPlaceholder="Search by name, phone, or LINE display name..."
+            filters={[
+              { key: "lineOa", label: "LINE OA", type: "single", options: [{ label: "All LINE OAs", value: "" }, ...filterOptions] },
+            ]}
+            value={filterValue}
+            onFilterChange={(value) => setFilterValue(value)}
+          />
         )}
-      </div>
+        table={tableNode}
+      />
 
       <CsvImportWizard
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        lineOAId={selectedLineOAId}
+        lineOAId={currentLineOaId}
       />
 
-      {/* Delete All confirm dialog */}
-      <AlertDialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ลบ Contact ทั้งหมด?</AlertDialogTitle>
-            <AlertDialogDescription>
-              คุณกำลังจะลบ <span className="font-semibold">ทั้งหมด {total} รายการ</span> ออกจากระบบถาวร
-              รวมถึง OA linkage ทั้งหมด ไม่สามารถกู้คืนได้
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteAlling}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); void handleDeleteAll(); }}
-              disabled={deleteAlling}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleteAlling ? "กำลังลบ…" : `ลบทั้งหมด ${total} รายการ`}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteAllOpen}
+        onClose={() => setDeleteAllOpen(false)}
+        onConfirm={() => { void handleDeleteAll(); }}
+        title="Delete all phone contacts?"
+        description={`This will permanently remove ${total} imported phone contacts and any OA links tied to them.`}
+        confirmLabel="Delete all"
+        cancelLabel="Cancel"
+        variant="destructive"
+      />
 
-      {/* Bulk delete confirm dialog */}
-      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ลบ Contact ที่เลือก?</AlertDialogTitle>
-            <AlertDialogDescription>
-              คุณกำลังจะลบ <span className="font-semibold">{selectedIds.size} รายการ</span> ออกจากระบบถาวร
-              รวมถึง OA linkage ทั้งหมด ไม่สามารถกู้คืนได้
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={bulkDeleting}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); void handleBulkDelete(); }}
-              disabled={bulkDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {bulkDeleting ? "กำลังลบ…" : `ลบ ${selectedIds.size} รายการ`}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={() => { void handleBulkDelete(); }}
+        title="Delete selected contacts?"
+        description={`This will permanently remove ${selectedIds.size} selected phone contacts and their current OA links.`}
+        confirmLabel="Delete selected"
+        cancelLabel="Cancel"
+        variant="destructive"
+      />
     </AppLayout>
   );
 }

@@ -1,234 +1,243 @@
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Users, Zap, Trash2, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react";
-import { segmentApi } from "@/api/segment";
-import { broadcastApi } from "@/api/broadcast";
-import type { Segment, Broadcast } from "@/types";
-import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/components/ui/toast";
+  AdvancedDataTable,
+  Alert,
+  Badge,
+  Breadcrumb,
+  Card,
+  CardBody,
+  ConfirmDialog,
+  DSButton,
+  EmptyState,
+  FeaturePageScaffold,
+  PageHeader,
+  StatCard,
+  toast,
+  type AdvancedColumn,
+} from "@uxuissk/design-system";
+import { AlertTriangle, Plus, Tag, Trash2, Users, Zap } from "lucide-react";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { broadcastApi } from "@/api/broadcast";
+import { segmentApi } from "@/api/segment";
+import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import { getWorkspaceId } from "@/lib/auth";
+import type { Broadcast, Segment } from "@/types";
 
 const WORKSPACE_ID = getWorkspaceId() ?? "";
 
 export function SegmentsPage() {
-  const toast = useToast();
   const { isEditorOrAbove } = useCurrentAdmin();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [affectedBroadcasts, setAffectedBroadcasts] = useState<Broadcast[]>([]);
   const [checkingUsage, setCheckingUsage] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
+    setError(null);
     segmentApi
       .list({ workspace_id: WORKSPACE_ID })
       .then((res) => setSegments(res.data ?? []))
-      .catch(console.error)
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load segments");
+      })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const handleConfirmedDelete = async (id: string) => {
-    setDeletingId(id);
+  const handleDeleteClick = async (segment: Segment) => {
+    setCheckingUsage(true);
+    setAffectedBroadcasts([]);
     try {
-      await segmentApi.delete(id);
-      setSegments((prev) => prev.filter((s) => s.id !== id));
-    } catch (e) {
-      toast.error("Failed to delete segment", e instanceof Error ? e.message : "An unexpected error occurred.");
+      const res = await broadcastApi.list({ workspace_id: WORKSPACE_ID, page_size: 100 });
+      const active = (res.data ?? []).filter(
+        (broadcast) => broadcast.target_segment_id === segment.id
+          && (broadcast.status === "scheduled" || broadcast.status === "sending" || broadcast.status === "draft"),
+      );
+      setAffectedBroadcasts(active);
+    } catch {
+      // Keep dialog generic if lookup fails.
     } finally {
-      setDeletingId(null);
+      setCheckingUsage(false);
+      setDeleteTarget({ id: segment.id, name: segment.name });
     }
   };
 
-  return (
-    <AppLayout title="Segments">
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            Group your followers into segments for targeted broadcasts.
-          </p>
-          {isEditorOrAbove && (
-            <Button className="gap-2 self-start sm:self-auto flex-shrink-0" onClick={() => { window.location.href = "/segments/new"; }}>
-              <Plus size={16} />
-              New Segment
-            </Button>
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return;
+
+    setDeletingId(deleteTarget.id);
+    try {
+      await segmentApi.delete(deleteTarget.id);
+      setSegments((prev) => prev.filter((segment) => segment.id !== deleteTarget.id));
+      toast.success(`Segment "${deleteTarget.name}" was deleted.`);
+    } catch (err) {
+      toast.error("Failed to delete segment", err instanceof Error ? err.message : "Unexpected error");
+    } finally {
+      setDeletingId(null);
+      setDeleteTarget(null);
+      setAffectedBroadcasts([]);
+    }
+  };
+
+  const stats = [
+    { title: "Total segments", value: segments.length, icon: <Tag size={18} /> },
+    { title: "Dynamic segments", value: segments.filter((segment) => segment.is_dynamic).length, icon: <Zap size={18} /> },
+    {
+      title: "Audience covered",
+      value: segments.reduce((sum, segment) => sum + (segment.customer_count ?? 0), 0).toLocaleString(),
+      icon: <Users size={18} />,
+    },
+  ];
+
+  const columns = useMemo<AdvancedColumn<Segment>[]>(() => [
+    {
+      key: "name",
+      header: "Segment",
+      sortable: true,
+      render: (_value, segment) => (
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold">{segment.name}</span>
+            {segment.is_dynamic && (
+              <Badge variant="default" size="sm">
+                Dynamic
+              </Badge>
+            )}
+          </div>
+          {segment.description && (
+            <div className="text-sm text-[var(--text-secondary)]">{segment.description}</div>
           )}
         </div>
+      ),
+    },
+    {
+      key: "customer_count",
+      header: "Followers",
+      align: "right",
+      render: (value: number | null | undefined) => (value ?? 0).toLocaleString(),
+    },
+    {
+      key: "rule",
+      header: "Conditions",
+      render: (_value, segment) => `${segment.rule?.conditions?.length ?? 0} rule${(segment.rule?.conditions?.length ?? 0) === 1 ? "" : "s"}`,
+    },
+    {
+      key: "created_at",
+      header: "Created",
+      render: (value: string) => new Date(value).toLocaleDateString(),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      render: (_value, segment) => (
+        <DSButton
+          variant="ghost"
+          size="sm"
+          leftIcon={<Trash2 size={14} />}
+          loading={checkingUsage && deleteTarget?.id === segment.id}
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleDeleteClick(segment);
+          }}
+        >
+          Delete
+        </DSButton>
+      ),
+    },
+  ], [checkingUsage, deleteTarget?.id]);
 
-        {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-            <RefreshCw size={16} className="animate-spin" />
-            Loading...
-          </div>
-        )}
+  const warningDescription = affectedBroadcasts.length > 0
+    ? `This segment is still used by ${affectedBroadcasts.length} scheduled, sending, or draft broadcast(s): ${affectedBroadcasts.slice(0, 3).map((broadcast) => broadcast.name || broadcast.campaign_name || broadcast.id).join(", ")}${affectedBroadcasts.length > 3 ? "..." : ""}`
+    : "Deleting this segment may affect any draft or scheduled broadcast that expects this audience.";
 
-        {/* Empty state */}
-        {!loading && segments.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-12">
-              <div className="text-4xl mb-3">🏷️</div>
-              <p className="font-medium">No segments yet</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Create a segment to group followers by behaviour or attributes.
-              </p>
-              {isEditorOrAbove && (
-                <Button className="mt-4 gap-2" onClick={() => { window.location.href = "/segments/new"; }}>
-                  <Plus size={16} />
+  const tableNode = segments.length === 0 && !loading && !error ? (
+    <Card elevation="none">
+      <CardBody>
+        <EmptyState
+          icon={<Tag size={44} />}
+          title="No segments yet"
+          description="Create your first dynamic or manual segment to target followers more precisely."
+          action={(
+            isEditorOrAbove ? (
+              <DSButton variant="primary" leftIcon={<Plus size={16} />} onClick={() => { window.location.href = "/segments/new"; }}>
+                New Segment
+              </DSButton>
+            ) : undefined
+          )}
+        />
+      </CardBody>
+    </Card>
+  ) : (
+    <AdvancedDataTable
+      rowKey="id"
+      columns={columns}
+      data={segments}
+      loading={loading}
+      error={error ?? undefined}
+      emptyMessage="No segments found"
+      emptyDescription="Try refreshing or adjusting your backend data."
+      onRowClick={(row) => { window.location.href = `/segments/${row.id}/edit`; }}
+    />
+  );
+
+  return (
+    <AppLayout title="Segments">
+      <FeaturePageScaffold
+        layout="list"
+        header={(
+          <PageHeader
+            title="Segments"
+            subtitle="Build reusable audiences and keep campaign targeting under control with DS-first list management."
+            breadcrumb={<Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Segments" }]} />}
+            actions={(
+              isEditorOrAbove ? (
+                <DSButton variant="primary" leftIcon={<Plus size={16} />} onClick={() => { window.location.href = "/segments/new"; }}>
                   New Segment
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+                </DSButton>
+              ) : undefined
+            )}
+          />
         )}
-
-        {/* List */}
-        {!loading && segments.length > 0 && (
-          <div className="grid gap-3">
-            {segments.map((seg) => (
-              <Card
-                key={seg.id}
-                className="cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => { window.location.href = `/segments/${seg.id}/edit`; }}
-              >
-                <CardContent className="flex items-center gap-4 p-4">
-                  {/* Icon */}
-                  <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                    <Users size={18} className="text-orange-600" />
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{seg.name}</span>
-                      {seg.is_dynamic && (
-                        <Badge variant="default" className="gap-1 text-xs">
-                          <Zap size={10} />
-                          Dynamic
-                        </Badge>
-                      )}
-                    </div>
-                    {seg.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{seg.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-muted-foreground">
-                        {seg.customer_count ?? 0} followers
-                      </span>
-                      {seg.rule?.conditions?.length > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          {seg.rule.conditions.length} condition{seg.rule.conditions.length !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Date */}
-                  <div className="hidden sm:block text-xs text-muted-foreground flex-shrink-0">
-                    {new Date(seg.created_at).toLocaleDateString()}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive h-8 w-8"
-                      disabled={deletingId === seg.id || checkingUsage}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void (async () => {
-                          setCheckingUsage(true);
-                          setAffectedBroadcasts([]);
-                          try {
-                            const res = await broadcastApi.list({ workspace_id: WORKSPACE_ID, page_size: 100 });
-                            const active = (res.data ?? []).filter(
-                              (b) => b.target_segment_id === seg.id &&
-                                (b.status === "scheduled" || b.status === "sending" || b.status === "draft")
-                            );
-                            setAffectedBroadcasts(active);
-                          } catch { /* ignore — show generic warning */ }
-                          finally { setCheckingUsage(false); }
-                          setDeleteTarget({ id: seg.id, name: seg.name });
-                        })();
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+        stats={(
+          <div className="grid gap-4 md:grid-cols-3">
+            {stats.map((stat) => (
+              <StatCard key={stat.title} title={stat.title} value={loading ? "..." : stat.value} icon={stat.icon} />
             ))}
           </div>
         )}
-      </div>
+        table={(
+          <div className="space-y-4">
+            {affectedBroadcasts.length > 0 && deleteTarget && (
+              <Alert variant="warning" title="This segment is currently in use" icon={<AlertTriangle size={16} />}>
+                {warningDescription}
+              </Alert>
+            )}
+            {tableNode}
+          </div>
+        )}
+      />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setAffectedBroadcasts([]); } }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบ Segment</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="space-y-3">
-                <p>คุณต้องการลบ <strong>"{deleteTarget?.name}"</strong> ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
-                {affectedBroadcasts.length > 0 ? (
-                  <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                    <div className="space-y-1">
-                      <p className="font-semibold">
-                        Segment นี้ถูกใช้ใน {affectedBroadcasts.length} broadcast ที่ยังไม่ส่ง:
-                      </p>
-                      <ul className="list-disc list-inside space-y-0.5">
-                        {affectedBroadcasts.slice(0, 5).map((b) => (
-                          <li key={b.id} className="text-xs">
-                            {b.name || b.campaign_name || `#${b.id.slice(-8)}`}{" "}
-                            <span className="opacity-70">({b.status})</span>
-                          </li>
-                        ))}
-                        {affectedBroadcasts.length > 5 && (
-                          <li className="text-xs opacity-70">และอีก {affectedBroadcasts.length - 5} รายการ</li>
-                        )}
-                      </ul>
-                      <p className="text-xs">การลบ segment นี้จะทำให้ broadcast เหล่านี้ส่งไม่ได้</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                    <p>การกระทำนี้ไม่สามารถย้อนกลับได้ หาก segment นี้ถูกใช้ใน broadcast ที่ scheduled ไว้จะได้รับผลกระทบ</p>
-                  </div>
-                )}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => { void handleConfirmedDelete(deleteTarget!.id); setDeleteTarget(null); setAffectedBroadcasts([]); }}
-            >
-              {affectedBroadcasts.length > 0 ? "ลบแม้มี broadcast ที่ใช้อยู่" : "ลบ"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => {
+          setDeleteTarget(null);
+          setAffectedBroadcasts([]);
+        }}
+        onConfirm={() => { void handleConfirmedDelete(); }}
+        title={`Delete "${deleteTarget?.name ?? "segment"}"?`}
+        description={warningDescription}
+        confirmLabel={deletingId ? "Deleting..." : "Delete segment"}
+        cancelLabel="Cancel"
+        variant="destructive"
+      />
     </AppLayout>
   );
 }

@@ -1,21 +1,47 @@
-import { useState, useEffect } from "react";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import {
-  Users, Radio, MessageCircle, Tag, Bot, Bell, ClipboardList,
-  Webhook, Image, Layers, LayoutTemplate, MessageCircleDashed,
-  ChevronRight, RefreshCw, ArrowRight, ScrollText, Inbox, ShieldAlert,
+  Alert,
+  Badge,
+  Breadcrumb,
+  Card,
+  CardBody,
+  CardHeader,
+  DSButton,
+  EmptyState,
+  FeaturePageScaffold,
+  PageHeader,
+  Spinner,
+  StatCard,
+} from "@uxuissk/design-system";
+import {
+  ArrowRight,
+  Bell,
+  Bot,
+  ChevronRight,
+  ClipboardList,
+  Image,
+  Inbox,
+  Layers,
+  LayoutTemplate,
+  MessageCircle,
+  MessageCircleDashed,
+  Radio,
+  RefreshCw,
+  ScrollText,
+  ShieldAlert,
+  Tag,
+  Users,
+  Webhook,
 } from "lucide-react";
-import { lineOAApi } from "@/api/lineOA";
-import { followerApi } from "@/api/follower";
-import { broadcastApi } from "@/api/broadcast";
-import { segmentApi } from "@/api/segment";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { authApi } from "@/api/auth";
+import { broadcastApi } from "@/api/broadcast";
+import { followerApi } from "@/api/follower";
+import { lineOAApi } from "@/api/lineOA";
+import { segmentApi } from "@/api/segment";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
-import type { LineOA, Broadcast } from "@/types";
 import { getWorkspaceId } from "@/lib/auth";
+import type { Broadcast, LineOA } from "@/types";
 
 const WORKSPACE_ID = getWorkspaceId() ?? "";
 
@@ -57,6 +83,13 @@ const featureGroups = [
   },
 ];
 
+const WARNING_MESSAGES: Record<string, string> = {
+  default_jwt_secret:
+    "AUTH_LOCAL_JWT_SECRET is still the factory default. Set a strong secret before going to production.",
+  default_admin_credentials:
+    "You are logged in as admin@bola.local. Change the default admin email and password.",
+};
+
 const broadcastStatusVariant: Record<string, "success" | "default" | "secondary" | "destructive" | "outline" | "warning"> = {
   sent: "success",
   sending: "default",
@@ -66,29 +99,136 @@ const broadcastStatusVariant: Record<string, "success" | "default" | "secondary"
   cancelled: "secondary",
 };
 
-const WARNING_MESSAGES: Record<string, string> = {
-  default_jwt_secret:
-    "AUTH_LOCAL_JWT_SECRET is still the factory default. Set a strong secret before going to production.",
-  default_admin_credentials:
-    "You are logged in as admin@bola.local. Change the default admin email and password.",
-};
+function DashboardPanel({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card elevation="none" className="h-full">
+      <CardHeader action={action}>
+        <div className="space-y-1">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
+        </div>
+      </CardHeader>
+      <CardBody>{children}</CardBody>
+    </Card>
+  );
+}
+
+function LineOAList({ lineOAs }: { lineOAs: LineOA[] }) {
+  if (lineOAs.length === 0) {
+    return (
+      <EmptyState
+        icon={<MessageCircle size={40} />}
+        title="No LINE OA connected yet"
+        description="Connect your first LINE Official Account to start managing customers and sending messages."
+        action={
+          <DSButton variant="primary" onClick={() => { window.location.href = "/line-oa"; }}>
+            Connect LINE OA
+          </DSButton>
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {lineOAs.map((oa) => (
+        <a
+          key={oa.id}
+          href={`/line-oa/${oa.id}`}
+          className="flex items-center gap-4 rounded-xl border border-[var(--border-default)] bg-white p-4 transition hover:border-sky-300 hover:bg-sky-50/40"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sky-100 bg-sky-50">
+            {oa.picture_url ? (
+              <img src={oa.picture_url} alt={oa.name} className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-lg font-semibold text-sky-600">{oa.name[0]?.toUpperCase()}</span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold text-[var(--text-primary)]">{oa.name}</div>
+            <div className="truncate text-sm text-[var(--text-secondary)]">{oa.basic_id || oa.channel_id}</div>
+          </div>
+          <Badge
+            variant={oa.status === "active" ? "success" : oa.status === "error" ? "destructive" : "secondary"}
+            size="sm"
+          >
+            {oa.status}
+          </Badge>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function BroadcastList({ broadcasts }: { broadcasts: Broadcast[] }) {
+  if (broadcasts.length === 0) {
+    return (
+      <EmptyState
+        icon={<Radio size={40} />}
+        title="No broadcasts yet"
+        description="Create your first campaign to start sending targeted messages."
+        action={
+          <DSButton variant="secondary" onClick={() => { window.location.href = "/broadcasts"; }}>
+            Create Broadcast
+          </DSButton>
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {broadcasts.map((broadcast) => (
+        <a
+          key={broadcast.id}
+          href={`/broadcasts/${broadcast.id}`}
+          className="flex items-center gap-4 rounded-xl border border-[var(--border-default)] bg-white p-4 transition hover:border-sky-300 hover:bg-sky-50/40"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+            <Radio size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold text-[var(--text-primary)]">{broadcast.name}</div>
+            <div className="text-sm text-[var(--text-secondary)]">
+              {broadcast.sent_at
+                ? `Sent ${new Date(broadcast.sent_at).toLocaleDateString()}`
+                : broadcast.scheduled_at
+                  ? `Scheduled ${new Date(broadcast.scheduled_at).toLocaleDateString()}`
+                  : "Draft"}
+            </div>
+          </div>
+          <Badge variant={broadcastStatusVariant[broadcast.status] ?? "secondary"} size="sm">
+            {broadcast.status}
+          </Badge>
+        </a>
+      ))}
+    </div>
+  );
+}
 
 export function DashboardPage() {
   const { currentAdmin } = useCurrentAdmin();
   const [securityWarnings, setSecurityWarnings] = useState<string[]>([]);
-
   const [lineOAs, setLineOAs] = useState<LineOA[]>([]);
   const [followerTotal, setFollowerTotal] = useState<number | null>(null);
   const [broadcastTotal, setBroadcastTotal] = useState<number | null>(null);
   const [segmentTotal, setSegmentTotal] = useState<number | null>(null);
   const [recentBroadcasts, setRecentBroadcasts] = useState<Broadcast[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentAdmin?.role !== "super_admin") return;
     void authApi.getSystemStatus(WORKSPACE_ID)
       .then(({ warnings }) => setSecurityWarnings(warnings ?? []))
-      .catch(() => { /* silently ignore — non-super_admin or backend unavailable */ });
+      .catch(() => {});
   }, [currentAdmin]);
 
   useEffect(() => {
@@ -104,219 +244,139 @@ export function DashboardPage() {
         setBroadcastTotal(broadcastRes.value.total ?? 0);
         setRecentBroadcasts(broadcastRes.value.data ?? []);
       }
-      if (segmentRes.status === "fulfilled") setSegmentTotal((segmentRes.value.data ?? []).length);
+      if (segmentRes.status === "fulfilled") {
+        setSegmentTotal((segmentRes.value.data ?? []).length);
+      }
+
+      if ([oaRes, followerRes, broadcastRes, segmentRes].every((result) => result.status === "rejected")) {
+        setError("Dashboard data is unavailable right now. Check backend connectivity and try again.");
+      }
+
       setLoading(false);
     });
   }, []);
 
   const stats = [
-    { label: "LINE OAs", value: lineOAs.length, icon: MessageCircle, color: "text-green-500", href: "/line-oa" },
-    { label: "Followers", value: followerTotal, icon: Users, color: "text-blue-500", href: "/followers" },
-    { label: "Broadcasts", value: broadcastTotal, icon: Radio, color: "text-purple-500", href: "/broadcasts" },
-    { label: "Segments", value: segmentTotal, icon: Tag, color: "text-orange-500", href: "/segments" },
+    { label: "LINE OAs", value: lineOAs.length, icon: <MessageCircle size={18} />, href: "/line-oa" },
+    { label: "Followers", value: followerTotal ?? 0, icon: <Users size={18} />, href: "/contacts" },
+    { label: "Broadcasts", value: broadcastTotal ?? 0, icon: <Radio size={18} />, href: "/broadcasts" },
+    { label: "Segments", value: segmentTotal ?? 0, icon: <Tag size={18} />, href: "/segments" },
   ];
 
   return (
     <AppLayout title="Dashboard">
-      <div className="space-y-6">
-
-        {/* ── Security warnings (super_admin only) ── */}
-        {securityWarnings.length > 0 && (
-          <div className="rounded-lg border border-red-300 bg-red-50 p-4 dark:border-red-700 dark:bg-red-950/30">
-            <div className="flex items-start gap-3">
-              <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
-              <div>
-                <p className="font-semibold text-red-800 dark:text-red-300">
-                  Security warnings
-                </p>
-                <ul className="mt-1 space-y-1">
-                  {securityWarnings.map((key) => (
-                    <li key={key} className="text-sm text-red-700 dark:text-red-400">
-                      {WARNING_MESSAGES[key] ?? key}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+      <FeaturePageScaffold
+        layout="dashboard"
+        header={(
+          <PageHeader
+            title="BOLA Overview"
+            subtitle="Monitor channels, audience health, and campaign activity from one modern control panel."
+            breadcrumb={<Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Dashboard" }]} />}
+            actions={(
+              <DSButton
+                variant="secondary"
+                leftIcon={<RefreshCw size={16} />}
+                onClick={() => window.location.reload()}
+              >
+                Refresh data
+              </DSButton>
+            )}
+          />
+        )}
+        kpis={(
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {stats.map((stat) => (
+              <a key={stat.label} href={stat.href} className="block">
+                <StatCard title={stat.label} value={loading ? "..." : stat.value} icon={stat.icon} />
+              </a>
+            ))}
           </div>
         )}
-
-        {/* ── Stat cards ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <a key={stat.label} href={stat.href}>
-                <Card className="hover:border-border/80 transition-colors cursor-pointer h-full">
-                  <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">
-                      {stat.label}
-                    </CardTitle>
-                    <Icon size={15} className={stat.color} />
-                  </CardHeader>
-                  <CardContent className="px-4 pb-4">
-                    <div className="text-2xl font-bold">
-                      {loading ? (
-                        <span className="text-muted-foreground text-lg">—</span>
-                      ) : (
-                        stat.value ?? 0
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </a>
-            );
-          })}
-        </div>
-
-        {/* ── LINE OAs + Recent Broadcasts ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {/* Connected LINE OAs */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold">Connected LINE OAs</CardTitle>
-                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" asChild>
-                  <a href="/line-oa">Manage <ArrowRight className="h-3 w-3" /></a>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {loading ? (
-                <div className="flex items-center gap-2 text-muted-foreground text-sm py-6">
-                  <RefreshCw className="h-4 w-4 animate-spin" /> Loading...
-                </div>
-              ) : lineOAs.length === 0 ? (
-                <div className="text-center py-8 space-y-3">
-                  <p className="text-sm text-muted-foreground">No LINE OA connected yet</p>
-                  <Button size="sm" className="bg-line hover:bg-line/90" asChild>
-                    <a href="/line-oa">Connect LINE OA</a>
-                  </Button>
-                </div>
-              ) : (
-                <ul className="space-y-1">
-                  {lineOAs.map((oa) => (
-                    <li key={oa.id}>
-                      <a
-                        href={`/line-oa/${oa.id}`}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-line/10 border border-line/20 flex items-center justify-center overflow-hidden flex-shrink-0">
-                          {oa.picture_url ? (
-                            <img src={oa.picture_url} alt={oa.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-line font-bold text-sm">{oa.name[0]?.toUpperCase()}</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{oa.name}</div>
-                          {oa.basic_id && (
-                            <div className="text-xs text-muted-foreground">{oa.basic_id}</div>
-                          )}
-                        </div>
-                        <Badge
-                          variant={oa.status === "active" ? "success" : oa.status === "error" ? "destructive" : "secondary"}
-                          className="text-xs flex-shrink-0"
-                        >
-                          {oa.status}
-                        </Badge>
-                      </a>
-                    </li>
+        primaryChart={(
+          <div className="space-y-4">
+            {securityWarnings.length > 0 && (
+              <Alert variant="warning" title="Security warnings" icon={<ShieldAlert size={18} />}>
+                <ul className="list-disc space-y-1 pl-5">
+                  {securityWarnings.map((warning) => (
+                    <li key={warning}>{WARNING_MESSAGES[warning] ?? warning}</li>
                   ))}
                 </ul>
+              </Alert>
+            )}
+            <DashboardPanel
+              title="Connected LINE OAs"
+              action={(
+                <DSButton variant="ghost" size="sm" rightIcon={<ArrowRight size={14} />} onClick={() => { window.location.href = "/line-oa"; }}>
+                  Manage
+                </DSButton>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Recent Broadcasts */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold">Recent Broadcasts</CardTitle>
-                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" asChild>
-                  <a href="/broadcasts">View all <ArrowRight className="h-3 w-3" /></a>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
+            >
               {loading ? (
-                <div className="flex items-center gap-2 text-muted-foreground text-sm py-6">
-                  <RefreshCw className="h-4 w-4 animate-spin" /> Loading...
+                <div className="flex min-h-[220px] items-center justify-center">
+                  <Spinner />
                 </div>
-              ) : recentBroadcasts.length === 0 ? (
-                <div className="text-center py-8 space-y-3">
-                  <p className="text-sm text-muted-foreground">No broadcasts yet</p>
-                  <Button size="sm" asChild>
-                    <a href="/broadcasts">Create Broadcast</a>
-                  </Button>
-                </div>
+              ) : error ? (
+                <Alert variant="error" title="Failed to load LINE OA data">{error}</Alert>
               ) : (
-                <ul className="space-y-1">
-                  {recentBroadcasts.map((b) => (
-                    <li key={b.id}>
-                      <a
-                        href={`/broadcasts/${b.id}`}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                      >
-                        <Radio className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{b.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {b.sent_at
-                              ? `Sent ${new Date(b.sent_at).toLocaleDateString()}`
-                              : b.scheduled_at
-                              ? `Scheduled ${new Date(b.scheduled_at).toLocaleDateString()}`
-                              : "Draft"}
-                          </div>
-                        </div>
-                        <Badge
-                          variant={broadcastStatusVariant[b.status] ?? "secondary"}
-                          className="text-xs flex-shrink-0 capitalize"
-                        >
-                          {b.status}
-                        </Badge>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                <LineOAList lineOAs={lineOAs} />
               )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* ── Feature shortcuts ── */}
-        <div className="space-y-5">
-          {featureGroups.map((group) => (
-            <div key={group.title}>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-0.5">
-                {group.title}
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <a key={item.href} href={item.href}>
-                      <Card className="hover:border-line/40 hover:bg-line/5 transition-colors cursor-pointer h-full">
-                        <CardContent className="p-3 flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-line/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <Icon className="h-4 w-4 text-line" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium leading-tight">{item.label}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5 leading-tight line-clamp-2">{item.desc}</div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </a>
-                  );
-                })}
+            </DashboardPanel>
+          </div>
+        )}
+        secondaryCharts={(
+          <DashboardPanel
+            title="Recent Broadcasts"
+            action={(
+              <DSButton variant="ghost" size="sm" rightIcon={<ArrowRight size={14} />} onClick={() => { window.location.href = "/broadcasts"; }}>
+                View all
+              </DSButton>
+            )}
+          >
+            {loading ? (
+              <div className="flex min-h-[220px] items-center justify-center">
+                <Spinner />
               </div>
-            </div>
-          ))}
-        </div>
-
-      </div>
+            ) : error ? (
+              <Alert variant="error" title="Failed to load broadcast data">{error}</Alert>
+            ) : (
+              <BroadcastList broadcasts={recentBroadcasts} />
+            )}
+          </DashboardPanel>
+        )}
+        table={(
+          <div className="space-y-6">
+            {featureGroups.map((group) => (
+              <section key={group.title} className="space-y-3">
+                <div className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                  {group.title}
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <a key={item.href} href={item.href} className="block">
+                        <Card hover elevation="none" className="h-full">
+                          <CardBody>
+                            <div className="flex items-start gap-4">
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
+                                <Icon size={20} />
+                              </div>
+                              <div className="min-w-0 space-y-2">
+                                <div className="font-semibold text-[var(--text-primary)]">{item.label}</div>
+                                <p className="text-sm leading-6 text-[var(--text-secondary)]">{item.desc}</p>
+                              </div>
+                            </div>
+                          </CardBody>
+                        </Card>
+                      </a>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      />
     </AppLayout>
   );
 }

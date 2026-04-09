@@ -1,4 +1,5 @@
 import React from "react";
+import { ToastContainer } from "@uxuissk/design-system";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { AcceptInvitePage } from "@/pages/auth/AcceptInvitePage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
@@ -231,6 +232,7 @@ function App() {
   return (
     <ToastProvider>
       <Router />
+      <ToastContainer />
     </ToastProvider>
   );
 }
