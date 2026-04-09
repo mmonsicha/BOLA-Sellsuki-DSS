@@ -1,37 +1,39 @@
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
+  Badge,
+  Breadcrumb,
+  Card,
+  CardBody,
+  CardHeader,
+  ConfirmDialog,
+  DSButton,
+  DSCheckbox,
+  DSInput,
+  DSTextarea,
+  EmptyState,
+  FeaturePageScaffold,
+  FormField,
+  PageHeader,
+  Spinner,
+  StatCard,
+  Switch,
+  toast,
+} from "@uxuissk/design-system";
+import {
+  ArrowLeft,
+  Copy,
   RefreshCw,
   Save,
-  Copy,
-  Check,
-  ArrowLeft,
-  Link2,
-  Settings,
-  KeyRound,
   Shield,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  Bell,
-  HelpCircle,
+  Trash2,
   Users,
-  Download,
   Webhook,
-  Info,
-  BarChart2,
 } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { lineOAApi } from "@/api/lineOA";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { lineOAApi, type MessageQuota } from "@/api/lineOA";
 import { followerApi, type FollowerSyncStatus } from "@/api/follower";
 import type { LineOA } from "@/types";
-import { useToast } from "@/components/ui/toast";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 const statusVariant = {
   active: "success" as const,
@@ -39,167 +41,56 @@ const statusVariant = {
   error: "destructive" as const,
 };
 
-// ─── Small helpers ─────────────────────────────────────────────────────────────
+const OUTBOUND_EVENT_OPTIONS = [
+  "message.sent",
+  "message.failed",
+  "broadcast.completed",
+  "follower.linked",
+];
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
+function CopyInlineButton({ text }: { text: string }) {
   return (
-    <div className="space-y-1">
-      <label className="text-sm font-medium">{label}</label>
-      {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
-
-function ReadonlyInput({ value }: { value: string }) {
-  return (
-    <input
-      type="text"
-      readOnly
-      value={value}
-      className="w-full border rounded-md px-3 py-2 text-sm bg-muted text-muted-foreground cursor-default focus:outline-none font-mono"
-    />
-  );
-}
-
-function TextInput({
-  value,
-  onChange,
-  placeholder,
-  disabled,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <input
-      type="text"
-      className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      disabled={disabled}
-    />
-  );
-}
-
-function SecretInput({
-  value,
-  onChange,
-  placeholder,
-  disabled,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="relative">
-      <input
-        type={show ? "text" : "password"}
-        className="w-full border rounded-md px-3 py-2 pr-9 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 font-mono"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        autoComplete="new-password"
-      />
-      <button
-        type="button"
-        onClick={() => setShow((s) => !s)}
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-        tabIndex={-1}
-      >
-        {show ? <EyeOff size={15} /> : <Eye size={15} />}
-      </button>
-    </div>
-  );
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    void navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <button
-      onClick={handleCopy}
-      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border hover:border-border"
-      title="Copy"
+    <DSButton
+      variant="ghost"
+      size="sm"
+      leftIcon={<Copy size={14} />}
+      onClick={() => {
+        void navigator.clipboard.writeText(text);
+        toast.success("Copied to clipboard");
+      }}
     >
-      {copied ? (
-        <>
-          <Check size={12} className="text-green-500" />
-          Copied
-        </>
-      ) : (
-        <>
-          <Copy size={12} />
-          Copy
-        </>
-      )}
-    </button>
+      Copy
+    </DSButton>
   );
 }
-
-// ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export function LineOADetailPage() {
-  const toast = useToast();
   const id = window.location.pathname.split("/")[2];
-
   const [oa, setOa] = useState<LineOA | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-
-  // General settings form
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isDefault, setIsDefault] = useState(false);
   const [savingGeneral, setSavingGeneral] = useState(false);
-  const [savedGeneral, setSavedGeneral] = useState(false);
-
-  // Credentials form
   const [channelSecret, setChannelSecret] = useState("");
   const [channelAccessToken, setChannelAccessToken] = useState("");
   const [savingCreds, setSavingCreds] = useState(false);
-  const [savedCreds, setSavedCreds] = useState(false);
   const [credsError, setCredsError] = useState("");
-
-  // LON LIFF settings
   const [liffId, setLiffId] = useState("");
   const [savingLiff, setSavingLiff] = useState(false);
-  const [savedLiff, setSavedLiff] = useState(false);
   const [liffError, setLiffError] = useState("");
-
-  // Outbound webhook settings
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
   const [webhookEvents, setWebhookEvents] = useState<string[]>([]);
   const [savingWebhook, setSavingWebhook] = useState(false);
-
-  // Message quota
-  const [quota, setQuota] = useState<{ quota_type: string; limit: number; total_usage: number; remaining: number } | null>(null);
+  const [quota, setQuota] = useState<MessageQuota | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(false);
   const [quotaError, setQuotaError] = useState("");
-
-  // Follower sync
   const [syncStatus, setSyncStatus] = useState<FollowerSyncStatus | null>(null);
   const [startingSync, setStartingSync] = useState(false);
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -217,62 +108,24 @@ export function LineOADetailPage() {
         if (status.status === "completed" || status.status === "failed" || status.status === "idle") {
           stopPolling();
         }
-      }).catch(() => {
-        stopPolling();
-      });
+      }).catch(() => stopPolling());
     };
-    poll(); // immediate first check
+    poll();
     pollRef.current = setInterval(poll, 2000);
   }, [stopPolling]);
 
-  // Fetch initial sync status on mount
   useEffect(() => {
     if (!id) return;
     followerApi.getSyncStatus(id).then(setSyncStatus).catch(() => {});
   }, [id]);
 
-  // Start polling if sync is in progress
-  const syncStatusValue = syncStatus?.status;
   useEffect(() => {
-    if (syncStatusValue === "fetching_ids" || syncStatusValue === "syncing_profiles") {
-      if (!pollRef.current && id) {
-        pollSyncStatus(id);
-      }
+    const statusValue = syncStatus?.status;
+    if ((statusValue === "fetching_ids" || statusValue === "syncing_profiles") && id && !pollRef.current) {
+      pollSyncStatus(id);
     }
     return () => { stopPolling(); };
-  }, [syncStatusValue, id, pollSyncStatus, stopPolling]);
-
-  const handleStartSync = async () => {
-    if (!oa) return;
-    setStartingSync(true);
-    try {
-      const status = await followerApi.startSync(oa.id);
-      setSyncStatus(status);
-      pollSyncStatus(oa.id);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to start sync.");
-    } finally {
-      setStartingSync(false);
-    }
-  };
-
-  const handleToggleDefault = async () => {
-    if (!oa) return;
-    const newValue = !isDefault;
-    setIsDefault(newValue);
-    try {
-      const updated = await lineOAApi.update(oa.id, { is_default: newValue });
-      setOa(updated);
-      setIsDefault(updated.is_default);
-    } catch (err) {
-      setIsDefault(!newValue); // revert on error
-      toast.error(err instanceof Error ? err.message : "Failed to update.");
-    }
-  };
-
-  // Danger zone
-  const [deleting, setDeleting] = useState(false);
-  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  }, [id, pollSyncStatus, stopPolling, syncStatus?.status]);
 
   useEffect(() => {
     if (!id) return;
@@ -286,15 +139,25 @@ export function LineOADetailPage() {
         setLiffId(data.liff_id ?? "");
         setWebhookUrl(data.outbound_webhook_url ?? "");
         setWebhookSecret(data.outbound_webhook_secret ?? "");
-        setWebhookEvents(
-          data.outbound_webhook_events
-            ? data.outbound_webhook_events.split(",").filter(Boolean)
-            : [],
-        );
+        setWebhookEvents(data.outbound_webhook_events ? data.outbound_webhook_events.split(",").filter(Boolean) : []);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleToggleDefault = async (checked: boolean) => {
+    if (!oa) return;
+    setIsDefault(checked);
+    try {
+      const updated = await lineOAApi.update(oa.id, { is_default: checked });
+      setOa(updated);
+      setIsDefault(updated.is_default);
+      toast.success(checked ? "Default OA enabled" : "Default OA unset");
+    } catch (err) {
+      setIsDefault(!checked);
+      toast.error("Unable to update default OA", err instanceof Error ? err.message : "Unexpected error");
+    }
+  };
 
   const handleSaveGeneral = async () => {
     if (!oa) return;
@@ -307,11 +170,9 @@ export function LineOADetailPage() {
       setOa(updated);
       setName(updated.name);
       setDescription(updated.description ?? "");
-      setIsDefault(updated.is_default);
-      setSavedGeneral(true);
-      setTimeout(() => setSavedGeneral(false), 2000);
+      toast.success("General settings saved");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save settings.");
+      toast.error("Failed to save settings", err instanceof Error ? err.message : "Unexpected error");
     } finally {
       setSavingGeneral(false);
     }
@@ -332,15 +193,7 @@ export function LineOADetailPage() {
       setOa(updated);
       setChannelSecret("");
       setChannelAccessToken("");
-      setSavedCreds(true);
-      setTimeout(() => setSavedCreds(false), 2000);
-      // Toast: next-step suggestion
-      toast.toast({
-        variant: "success",
-        title: "LINE OA connected!",
-        description: "Import followers to start segmenting",
-        duration: 6000,
-      });
+      toast.success("LINE credentials updated", "You can sync followers now.");
     } catch (err) {
       setCredsError(err instanceof Error ? err.message : "Failed to update credentials.");
     } finally {
@@ -356,8 +209,7 @@ export function LineOADetailPage() {
       const updated = await lineOAApi.update(oa.id, { liff_id: liffId.trim() });
       setOa(updated);
       setLiffId(updated.liff_id ?? "");
-      setSavedLiff(true);
-      setTimeout(() => setSavedLiff(false), 2000);
+      toast.success("LIFF settings saved");
     } catch (err) {
       setLiffError(err instanceof Error ? err.message : "Failed to save LIFF ID.");
     } finally {
@@ -374,9 +226,9 @@ export function LineOADetailPage() {
         secret: webhookSecret.trim(),
         events: webhookEvents.join(","),
       });
-      toast.toast({ variant: "success", title: "บันทึกสำเร็จ" });
+      toast.success("Outbound webhook saved");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save outbound webhook.");
+      toast.error("Failed to save outbound webhook", err instanceof Error ? err.message : "Unexpected error");
     } finally {
       setSavingWebhook(false);
     }
@@ -387,8 +239,7 @@ export function LineOADetailPage() {
     setQuotaLoading(true);
     setQuotaError("");
     try {
-      const result = await lineOAApi.getMessageQuota(oa.id);
-      setQuota(result);
+      setQuota(await lineOAApi.getMessageQuota(oa.id));
     } catch (err) {
       setQuotaError(err instanceof Error ? err.message : "Failed to fetch quota");
     } finally {
@@ -396,31 +247,38 @@ export function LineOADetailPage() {
     }
   };
 
-  const handleDisconnect = () => {
-    setShowDisconnectDialog(true);
+  const handleStartSync = async () => {
+    if (!oa) return;
+    setStartingSync(true);
+    try {
+      const status = await followerApi.startSync(oa.id);
+      setSyncStatus(status);
+      pollSyncStatus(oa.id);
+      toast.success("Follower sync started");
+    } catch (err) {
+      toast.error("Failed to start follower sync", err instanceof Error ? err.message : "Unexpected error");
+    } finally {
+      setStartingSync(false);
+    }
   };
 
-  const handleConfirmedDisconnect = async () => {
+  const handleDisconnect = async () => {
     if (!oa) return;
-    setShowDisconnectDialog(false);
     setDeleting(true);
     try {
       await lineOAApi.delete(oa.id);
       window.location.pathname = "/line-oa";
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to disconnect LINE OA.");
+      toast.error("Failed to disconnect LINE OA", err instanceof Error ? err.message : "Unexpected error");
       setDeleting(false);
     }
   };
 
-  // ── Loading / Error states ──────────────────────────────────────────────────
-
   if (loading) {
     return (
       <AppLayout title="LINE OA Settings">
-        <div className="flex items-center justify-center py-20 text-muted-foreground gap-2">
-          <RefreshCw size={16} className="animate-spin" />
-          Loading...
+        <div className="flex justify-center py-16">
+          <Spinner label="Loading LINE OA" />
         </div>
       </AppLayout>
     );
@@ -429,751 +287,247 @@ export function LineOADetailPage() {
   if (notFound || !oa) {
     return (
       <AppLayout title="LINE OA Settings">
-        <div className="text-center py-20">
-          <p className="text-muted-foreground">LINE OA not found.</p>
-          <Button
-            variant="outline"
-            className="mt-4"
-            onClick={() => (window.location.pathname = "/line-oa")}
-          >
-            Back to LINE OAs
-          </Button>
-        </div>
+        <EmptyState
+          title="LINE OA not found"
+          description="This official account is not available in the current workspace."
+          action={<DSButton variant="secondary" onClick={() => { window.location.pathname = "/line-oa"; }}>Back to LINE OAs</DSButton>}
+        />
       </AppLayout>
     );
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
     <AppLayout title="LINE OA Settings">
-      <div className="space-y-6 max-w-2xl">
-
-        {/* Breadcrumb / back */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => (window.location.pathname = "/line-oa")}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft size={15} />
-            LINE Official Accounts
-          </button>
-          <span className="text-muted-foreground/40">/</span>
-          <span className="text-sm font-medium truncate">{oa.name}</span>
-        </div>
-
-        {/* Hero header */}
-        <div className="flex items-center gap-4 p-4 bg-muted/40 border rounded-lg">
-          <div className="w-14 h-14 rounded-full bg-line/10 border-2 border-line/20 flex items-center justify-center overflow-hidden flex-shrink-0">
-            {oa.picture_url ? (
-              <img src={oa.picture_url} alt={oa.name} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-line font-bold text-xl">{oa.name[0]?.toUpperCase()}</span>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-lg">{oa.name}</span>
-              <Badge variant={statusVariant[oa.status]}>{oa.status}</Badge>
-              {oa.basic_id && (
-                <a
-                  href={`https://line.me/R/ti/p/${oa.basic_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-line/10 text-line hover:bg-line/20 transition-colors border border-line/20"
-                >
-                  {oa.basic_id}
-                </a>
-              )}
-              {oa.is_default && (
-                <Badge variant="outline" className="text-xs">Default</Badge>
-              )}
-            </div>
-            {oa.description && (
-              <p className="text-sm text-muted-foreground mt-0.5 truncate">{oa.description}</p>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">
-              Connected {new Date(oa.created_at).toLocaleDateString()}
-            </p>
-          </div>
-          <button
-            onClick={() => { void handleToggleDefault(); }}
-            title={isDefault ? "Default OA — click to unset" : "Set as default OA"}
-            className={`flex-shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
-              isDefault
-                ? "bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
-                : "text-muted-foreground border-border hover:border-primary/30 hover:text-primary"
-            }`}
-          >
-            <CheckCircle2 size={13} className={isDefault ? "text-primary" : "text-muted-foreground"} />
-            {isDefault ? "Default" : "Set default"}
-          </button>
-        </div>
-
-        {/* ── Card 1: Webhook Integration ───────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Link2 size={16} />
-              Webhook Integration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Copy the webhook URL below and paste it into your{" "}
-              <a
-                href="https://developers.line.biz/console/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline underline-offset-2"
-              >
-                LINE Developers Console
-              </a>{" "}
-              under <strong>Messaging API → Webhook settings</strong>.
-            </p>
-
-            {oa.webhook_url ? (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Webhook URL</label>
-                <div className="flex items-center gap-2">
-                  <ReadonlyInput value={oa.webhook_url} />
-                  <CopyButton text={oa.webhook_url} />
-                </div>
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground bg-muted rounded-md px-4 py-3">
-                No webhook URL assigned yet. Contact your administrator.
+      <FeaturePageScaffold
+        layout="detail"
+        header={(
+          <PageHeader
+            title={oa.name}
+            subtitle="Official account configuration, sync status, credentials, and integration settings."
+            breadcrumb={<Breadcrumb items={[{ label: "Home", href: "/" }, { label: "LINE OA", href: "/line-oa" }, { label: oa.name }]} />}
+            actions={(
+              <div className="flex items-center gap-3">
+                <DSButton variant="ghost" leftIcon={<ArrowLeft size={16} />} onClick={() => { window.location.pathname = "/line-oa"; }}>
+                  Back
+                </DSButton>
+                <Badge variant={statusVariant[oa.status]} size="sm">{oa.status}</Badge>
               </div>
             )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide mb-1">
-                  Channel ID
-                </p>
-                <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono">{oa.channel_id}</code>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide mb-1">
-                  OA ID
-                </p>
-                <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono">{oa.id}</code>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── Card 2: Sync Followers ─────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users size={16} />
-              Sync Followers
-              {oa.follower_count > 0 && (
-                <span className="text-sm font-normal text-muted-foreground ml-auto">
-                  {oa.follower_count.toLocaleString()} followers in BOLA
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {(!syncStatus || syncStatus.status === "idle") && (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Import existing followers from LINE into BOLA. This fetches all follower profiles
-                  (display name, picture, status message) from the LINE API. New followers from webhooks
-                  are imported automatically — use this to backfill existing ones.
-                </p>
-                <Button
-                  onClick={() => { void handleStartSync(); }}
-                  disabled={startingSync}
-                  className="gap-2"
-                >
-                  {startingSync ? (
-                    <RefreshCw size={14} className="animate-spin" />
-                  ) : (
-                    <Download size={14} />
-                  )}
-                  {startingSync ? "Starting..." : "Sync Followers from LINE"}
-                </Button>
-              </>
-            )}
-
-            {syncStatus && syncStatus.status === "fetching_ids" && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <RefreshCw size={14} className="animate-spin text-primary" />
-                  <span>Fetching follower IDs from LINE...</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div className="bg-primary h-full rounded-full animate-pulse w-1/3" />
-                </div>
-              </div>
-            )}
-
-            {syncStatus && syncStatus.status === "syncing_profiles" && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <RefreshCw size={14} className="animate-spin text-primary" />
-                  <span>
-                    Syncing profiles: {syncStatus.synced_count.toLocaleString()} / {syncStatus.total_ids.toLocaleString()}
-                  </span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-primary h-full rounded-full transition-all duration-500"
-                    style={{ width: `${syncStatus.total_ids > 0 ? (syncStatus.synced_count / syncStatus.total_ids) * 100 : 0}%` }}
-                  />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
-                  <div>New: <span className="font-medium text-foreground">{syncStatus.new_count}</span></div>
-                  <div>Updated: <span className="font-medium text-foreground">{syncStatus.updated_count}</span></div>
-                  <div>Skipped: <span className="font-medium text-foreground">{syncStatus.skipped_count}</span></div>
-                  <div>Failed: <span className="font-medium text-foreground">{syncStatus.failed_count}</span></div>
-                </div>
-              </div>
-            )}
-
-            {syncStatus && syncStatus.status === "completed" && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-green-600">
-                  <CheckCircle2 size={14} />
-                  <span>Sync completed!</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
-                  <div>Total: <span className="font-medium text-foreground">{syncStatus.total_ids.toLocaleString()}</span></div>
-                  <div>New: <span className="font-medium text-foreground">{syncStatus.new_count}</span></div>
-                  <div>Updated: <span className="font-medium text-foreground">{syncStatus.updated_count}</span></div>
-                  <div>Skipped: <span className="font-medium text-foreground">{syncStatus.skipped_count}</span></div>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { void handleStartSync(); }}
-                  disabled={startingSync}
-                  className="gap-2"
-                >
-                  <RefreshCw size={13} />
-                  Sync Again
-                </Button>
-              </div>
-            )}
-
-            {syncStatus && syncStatus.status === "failed" && (() => {
-              const is403 = syncStatus.error_message?.includes("403") || syncStatus.error_message?.includes("Access to this API is not available");
-              return (
-                <div className="space-y-3">
-                  <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2 space-y-1">
-                    {is403 ? (
-                      <>
-                        <p className="font-medium">Follower sync is not available for this LINE OA plan.</p>
-                        <p className="text-xs text-destructive/80">
-                          The LINE Followers API requires a <strong>Verified</strong> or <strong>Premium</strong> LINE Official Account.
-                          Free accounts cannot list follower IDs via API.
-                          New followers will still be added automatically when they message you via webhook.
-                        </p>
-                      </>
-                    ) : (
-                      <p>Sync failed: {syncStatus.error_message || "Unknown error"}</p>
-                    )}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => { void handleStartSync(); }}
-                    disabled={startingSync}
-                    className="gap-2"
-                  >
-                    <RefreshCw size={13} />
-                    Retry
-                  </Button>
-                </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
-
-        {/* ── Card 3: LON Settings ─────────────────────────────────────────── */}
-        {(() => {
-          const backendOrigin = oa.webhook_url
-            ? new URL(oa.webhook_url).origin
-            : window.location.origin;
-          const consentURL = `${backendOrigin}/v1/lon/consent-callback`;
-          const revokeURL = `${backendOrigin}/v1/lon/revoke-callback`;
-          return (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Bell size={16} />
-                  LINE Notification Messaging (LON)
-                  <span className="relative group inline-flex items-center">
-                    <HelpCircle size={14} className="text-muted-foreground cursor-help" />
-                    <span className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 w-72 rounded bg-gray-800 px-2.5 py-1.5 text-xs text-white font-normal opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 leading-relaxed">
-                      LON lets you send LINE notifications to users without a prior follow. Unlike Broadcasts, users see a consent prompt the first time. Requires LINE Partner approval and is available in Thailand, Japan, and Taiwan only.
-                    </span>
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Configure these callback URLs in your{" "}
-                  <a
-                    href="https://developers.line.biz/console/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary underline underline-offset-2"
-                  >
-                    LINE Developers Console
-                  </a>{" "}
-                  under{" "}
-                  <strong>Messaging API → LINE Notification Messaging → Consent settings</strong>.
-                </p>
-
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Consent Callback URL</label>
-                    <div className="flex items-center gap-2">
-                      <ReadonlyInput value={consentURL} />
-                      <CopyButton text={consentURL} />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      LINE calls this URL when a user grants LON consent. BOLA registers the subscriber automatically. Copy this URL into the LINE Developers Console → Messaging API → LINE Notification Messaging.
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Revoke Callback URL</label>
-                    <div className="flex items-center gap-2">
-                      <ReadonlyInput value={revokeURL} />
-                      <CopyButton text={revokeURL} />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      LINE calls this URL when a user revokes LON consent. BOLA removes the subscriber automatically. Copy this URL into the LINE Developers Console alongside the Consent Callback URL.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-md bg-muted/60 border px-4 py-3 text-xs text-muted-foreground space-y-1">
-                  <p className="font-medium text-foreground">Setup steps in LINE Developers Console:</p>
-                  <ol className="list-decimal list-inside space-y-0.5 pl-1">
-                    <li>Go to your channel → <strong>Messaging API</strong> tab</li>
-                    <li>Scroll to <strong>LINE Notification Messaging</strong></li>
-                    <li>Paste the Consent Callback URL above</li>
-                    <li>Paste the Revoke Callback URL above</li>
-                    <li>Save changes</li>
-                  </ol>
-                </div>
-
-                {/* LIFF ID field */}
-                <div className="pt-2 border-t space-y-3">
-                  <div>
-                    <p className="text-sm font-medium mb-0.5">LIFF App ID (for consent push)</p>
-                    <p className="text-xs text-muted-foreground">
-                      When set, BOLA can send a Flex Message button to followers that opens
-                      your LIFF app so they can grant LON consent directly in LINE.
-                      Create a LIFF app in the{" "}
-                      <a
-                        href="https://developers.line.biz/console/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline underline-offset-2"
-                      >
-                        LINE Developers Console
-                      </a>{" "}
-                      and set its endpoint URL to{" "}
-                      <code className="bg-muted px-1 rounded">
-                        {window.location.origin}/lon/subscribe/{oa.id}?liff_id=YOUR_LIFF_ID
-                      </code>
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <TextInput
-                      value={liffId}
-                      onChange={setLiffId}
-                      placeholder="e.g. 1234567890-AbCdEfGh"
-                      disabled={savingLiff}
+          />
+        )}
+        banner={
+          credsError ? <Alert variant="danger" title="Credential update failed">{credsError}</Alert>
+            : liffError ? <Alert variant="danger" title="LIFF update failed">{liffError}</Alert>
+            : quotaError ? <Alert variant="warning" title="Unable to load message quota">{quotaError}</Alert>
+            : undefined
+        }
+        main={(
+          <div className="space-y-6">
+            <Card elevation="none">
+              <CardHeader title="General settings" subtitle="Display metadata and sender defaults for this OA." />
+              <CardBody className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField name="oa-name" label="Display name" required>
+                    <DSInput id="oa-name" value={name} onChange={(event) => setName(event.target.value)} fullWidth />
+                  </FormField>
+                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)]/30 p-4">
+                    <Switch
+                      checked={isDefault}
+                      onChange={(checked) => { void handleToggleDefault(checked); }}
+                      label="Default LINE OA"
+                      description="Use this account as the default sender when a flow does not explicitly pick an OA."
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Format: <code className="bg-muted px-1 rounded">&lt;channelId&gt;-&lt;suffix&gt;</code>
-                    </p>
-                  </div>
-                  {liffError && (
-                    <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
-                      {liffError}
-                    </div>
-                  )}
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={() => { void handleSaveLiff(); }}
-                      disabled={savingLiff}
-                      size="sm"
-                      variant="outline"
-                      className="gap-2 min-w-[120px]"
-                    >
-                      {savingLiff ? (
-                        <RefreshCw size={13} className="animate-spin" />
-                      ) : savedLiff ? (
-                        <CheckCircle2 size={13} className="text-green-500" />
-                      ) : (
-                        <Save size={13} />
-                      )}
-                      {savedLiff ? "Saved!" : savingLiff ? "Saving..." : "Save LIFF ID"}
-                    </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
-
-        {/* ── Card 3: General Settings ──────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Settings size={16} />
-              General Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Field label="Display Name">
-              <TextInput
-                value={name}
-                onChange={setName}
-                placeholder="e.g. My Brand OA"
-                disabled={savingGeneral}
-              />
-            </Field>
-
-            <Field label="Description">
-              <TextInput
-                value={description}
-                onChange={setDescription}
-                placeholder="Optional description"
-                disabled={savingGeneral}
-              />
-            </Field>
-
-            <div className="flex justify-end pt-2">
-              <Button
-                onClick={() => { void handleSaveGeneral(); }}
-                disabled={savingGeneral}
-                className="gap-2 min-w-[130px]"
-              >
-                {savingGeneral ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : savedGeneral ? (
-                  <CheckCircle2 size={14} />
-                ) : (
-                  <Save size={14} />
-                )}
-                {savedGeneral ? "Saved!" : savingGeneral ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── Card 4: Credentials ──────────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <KeyRound size={16} />
-              Update Credentials
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Rotate your LINE credentials here. Leave a field blank to keep the current value.
-            </p>
-
-            <Field
-              label="New Channel Secret"
-              hint="Found in LINE Developers Console → Basic settings"
-            >
-              <SecretInput
-                value={channelSecret}
-                onChange={setChannelSecret}
-                placeholder="Leave blank to keep current"
-                disabled={savingCreds}
-              />
-            </Field>
-
-            <Field
-              label="New Channel Access Token"
-              hint="Found in LINE Developers Console → Messaging API settings"
-            >
-              <SecretInput
-                value={channelAccessToken}
-                onChange={setChannelAccessToken}
-                placeholder="Leave blank to keep current"
-                disabled={savingCreds}
-              />
-            </Field>
-
-            {credsError && (
-              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
-                {credsError}
-              </div>
-            )}
-
-            <div className="flex justify-end pt-2">
-              <Button
-                onClick={() => { void handleSaveCredentials(); }}
-                disabled={savingCreds}
-                variant="outline"
-                className="gap-2 min-w-[160px]"
-              >
-                {savingCreds ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : savedCreds ? (
-                  <CheckCircle2 size={14} className="text-green-500" />
-                ) : (
-                  <KeyRound size={14} />
-                )}
-                {savedCreds ? "Credentials Updated!" : savingCreds ? "Updating..." : "Update Credentials"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── Card 5: Outbound Events ──────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Webhook size={16} />
-              Outbound Events
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Forward incoming chat events to an external webhook URL. BOLA will POST a JSON payload
-              for each selected event type.
-            </p>
-
-            <Field label="Webhook URL">
-              <TextInput
-                value={webhookUrl}
-                onChange={setWebhookUrl}
-                placeholder="https://your-server.example.com/webhook"
-                disabled={savingWebhook}
-              />
-            </Field>
-
-            <Field label="Secret (optional)">
-              <SecretInput
-                value={webhookSecret}
-                onChange={setWebhookSecret}
-                placeholder="Leave blank to disable signing"
-                disabled={savingWebhook}
-              />
-            </Field>
-
-            <div className="flex items-start gap-2 rounded-md bg-muted/60 border px-3 py-2.5 text-xs text-muted-foreground">
-              <Info size={13} className="mt-0.5 flex-shrink-0" />
-              <span>
-                Secret ใช้ sign payload ด้วย HMAC-SHA256 (Header:{" "}
-                <code className="bg-muted px-1 rounded font-mono">X-BOLA-Signature</code>)
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Events</label>
-              <div className="flex flex-wrap gap-4">
-                {(
-                  [
-                    { value: "message", label: "ข้อความ" },
-                    { value: "follow", label: "Follow" },
-                    { value: "unfollow", label: "Unfollow" },
-                  ] as const
-                ).map(({ value, label }) => (
-                  <label key={value} className="flex items-center gap-2 cursor-pointer select-none text-sm">
-                    <input
-                      type="checkbox"
-                      className="rounded border-border h-4 w-4 accent-primary"
-                      checked={webhookEvents.includes(value)}
-                      onChange={(e) => {
-                        setWebhookEvents((prev) =>
-                          e.target.checked ? [...prev, value] : prev.filter((v) => v !== value),
-                        );
-                      }}
-                      disabled={savingWebhook}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <Button
-                onClick={() => { void handleSaveOutboundWebhook(); }}
-                disabled={savingWebhook}
-                variant="outline"
-                className="gap-2 min-w-[130px]"
-              >
-                {savingWebhook ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : (
-                  <Save size={14} />
-                )}
-                {savingWebhook ? "Saving..." : "Save"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── Card 6: Message Quota ────────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BarChart2 size={16} />
-              Messaging API Quota
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Monthly message quota and current usage for this LINE OA.
-              Data is fetched live from the LINE Messaging API.
-            </p>
-
-            {!quota && !quotaLoading && !quotaError && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { void handleFetchQuota(); }}
-                className="gap-2"
-              >
-                <BarChart2 size={14} />
-                Check Quota
-              </Button>
-            )}
-
-            {quotaLoading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <RefreshCw size={14} className="animate-spin" />
-                Fetching quota from LINE API...
-              </div>
-            )}
-
-            {quotaError && (
-              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
-                {quotaError}
-              </div>
-            )}
-
-            {quota && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="rounded-lg border bg-muted/40 px-3 py-3 space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Limit</p>
-                    <p className="text-lg font-semibold">
-                      {quota.limit === -1 ? "∞" : quota.limit.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground capitalize">{quota.quota_type}</p>
-                  </div>
-                  <div className="rounded-lg border bg-muted/40 px-3 py-3 space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Used this month</p>
-                    <p className="text-lg font-semibold">{quota.total_usage.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">messages sent</p>
-                  </div>
-                  <div className="rounded-lg border bg-muted/40 px-3 py-3 space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Remaining</p>
-                    <p className={`text-lg font-semibold ${quota.remaining !== -1 && quota.remaining < 1000 ? "text-destructive" : ""}`}>
-                      {quota.remaining === -1 ? "∞" : quota.remaining.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">messages left</p>
-                  </div>
-                </div>
-
-                {quota.quota_type === "limited" && quota.limit > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Usage this month</span>
-                      <span>{Math.round((quota.total_usage / quota.limit) * 100)}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          quota.total_usage / quota.limit >= 0.9
-                            ? "bg-destructive"
-                            : quota.total_usage / quota.limit >= 0.7
-                              ? "bg-yellow-500"
-                              : "bg-primary"
-                        }`}
-                        style={{ width: `${Math.min((quota.total_usage / quota.limit) * 100, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
+                <FormField name="oa-description" label="Description">
+                  <DSTextarea id="oa-description" value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
+                </FormField>
                 <div className="flex justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { void handleFetchQuota(); }}
-                    disabled={quotaLoading}
-                    className="gap-2 text-xs text-muted-foreground"
-                  >
-                    <RefreshCw size={12} className={quotaLoading ? "animate-spin" : ""} />
-                    Refresh
-                  </Button>
+                  <DSButton variant="primary" leftIcon={savingGeneral ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />} loading={savingGeneral} onClick={() => { void handleSaveGeneral(); }}>
+                    Save general settings
+                  </DSButton>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardBody>
+            </Card>
 
-        {/* ── Card 7: Danger Zone ───────────────────────────────────────────── */}
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-destructive">
-              <Shield size={16} />
-              Danger Zone
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium">Disconnect LINE OA</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Removes this OA and stops all auto replies, webhooks, and scheduled broadcasts
-                  associated with it. This action cannot be undone.
-                </p>
-              </div>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDisconnect}
-                disabled={deleting}
-                className="flex-shrink-0 gap-2"
-              >
-                {deleting && <RefreshCw size={13} className="animate-spin" />}
-                {deleting ? "Disconnecting..." : "Disconnect"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            <Card elevation="none">
+              <CardHeader title="Webhook integration" subtitle="Use these values when configuring Messaging API callbacks in LINE Developers Console." />
+              <CardBody className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)]/30 p-4">
+                    <div className="mb-2 text-sm font-medium text-[var(--text-primary)]">Webhook URL</div>
+                    <div className="break-all text-sm text-[var(--text-secondary)]">{oa.webhook_url || "Not available"}</div>
+                  </div>
+                  {oa.webhook_url ? (
+                    <div className="flex items-end">
+                      <CopyInlineButton text={oa.webhook_url} />
+                    </div>
+                  ) : null}
+                </div>
+              </CardBody>
+            </Card>
 
-      </div>
+            <Card elevation="none">
+              <CardHeader title="LINE credentials" subtitle="Rotate secrets here when you update credentials in LINE Developers Console." />
+              <CardBody className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField name="oa-channel-id" label="Channel ID">
+                    <DSInput id="oa-channel-id" value={oa.channel_id} disabled fullWidth />
+                  </FormField>
+                  <FormField name="oa-basic-id" label="Basic ID">
+                    <DSInput id="oa-basic-id" value={oa.basic_id || "-"} disabled fullWidth />
+                  </FormField>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField name="oa-channel-secret" label="Channel Secret" helperText="Leave empty if you do not want to rotate it now.">
+                    <DSInput id="oa-channel-secret" value={channelSecret} onChange={(event) => setChannelSecret(event.target.value)} showPasswordToggle fullWidth />
+                  </FormField>
+                  <FormField name="oa-channel-token" label="Channel Access Token" helperText="Leave empty if you do not want to rotate it now.">
+                    <DSInput id="oa-channel-token" value={channelAccessToken} onChange={(event) => setChannelAccessToken(event.target.value)} showPasswordToggle fullWidth />
+                  </FormField>
+                </div>
+                <div className="flex justify-end">
+                  <DSButton variant="primary" leftIcon={savingCreds ? <RefreshCw size={16} className="animate-spin" /> : <Shield size={16} />} loading={savingCreds} onClick={() => { void handleSaveCredentials(); }}>
+                    Update credentials
+                  </DSButton>
+                </div>
+              </CardBody>
+            </Card>
 
-      <AlertDialog open={showDisconnectDialog} onOpenChange={(open) => !open && setShowDisconnectDialog(false)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Disconnect "{oa?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove the LINE OA and stop all associated auto replies, webhooks, and broadcasts. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { void handleConfirmedDisconnect(); }}
-            >
-              Disconnect
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <Card elevation="none">
+              <CardHeader title="Follower sync" subtitle="Pull latest follower IDs and profile metadata from LINE into BOLA." />
+              <CardBody className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-4">
+                  <StatCard title="Status" value={syncStatus?.status ?? "idle"} icon={<Users size={18} />} />
+                  <StatCard title="Fetched IDs" value={syncStatus?.total_ids ?? 0} icon={<Users size={18} />} />
+                  <StatCard title="Synced" value={syncStatus?.synced_count ?? 0} icon={<Users size={18} />} />
+                  <StatCard title="Failed" value={syncStatus?.failed_count ?? 0} icon={<Users size={18} />} />
+                </div>
+                {syncStatus?.error_message ? (
+                  <Alert variant="danger" title="Last sync error">{syncStatus.error_message}</Alert>
+                ) : null}
+                <div className="flex justify-end">
+                  <DSButton variant="primary" leftIcon={startingSync ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />} loading={startingSync} onClick={() => { void handleStartSync(); }}>
+                    Start sync
+                  </DSButton>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card elevation="none">
+              <CardHeader title="LIFF and outbound webhook" subtitle="Configure BOLA's LIFF bridge and outbound event delivery." />
+              <CardBody className="space-y-6">
+                <div className="space-y-4">
+                  <FormField name="oa-liff-id" label="LIFF ID" helperText="Used by greeting and consent flows embedded in LINE.">
+                    <DSInput id="oa-liff-id" value={liffId} onChange={(event) => setLiffId(event.target.value)} fullWidth />
+                  </FormField>
+                  <div className="flex justify-end">
+                    <DSButton variant="secondary" leftIcon={savingLiff ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />} loading={savingLiff} onClick={() => { void handleSaveLiff(); }}>
+                      Save LIFF ID
+                    </DSButton>
+                  </div>
+                </div>
+
+                <div className="space-y-4 rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)]/20 p-4">
+                  <FormField name="oa-outbound-url" label="Outbound webhook URL">
+                    <DSInput id="oa-outbound-url" value={webhookUrl} onChange={(event) => setWebhookUrl(event.target.value)} fullWidth />
+                  </FormField>
+                  <FormField name="oa-outbound-secret" label="Outbound webhook secret">
+                    <DSInput id="oa-outbound-secret" value={webhookSecret} onChange={(event) => setWebhookSecret(event.target.value)} showPasswordToggle fullWidth />
+                  </FormField>
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-[var(--text-primary)]">Events</div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {OUTBOUND_EVENT_OPTIONS.map((eventName) => (
+                        <div key={eventName} className="rounded-2xl border border-[var(--border-default)] bg-white p-4">
+                          <DSCheckbox
+                            checked={webhookEvents.includes(eventName)}
+                            onChange={(checked) => setWebhookEvents((current) => checked ? [...new Set([...current, eventName])] : current.filter((item) => item !== eventName))}
+                            label={eventName}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <DSButton variant="primary" leftIcon={savingWebhook ? <RefreshCw size={16} className="animate-spin" /> : <Webhook size={16} />} loading={savingWebhook} onClick={() => { void handleSaveOutboundWebhook(); }}>
+                      Save outbound webhook
+                    </DSButton>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card elevation="none">
+              <CardHeader title="Danger zone" subtitle="Disconnecting removes the OA configuration from this workspace." />
+              <CardBody>
+                <DSButton variant="danger" leftIcon={<Trash2 size={16} />} onClick={() => setShowDisconnectDialog(true)}>
+                  Disconnect LINE OA
+                </DSButton>
+              </CardBody>
+            </Card>
+          </div>
+        )}
+        aside={(
+          <div className="space-y-4">
+            <Card elevation="none">
+              <CardBody className="flex flex-col items-center gap-4 p-6 text-center">
+                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-sky-50 text-xl font-semibold text-sky-700">
+                  {oa.picture_url ? <img src={oa.picture_url} alt={oa.name} className="h-full w-full object-cover" /> : oa.name[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">{oa.name}</h3>
+                  <div className="mt-2 flex flex-wrap justify-center gap-2">
+                    <Badge variant={statusVariant[oa.status]} size="sm">{oa.status}</Badge>
+                    {oa.is_default ? <Badge variant="outline" size="sm">Default</Badge> : null}
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+            <StatCard title="Followers" value={(oa.follower_count ?? 0).toLocaleString()} icon={<Users size={18} />} />
+            <Card elevation="none">
+              <CardHeader title="Message quota" action={<DSButton variant="ghost" size="sm" onClick={() => { void handleFetchQuota(); }}>{quotaLoading ? "Loading..." : "Refresh"}</DSButton>} />
+              <CardBody className="space-y-3 text-sm text-[var(--text-secondary)]">
+                <div className="rounded-xl border border-[var(--border-default)] bg-white px-4 py-3">Plan: <span className="font-medium text-[var(--text-primary)]">{quota?.quota_type ?? "-"}</span></div>
+                <div className="rounded-xl border border-[var(--border-default)] bg-white px-4 py-3">Limit: <span className="font-medium text-[var(--text-primary)]">{quota ? quota.limit.toLocaleString() : "-"}</span></div>
+                <div className="rounded-xl border border-[var(--border-default)] bg-white px-4 py-3">Usage: <span className="font-medium text-[var(--text-primary)]">{quota ? quota.total_usage.toLocaleString() : "-"}</span></div>
+                <div className="rounded-xl border border-[var(--border-default)] bg-white px-4 py-3">Remaining: <span className="font-medium text-[var(--text-primary)]">{quota ? quota.remaining.toLocaleString() : "-"}</span></div>
+              </CardBody>
+            </Card>
+            <Card elevation="none">
+              <CardHeader title="Quick reference" />
+              <CardBody className="space-y-3 text-sm text-[var(--text-secondary)]">
+                <div className="rounded-xl border border-[var(--border-default)] bg-white px-4 py-3">
+                  Basic ID: <span className="font-medium text-[var(--text-primary)]">{oa.basic_id || "-"}</span>
+                </div>
+                <div className="rounded-xl border border-[var(--border-default)] bg-white px-4 py-3">
+                  Channel ID: <span className="font-medium text-[var(--text-primary)]">{oa.channel_id}</span>
+                </div>
+                {oa.webhook_url ? (
+                  <div className="rounded-xl border border-[var(--border-default)] bg-white px-4 py-3">
+                    <div className="mb-2 text-xs uppercase tracking-wide">Webhook URL</div>
+                    <div className="break-all text-[var(--text-primary)]">{oa.webhook_url}</div>
+                    <div className="mt-3">
+                      <CopyInlineButton text={oa.webhook_url} />
+                    </div>
+                  </div>
+                ) : null}
+              </CardBody>
+            </Card>
+          </div>
+        )}
+      />
+
+      <ConfirmDialog
+        open={showDisconnectDialog}
+        onClose={() => setShowDisconnectDialog(false)}
+        onConfirm={() => { void handleDisconnect(); }}
+        title="Disconnect this LINE OA?"
+        description={`"${oa.name}" will be removed from this workspace. This action cannot be undone from the UI.`}
+        confirmLabel={deleting ? "Disconnecting..." : "Disconnect LINE OA"}
+        cancelLabel="Cancel"
+        variant="destructive"
+      />
     </AppLayout>
   );
 }

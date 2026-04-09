@@ -1,19 +1,21 @@
-import { useState, useEffect } from "react";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ArrowLeft, Phone, Link2, UserCheck, UserX, Trash2, Unlink, Send } from "lucide-react";
+  Alert,
+  Badge,
+  Breadcrumb,
+  Card,
+  CardBody,
+  CardHeader,
+  ConfirmDialog,
+  DSButton,
+  EmptyState,
+  FeaturePageScaffold,
+  PageHeader,
+  Spinner,
+  StatCard,
+} from "@uxuissk/design-system";
+import { ArrowLeft, Link2, Phone, Send, Trash2, Unlink, UserCheck, UserX } from "lucide-react";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { maskPhone } from "@/lib/phone";
 import { followerApi } from "@/api/follower";
 import type { PhoneContactActivity } from "@/api/follower";
@@ -45,56 +47,39 @@ const sourceBadgeClass: Record<string, string> = {
   manual: "bg-gray-100 text-gray-700 border-0",
 };
 
-function PhoneContactActivitySection({ contactId }: { contactId: string }) {
+function PhoneContactActivityCard({ contactId }: { contactId: string }) {
   const [activity, setActivity] = useState<PhoneContactActivity | null>(null);
 
   useEffect(() => {
-    followerApi.getPhoneContactActivity(contactId)
-      .then(setActivity)
-      .catch(() => {});
+    followerApi.getPhoneContactActivity(contactId).then(setActivity).catch(() => {});
   }, [contactId]);
 
   if (!activity) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Send size={16} />
-          Messaging Activity
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-3 text-sm">
-          <div className="bg-muted/40 rounded-lg p-3">
-            <div className="text-muted-foreground text-xs mb-1">Broadcasts</div>
-            <div className="font-semibold">{activity.total_broadcasts.toLocaleString()}</div>
-          </div>
-          <div className="bg-muted/40 rounded-lg p-3">
-            <div className="text-muted-foreground text-xs mb-1">LON Messages</div>
-            <div className="font-semibold">{activity.lon_count.toLocaleString()}</div>
-          </div>
-          <div className="bg-muted/40 rounded-lg p-3">
-            <div className="text-muted-foreground text-xs mb-1">PNP</div>
-            <div className="font-semibold">{activity.pnp_success.toLocaleString()} <span className="text-xs text-muted-foreground">/ {activity.pnp_total}</span></div>
-          </div>
+    <Card elevation="none">
+      <CardHeader title="Messaging activity" subtitle="Latest broadcast delivery footprint for this contact." />
+      <CardBody className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatCard title="Broadcasts" value={activity.total_broadcasts.toLocaleString()} icon={<Send size={18} />} />
+          <StatCard title="LON messages" value={activity.lon_count.toLocaleString()} icon={<Send size={18} />} />
+          <StatCard title="PNP success" value={`${activity.pnp_success.toLocaleString()} / ${activity.pnp_total.toLocaleString()}`} icon={<Send size={18} />} />
         </div>
         {activity.recent_broadcasts.length > 0 && (
-          <div>
-            <div className="text-sm font-medium mb-2">Recent Broadcasts</div>
-            <div className="space-y-2">
-              {activity.recent_broadcasts.map((dl) => (
-                <div key={dl.id} className="flex items-center justify-between text-xs border rounded-md px-3 py-2">
-                  <span className="text-muted-foreground">{dl.created_at ? new Date(dl.created_at).toLocaleString() : "-"}</span>
-                  <Badge variant={dl.status === "success" ? "success" : dl.status === "failed" ? "destructive" : "secondary"} className="text-xs">
-                    {dl.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+          <div className="space-y-3">
+            {activity.recent_broadcasts.map((delivery) => (
+              <div key={delivery.id} className="flex items-center justify-between rounded-xl border border-[var(--border-default)] bg-white px-4 py-3 text-sm">
+                <span className="text-[var(--text-secondary)]">
+                  {delivery.created_at ? new Date(delivery.created_at).toLocaleString() : "-"}
+                </span>
+                <Badge variant={delivery.status === "success" ? "success" : delivery.status === "failed" ? "destructive" : "secondary"} size="sm">
+                  {delivery.status}
+                </Badge>
+              </div>
+            ))}
           </div>
         )}
-      </CardContent>
+      </CardBody>
     </Card>
   );
 }
@@ -123,7 +108,7 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
       const fresh = await followerApi.getPhoneContact(contactId);
       setContact(fresh);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to unlink");
+      setError(err instanceof Error ? err.message : "Failed to unlink contact from LINE OA");
     } finally {
       setUnlinkingOAId(null);
     }
@@ -141,210 +126,167 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
     }
   };
 
-  const fullName = contact
-    ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") || maskPhone(contact.phone)
-    : "";
+  if (loading) {
+    return (
+      <AppLayout title="Contact Detail">
+        <div className="flex justify-center py-16">
+          <Spinner label="Loading contact" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!contact) {
+    return (
+      <AppLayout title="Contact Detail">
+        <EmptyState
+          title="Contact not found"
+          description={error ?? "This phone contact is not available in the current workspace."}
+          action={<DSButton variant="secondary" onClick={() => window.history.back()}>Go back</DSButton>}
+        />
+      </AppLayout>
+    );
+  }
+
+  const fullName = [contact.first_name, contact.last_name].filter(Boolean).join(" ") || maskPhone(contact.phone);
 
   return (
     <AppLayout title="Contact Detail">
-      <div className="space-y-4 max-w-3xl">
-        {/* Back */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 -ml-2 text-muted-foreground"
-            onClick={() => window.history.back()}
-          >
-            <ArrowLeft size={16} />
-            Back to Contacts
-          </Button>
-
-          {contact && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-destructive border-destructive/40 hover:bg-destructive/10"
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 size={14} />
-              Delete Contact
-            </Button>
-          )}
-        </div>
-
-        {/* Loading */}
-        {loading && (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              Loading...
-            </CardContent>
-          </Card>
+      <FeaturePageScaffold
+        layout="detail"
+        header={(
+          <PageHeader
+            title={fullName}
+            subtitle="Phone-only contact profile and LINE OA linkage details."
+            breadcrumb={<Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Contacts", href: "/contacts" }, { label: fullName }]} />}
+            actions={(
+              <div className="flex items-center gap-3">
+                <DSButton variant="ghost" leftIcon={<ArrowLeft size={16} />} onClick={() => window.history.back()}>
+                  Back
+                </DSButton>
+                <DSButton variant="danger" leftIcon={<Trash2 size={16} />} onClick={() => setDeleteOpen(true)}>
+                  Delete Contact
+                </DSButton>
+              </div>
+            )}
+          />
         )}
-
-        {/* Error */}
-        {!loading && error && (
-          <Card>
-            <CardContent className="py-12 text-center text-destructive text-sm">
-              {error}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Content */}
-        {!loading && contact && (
-          <>
-            {/* Header card */}
-            <Card>
-              <CardContent className="flex items-center gap-4 p-5">
-                {/* Avatar */}
-                <div className="w-14 h-14 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-semibold text-lg flex-shrink-0">
+        banner={error ? <Alert variant="danger" title="Something needs attention">{error}</Alert> : undefined}
+        main={(
+          <div className="space-y-6">
+            <Card elevation="none">
+              <CardBody className="flex flex-col gap-4 p-6 md:flex-row md:items-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-50 text-lg font-semibold text-sky-700">
                   {getInitials(contact.first_name, contact.last_name, contact.phone)}
                 </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-lg font-semibold">{fullName}</h1>
-                    <span
-                      className={cn(
-                        "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
-                        sourceBadgeClass[contact.source] ?? sourceBadgeClass.manual
-                      )}
-                    >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-xl font-semibold text-[var(--text-primary)]">{fullName}</h2>
+                    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", sourceBadgeClass[contact.source] ?? sourceBadgeClass.manual)}>
                       {contact.source}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground">
-                    <Phone size={13} />
+                  <div className="mt-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                    <Phone size={14} />
                     <span className="font-mono">{maskPhone(contact.phone)}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Imported {formatDate(contact.created_at)}
-                  </p>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">Imported {formatDate(contact.created_at)}</p>
                 </div>
-              </CardContent>
+              </CardBody>
             </Card>
 
-            {/* Linked OAs */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Link2 size={16} />
-                  Linked LINE OAs
-                  <Badge variant="secondary" className="ml-auto">
-                    {contact.linked_oas.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
+            <Card elevation="none">
+              <CardHeader
+                title="Linked LINE OAs"
+                subtitle="Phone contact matches and follower relationships connected to this profile."
+                action={<Badge variant="secondary" size="sm">{contact.linked_oas.length}</Badge>}
+              />
+              <CardBody>
                 {contact.linked_oas.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    <div className="text-2xl mb-2">🔗</div>
-                    No LINE OAs linked yet.
-                    <br />
-                    This contact has not been matched to any LINE OA follower.
-                  </div>
+                  <EmptyState
+                    icon={<Link2 size={36} />}
+                    title="No linked LINE OA yet"
+                    description="This phone contact has not been matched to any follower record yet."
+                  />
                 ) : (
-                  <div className="divide-y">
+                  <div className="space-y-3">
                     {contact.linked_oas.map((oa) => (
-                      <div key={oa.id} className="flex items-start gap-3 py-3">
-                        {/* Status icon / follower avatar */}
-                        <div className="mt-0.5 flex-shrink-0">
+                      <div key={oa.id} className="flex flex-col gap-4 rounded-2xl border border-[var(--border-default)] bg-white p-4 md:flex-row md:items-start">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-700">
                           {oa.is_follower && oa.follower_picture_url ? (
-                            <img
-                              src={oa.follower_picture_url}
-                              alt={oa.follower_display_name}
-                              className="w-8 h-8 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className={cn(oa.is_follower ? "text-line" : "text-muted-foreground")}>
-                              {oa.is_follower ? <UserCheck size={16} /> : <UserX size={16} />}
-                            </div>
-                          )}
+                            <img src={oa.follower_picture_url} alt={oa.follower_display_name} className="h-10 w-10 rounded-full object-cover" />
+                          ) : oa.is_follower ? <UserCheck size={18} /> : <UserX size={18} />}
                         </div>
-
-                        {/* Detail */}
-                        <div className="flex-1 min-w-0 space-y-0.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium">{oa.line_oa_name || oa.line_oa_id}</span>
-                            {oa.is_follower ? (
-                              <span className="text-xs text-line font-medium">Follower</span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">Phone</span>
-                            )}
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-[var(--text-primary)]">{oa.line_oa_name || oa.line_oa_id}</span>
+                            <Badge variant={oa.is_follower ? "success" : "secondary"} size="sm">
+                              {oa.is_follower ? "Follower" : "Phone only"}
+                            </Badge>
                           </div>
-                          {oa.is_follower && oa.follower_display_name && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground">LINE Name:</span>
-                              <span className="text-xs font-medium text-foreground">{oa.follower_display_name}</span>
-                            </div>
-                          )}
-                          {oa.line_oa_basic_id && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground">Basic ID:</span>
-                              <span className="font-mono text-xs text-foreground">{oa.line_oa_basic_id}</span>
-                            </div>
-                          )}
-                          {oa.line_user_id && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground">LINE UID:</span>
-                              <span className="font-mono text-xs text-foreground">{oa.line_user_id}</span>
-                            </div>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            Linked {formatDate(oa.linked_at)}
-                          </p>
+                          <div className="grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-2">
+                            {oa.follower_display_name && <span>LINE Name: <span className="font-medium text-[var(--text-primary)]">{oa.follower_display_name}</span></span>}
+                            {oa.line_oa_basic_id && <span>Basic ID: <span className="font-mono text-[var(--text-primary)]">{oa.line_oa_basic_id}</span></span>}
+                            {oa.line_user_id && <span>LINE UID: <span className="font-mono text-[var(--text-primary)]">{oa.line_user_id}</span></span>}
+                            <span>Linked: <span className="text-[var(--text-primary)]">{formatDate(oa.linked_at)}</span></span>
+                          </div>
                         </div>
-
-                        {/* Unlink button — only when LINE UID is set */}
                         {oa.line_user_id && (
-                          <Button
+                          <DSButton
                             variant="ghost"
                             size="sm"
-                            className="gap-1 text-xs text-muted-foreground hover:text-destructive flex-shrink-0"
-                            disabled={unlinkingOAId === oa.line_oa_id}
-                            onClick={() => void handleUnlink(oa.line_oa_id)}
+                            leftIcon={<Unlink size={14} />}
+                            loading={unlinkingOAId === oa.line_oa_id}
+                            onClick={() => { void handleUnlink(oa.line_oa_id); }}
                           >
-                            <Unlink size={12} />
-                            {unlinkingOAId === oa.line_oa_id ? "Unlinking…" : "Unlink"}
-                          </Button>
+                            Unlink
+                          </DSButton>
                         )}
                       </div>
                     ))}
                   </div>
                 )}
-              </CardContent>
+              </CardBody>
             </Card>
-          </>
+
+            <PhoneContactActivityCard contactId={contact.id} />
+          </div>
         )}
+        aside={(
+          <div className="space-y-4">
+            <StatCard title="Linked OAs" value={contact.linked_oas.length} icon={<Link2 size={18} />} />
+            <StatCard title="Source" value={contact.source} icon={<Phone size={18} />} />
+            <Card elevation="none">
+              <CardHeader title="Quick context" />
+              <CardBody className="space-y-3 text-sm text-[var(--text-secondary)]">
+                <div>
+                  <div className="text-xs uppercase tracking-wide">Phone</div>
+                  <div className="font-mono text-[var(--text-primary)]">{maskPhone(contact.phone)}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wide">Created</div>
+                  <div className="text-[var(--text-primary)]">{formatDate(contact.created_at)}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wide">Updated</div>
+                  <div className="text-[var(--text-primary)]">{formatDate(contact.updated_at)}</div>
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        )}
+      />
 
-        {/* Messaging Activity */}
-        {contact && <PhoneContactActivitySection contactId={contact.id} />}
-      </div>
-
-      {/* Delete confirm dialog */}
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ลบ Contact นี้?</AlertDialogTitle>
-            <AlertDialogDescription>
-              <span className="font-medium">{fullName}</span> ({contact ? maskPhone(contact.phone) : ""}) จะถูกลบออกจากระบบถาวร
-              รวมถึง OA linkage ทั้งหมด ไม่สามารถกู้คืนได้
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); void handleDelete(); }}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? "กำลังลบ…" : "ลบ"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => { void handleDelete(); }}
+        title="Delete this contact?"
+        description={`${fullName} (${maskPhone(contact.phone)}) will be permanently removed together with its OA linkage history.`}
+        confirmLabel={deleting ? "Deleting..." : "Delete contact"}
+        cancelLabel="Cancel"
+        variant="destructive"
+      />
     </AppLayout>
   );
 }

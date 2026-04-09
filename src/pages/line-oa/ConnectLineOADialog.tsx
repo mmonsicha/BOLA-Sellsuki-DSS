@@ -1,7 +1,13 @@
 import { useState } from "react";
-import { Dialog } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, Eye, EyeOff, HelpCircle } from "lucide-react";
+import {
+  Alert,
+  DSButton,
+  DSCheckbox,
+  DSInput,
+  FormField,
+  Modal,
+} from "@uxuissk/design-system";
+import { RefreshCw } from "lucide-react";
 import { lineOAApi } from "@/api/lineOA";
 import type { LineOA } from "@/types";
 import { getWorkspaceId } from "@/lib/auth";
@@ -34,94 +40,13 @@ const initialForm: FormState = {
   is_default: false,
 };
 
-function Field({
-  label,
-  required,
-  hint,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1">
-      <label className="text-sm font-medium">
-        {label}
-        {required && <span className="text-destructive ml-1">*</span>}
-      </label>
-      {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
-
-function TextInput({
-  value,
-  onChange,
-  placeholder,
-  disabled,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <input
-      type="text"
-      className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      disabled={disabled}
-    />
-  );
-}
-
-function SecretInput({
-  value,
-  onChange,
-  placeholder,
-  disabled,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="relative">
-      <input
-        type={show ? "text" : "password"}
-        className="w-full border rounded-md px-3 py-2 pr-9 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed font-mono"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        autoComplete="off"
-      />
-      <button
-        type="button"
-        onClick={() => setShow((s) => !s)}
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-        tabIndex={-1}
-      >
-        {show ? <EyeOff size={15} /> : <Eye size={15} />}
-      </button>
-    </div>
-  );
-}
-
 export function ConnectLineOADialog({ open, onClose, onCreated }: ConnectLineOADialogProps) {
   const [form, setForm] = useState<FormState>(initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const set = (key: keyof FormState) => (value: string | boolean) =>
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((current) => ({ ...current, [key]: value }));
 
   const handleClose = () => {
     setForm(initialForm);
@@ -129,12 +54,10 @@ export function ConnectLineOADialog({ open, onClose, onCreated }: ConnectLineOAD
     onClose();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setError("");
 
-    // Basic validation
-    if (!form.name.trim()) return setError("Name is required.");
+    if (!form.name.trim()) return setError("Display name is required.");
     if (!form.channel_id.trim()) return setError("Channel ID is required.");
     if (!form.channel_secret.trim()) return setError("Channel Secret is required.");
     if (!form.channel_access_token.trim()) return setError("Channel Access Token is required.");
@@ -161,135 +84,154 @@ export function ConnectLineOADialog({ open, onClose, onCreated }: ConnectLineOAD
   };
 
   return (
-    <Dialog
+    <Modal
       open={open}
       onClose={handleClose}
       title="Connect LINE Official Account"
-      description="Enter your LINE Developer Console credentials to link your OA."
+      description="Add your LINE Developer Console credentials to link a new official account into BOLA."
+      size="lg"
+      footer={(
+        <div className="flex w-full items-center justify-end gap-3">
+          <DSButton variant="secondary" onClick={handleClose} disabled={saving}>
+            Cancel
+          </DSButton>
+          <DSButton
+            variant="primary"
+            onClick={() => { void handleSubmit(); }}
+            loading={saving}
+            leftIcon={saving ? <RefreshCw size={16} className="animate-spin" /> : undefined}
+          >
+            Connect LINE OA
+          </DSButton>
+        </div>
+      )}
     >
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-        {/* Name */}
-        <Field label="Display Name" required>
-          <TextInput
-            value={form.name}
-            onChange={set("name")}
-            placeholder="e.g. My Brand OA"
-            disabled={saving}
-          />
-        </Field>
-
-        {/* Description */}
-        <Field label="Description">
-          <TextInput
-            value={form.description}
-            onChange={set("description")}
-            placeholder="Optional description"
-            disabled={saving}
-          />
-        </Field>
-
-        <div className="border-t pt-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-            LINE Developer Credentials
-          </p>
-
-          {/* Channel ID */}
-          <div className="space-y-3">
-            <Field
-              label="Channel ID"
-              required
-              hint="10-digit number identifying your Messaging API channel. Found in LINE Developers Console → Basic settings."
-            >
-              <TextInput
-                value={form.channel_id}
-                onChange={set("channel_id")}
-                placeholder="1234567890"
-                disabled={saving}
-              />
-            </Field>
-
-            {/* Channel Secret */}
-            <Field
-              label="Channel Secret"
-              required
-              hint="Used to verify LINE webhook signatures. Never share or commit to source code — treat it like a private key."
-            >
-              <SecretInput
-                value={form.channel_secret}
-                onChange={set("channel_secret")}
-                placeholder="Enter channel secret"
-                disabled={saving}
-              />
-            </Field>
-
-            {/* Channel Access Token */}
-            <Field
-              label="Channel Access Token"
-              required
-              hint="Authorises BOLA to send messages on behalf of your OA. Found in LINE Developers Console → Messaging API → Issue. Treat it like a password — do not share publicly."
-            >
-              <SecretInput
-                value={form.channel_access_token}
-                onChange={set("channel_access_token")}
-                placeholder="Enter long-lived access token"
-                disabled={saving}
-              />
-            </Field>
-
-            {/* Bot Basic ID */}
-            <Field
-              label="Bot Basic ID"
-              hint="Found in LINE Developers Console → Bot information (e.g. @ykg2018o)"
-            >
-              <TextInput
-                value={form.basic_id}
-                onChange={set("basic_id")}
-                placeholder="e.g. @ykg2018o"
-                disabled={saving}
-              />
-            </Field>
-          </div>
-        </div>
-
-        {/* Is Default */}
-        <div className="flex items-center gap-2 pt-1">
-          <input
-            id="is_default"
-            type="checkbox"
-            className="rounded border-gray-300 text-primary focus:ring-ring"
-            checked={form.is_default}
-            onChange={(e) => set("is_default")(e.target.checked)}
-            disabled={saving}
-          />
-          <label htmlFor="is_default" className="text-sm cursor-pointer select-none">
-            Set as default LINE OA
-          </label>
-          <span className="relative group">
-            <HelpCircle size={13} className="text-muted-foreground cursor-help" />
-            <span className="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 w-64 rounded bg-gray-800 px-2.5 py-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50">
-              The default LINE OA is used when no specific OA is selected in broadcasts and auto-replies.
-            </span>
-          </span>
-        </div>
-
-        {/* Error */}
+      <div className="space-y-6">
         {error && (
-          <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+          <Alert variant="danger" title="Unable to connect LINE OA">
             {error}
-          </div>
+          </Alert>
         )}
 
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2 border-t">
-          <Button type="button" variant="outline" onClick={handleClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={saving} className="gap-2 min-w-[120px]">
-            {saving && <RefreshCw size={14} className="animate-spin" />}
-            {saving ? "Connecting..." : "Connect LINE OA"}
-          </Button>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField
+            name="line-oa-name"
+            label="Display Name"
+            required
+            helperText="Use a name your team can easily recognize in BOLA."
+          >
+            <DSInput
+              id="line-oa-name"
+              value={form.name}
+              onChange={(event) => set("name")(event.target.value)}
+              placeholder="e.g. My Brand OA"
+              disabled={saving}
+              fullWidth
+            />
+          </FormField>
+
+          <FormField
+            name="line-oa-basic-id"
+            label="Bot Basic ID"
+            helperText="Optional, e.g. @ykg2018o."
+          >
+            <DSInput
+              id="line-oa-basic-id"
+              value={form.basic_id}
+              onChange={(event) => set("basic_id")(event.target.value)}
+              placeholder="@mybrand"
+              disabled={saving}
+              fullWidth
+            />
+          </FormField>
         </div>
-      </form>
-    </Dialog>
+
+        <FormField
+          name="line-oa-description"
+          label="Description"
+          helperText="Internal description for your team."
+        >
+          <DSInput
+            id="line-oa-description"
+            value={form.description}
+            onChange={(event) => set("description")(event.target.value)}
+            placeholder="Optional description"
+            disabled={saving}
+            fullWidth
+          />
+        </FormField>
+
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)]/40 p-4">
+          <div className="mb-4">
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">LINE Developer credentials</h3>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              These values come from LINE Developers Console. Keep them private and never commit them into source control.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <FormField
+              name="line-oa-channel-id"
+              label="Channel ID"
+              required
+              helperText="Found in LINE Developers Console > Basic settings."
+            >
+              <DSInput
+                id="line-oa-channel-id"
+                value={form.channel_id}
+                onChange={(event) => set("channel_id")(event.target.value)}
+                placeholder="1234567890"
+                disabled={saving}
+                fullWidth
+              />
+            </FormField>
+
+            <FormField
+              name="line-oa-channel-secret"
+              label="Channel Secret"
+              required
+              helperText="Used to verify webhook signatures."
+            >
+              <DSInput
+                id="line-oa-channel-secret"
+                value={form.channel_secret}
+                onChange={(event) => set("channel_secret")(event.target.value)}
+                placeholder="Enter channel secret"
+                disabled={saving}
+                showPasswordToggle
+                fullWidth
+              />
+            </FormField>
+
+            <FormField
+              name="line-oa-channel-token"
+              label="Channel Access Token"
+              required
+              helperText="Use a long-lived token that allows BOLA to message on behalf of this OA."
+            >
+              <DSInput
+                id="line-oa-channel-token"
+                value={form.channel_access_token}
+                onChange={(event) => set("channel_access_token")(event.target.value)}
+                placeholder="Enter long-lived access token"
+                disabled={saving}
+                showPasswordToggle
+                fullWidth
+              />
+            </FormField>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--border-default)] bg-white p-4">
+          <DSCheckbox
+            checked={form.is_default}
+            onChange={(checked) => set("is_default")(checked)}
+            label="Set as default LINE OA"
+            description="BOLA will use this account as the default sender when a feature does not ask for an OA explicitly."
+            disabled={saving}
+          />
+        </div>
+      </div>
+    </Modal>
   );
 }
