@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { FeedbackWidget } from "@/components/common/FeedbackWidget";
 import { DatabaseAlert } from "@/components/common/DatabaseAlert";
 import { useHealthCheck } from "@/hooks/useHealthCheck";
+import { switchWorkspace, getAuthMode } from "@/lib/auth";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -35,10 +36,15 @@ export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
             </h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* Workspace selector placeholder */}
-            <button className="hidden sm:block text-sm text-gray-600 border rounded-md px-3 py-1.5 hover:bg-gray-50">
-              My Workspace
-            </button>
+            {/* Workspace switcher */}
+            {getAuthMode() === "kratos" && (
+              <button
+                onClick={switchWorkspace}
+                className="hidden sm:block text-sm text-gray-600 border rounded-md px-3 py-1.5 hover:bg-gray-50"
+              >
+                My Workspace
+              </button>
+            )}
             {/* User avatar placeholder */}
             <div className="w-8 h-8 rounded-full bg-line text-white flex items-center justify-center text-sm font-medium">
               A
