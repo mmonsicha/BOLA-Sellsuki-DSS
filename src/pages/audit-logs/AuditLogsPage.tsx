@@ -138,6 +138,70 @@ const ACTION_LABEL_MAP: Record<string, string> = Object.fromEntries(
   AUDIT_ACTION_GROUPS.flatMap((g) => g.actions.map((a) => [a.value, a.label]))
 );
 
+// Date preset helpers
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+interface DatePreset {
+  label: string;
+  getDates: () => { from: string; to: string };
+}
+
+const DATE_PRESETS: DatePreset[] = [
+  {
+    label: "Today",
+    getDates: () => {
+      const t = toDateStr(new Date());
+      return { from: t, to: t };
+    },
+  },
+  {
+    label: "Yesterday",
+    getDates: () => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      const t = toDateStr(d);
+      return { from: t, to: t };
+    },
+  },
+  {
+    label: "Last 7 days",
+    getDates: () => {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 6);
+      return { from: toDateStr(from), to: toDateStr(to) };
+    },
+  },
+  {
+    label: "Last 30 days",
+    getDates: () => {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 29);
+      return { from: toDateStr(from), to: toDateStr(to) };
+    },
+  },
+  {
+    label: "This month",
+    getDates: () => {
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from: toDateStr(from), to: toDateStr(now) };
+    },
+  },
+  {
+    label: "Last month",
+    getDates: () => {
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const to = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { from: toDateStr(from), to: toDateStr(to) };
+    },
+  },
+];
+
 function actionBadgeClass(action: string): string {
   if (action.includes("delete") || action.includes("remove") || action.includes("deactivate")) {
     return "bg-red-100 text-red-800 border-red-200";
@@ -184,6 +248,7 @@ export function AuditLogsPage() {
   const [filterAction, setFilterAction] = useState("");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
   const loadLogs = (p: number = 1) => {
     setLoading(true);
@@ -220,6 +285,34 @@ export function AuditLogsPage() {
 
   const handleSearch = () => {
     loadLogs(1);
+  };
+
+  const applyPreset = (preset: DatePreset) => {
+    const { from, to } = preset.getDates();
+    setFilterFrom(from);
+    setFilterTo(to);
+    setActivePreset(preset.label);
+    // Auto-search immediately when a preset is clicked
+    setLoading(true);
+    setError(null);
+    auditLogApi.list({
+      page: 1,
+      page_size: PAGE_SIZE,
+      admin_id: filterAdminId.trim() || undefined,
+      action: filterAction.trim() || undefined,
+      from,
+      to,
+    })
+      .then((res) => {
+        setLogs(res.data ?? []);
+        setTotal(res.total ?? 0);
+        setPage(1);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load audit logs");
+        setLogs([]);
+      })
+      .finally(() => setLoading(false));
   };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -288,7 +381,7 @@ export function AuditLogsPage() {
                   id="filter-from"
                   type="date"
                   value={filterFrom}
-                  onChange={(e) => setFilterFrom(e.target.value)}
+                  onChange={(e) => { setFilterFrom(e.target.value); setActivePreset(null); }}
                   className="h-8 text-sm"
                 />
               </div>
@@ -298,11 +391,40 @@ export function AuditLogsPage() {
                   id="filter-to"
                   type="date"
                   value={filterTo}
-                  onChange={(e) => setFilterTo(e.target.value)}
+                  onChange={(e) => { setFilterTo(e.target.value); setActivePreset(null); }}
                   className="h-8 text-sm"
                 />
               </div>
             </div>
+
+            {/* Quick date range presets */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-3">
+              <span className="text-xs text-muted-foreground mr-0.5">Quick:</span>
+              {DATE_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => applyPreset(preset)}
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border transition-colors ${
+                    activePreset === preset.label
+                      ? "bg-primary text-primary-foreground border-primary font-medium"
+                      : "bg-background text-muted-foreground border-border hover:border-primary hover:text-foreground"
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {(filterFrom || filterTo) && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterFrom(""); setFilterTo(""); setActivePreset(null); }}
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border border-border bg-background text-muted-foreground hover:text-destructive hover:border-destructive transition-colors"
+                >
+                  Clear dates
+                </button>
+              )}
+            </div>
+
             <div className="flex justify-end mt-3">
               <Button size="sm" onClick={handleSearch} className="gap-1.5" disabled={loading}>
                 <Search size={14} />
