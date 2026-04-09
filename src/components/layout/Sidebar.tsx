@@ -33,7 +33,7 @@ import {
   Lightbulb,
   ArrowLeftRight,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { SetupProgressChecklist } from "./SetupProgressChecklist";
 import { logout, switchWorkspace, getAuthMode } from "@/lib/auth";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
@@ -61,13 +61,13 @@ const BASE_NAV_SECTIONS: NavSection[] = [
       { label: "Broadcasts", href: "/broadcasts", icon: Radio, tutorialId: "broadcasts" },
       { label: "Auto Reply", href: "/auto-reply", icon: ChevronRight, tutorialId: "auto-reply" },
       { label: "Auto Push Messages", href: "/auto-push-messages", icon: Zap },
+      { label: "Message Logs", href: "/message-logs", icon: FileText },
       { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
       // { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
-      { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
-      { label: "Message Logs", href: "/message-logs", icon: FileText },
       { label: "LON by Phone", href: "/lon-by-phone", icon: PhoneCall },
       { label: "LON Jobs", href: "/lon-jobs", icon: CalendarDays },
       { label: "LON Templates", href: "/lon-templates", icon: LayoutTemplate },
+      { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
       { label: "Registration Forms", href: "/registration-forms", icon: ClipboardList },
     ],
   },
@@ -110,6 +110,11 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
   const [collapsed, setCollapsed] = useState(false);
   const currentPath = window.location.pathname;
   const { isAdminOrAbove } = useCurrentAdmin();
+  const activeItemRef = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView({ block: "nearest" });
+  }, []);
 
   // Build the Team section dynamically so Audit Logs is only visible to admin+
   const teamSection: NavSection = {
@@ -202,6 +207,7 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
                     return (
                       <li key={item.href}>
                         <a
+                          ref={isActive ? activeItemRef : undefined}
                           href={item.href}
                           onClick={onMobileClose}
                           className={cn(
