@@ -6,12 +6,13 @@ import {
   Card,
   CardBody,
   CardHeader,
+  ChoiceCard,
+  ChoiceCardGroup,
   DSButton,
   EmptyState,
   FeaturePageScaffold,
   PageHeader,
   Spinner,
-  StatCard,
 } from "@uxuissk/design-system";
 import {
   ArrowRight,
@@ -284,13 +285,24 @@ export function DashboardPage() {
           />
         )}
         kpis={(
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <ChoiceCardGroup
+            value=""
+            size="lg"
+            className="grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
+            onChange={(value) => {
+              window.location.href = value;
+            }}
+          >
             {stats.map((stat) => (
-              <a key={stat.label} href={stat.href} className="block">
-                <StatCard title={stat.label} value={loading ? "..." : stat.value} icon={stat.icon} />
-              </a>
+              <ChoiceCard
+                key={stat.href}
+                value={stat.href}
+                title={stat.label}
+                description={loading ? "..." : String(stat.value)}
+                icon={stat.icon}
+              />
             ))}
-          </div>
+          </ChoiceCardGroup>
         )}
         primaryChart={(
           <div className="space-y-4">
