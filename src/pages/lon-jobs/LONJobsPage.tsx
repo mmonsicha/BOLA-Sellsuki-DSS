@@ -627,21 +627,15 @@ function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, segments, 
                           onChange={(e) => set("target_segment_id", e.target.value)}
                         >
                           <option value="">Select a segment…</option>
-                          {segments.map((s) => (
+                          {segments.filter((s) => s.source_type === "contact").map((s) => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                           ))}
                         </select>
                       </div>
                       {selectedSeg && (
                         <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs">
-                          {selectedSeg.source_type === "follower" ? (
-                            <Users size={13} className="text-violet-500 flex-shrink-0" />
-                          ) : (
-                            <Phone size={13} className="text-blue-500 flex-shrink-0" />
-                          )}
-                          <span className="text-muted-foreground">
-                            {selectedSeg.source_type === "follower" ? "Followers" : "Phone Contacts"}
-                          </span>
+                          <Phone size={13} className="text-blue-500 flex-shrink-0" />
+                          <span className="text-muted-foreground">Phone Contacts</span>
                           <span className="ml-auto font-semibold tabular-nums">
                             {selectedSeg.customer_count.toLocaleString()} คน
                           </span>
