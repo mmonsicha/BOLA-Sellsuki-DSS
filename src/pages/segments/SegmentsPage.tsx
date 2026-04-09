@@ -2,8 +2,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Users, Zap, Trash2, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Plus, RefreshCw, Users, Phone, Zap, Trash2, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { segmentApi } from "@/api/segment";
 import { broadcastApi } from "@/api/broadcast";
 import type { Segment, Broadcast } from "@/types";
@@ -28,6 +28,7 @@ export function SegmentsPage() {
   const { isEditorOrAbove } = useCurrentAdmin();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sourceFilter, setSourceFilter] = useState<"all" | "follower" | "contact">("all");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [affectedBroadcasts, setAffectedBroadcasts] = useState<Broadcast[]>([]);
@@ -43,6 +44,11 @@ export function SegmentsPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const filteredSegments = useMemo(() => {
+    if (sourceFilter === "all") return segments;
+    return segments.filter((s) => s.source_type === sourceFilter);
+  }, [segments, sourceFilter]);
 
   const handleConfirmedDelete = async (id: string) => {
     setDeletingId(id);
@@ -72,6 +78,30 @@ export function SegmentsPage() {
           )}
         </div>
 
+        {/* Source type filter */}
+        <div className="flex gap-2">
+          {(["all", "follower", "contact"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setSourceFilter(f)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border ${
+                sourceFilter === f
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:bg-muted"
+              }`}
+            >
+              {f === "follower" && <Users size={13} />}
+              {f === "contact" && <Phone size={13} />}
+              {f === "all" ? "ทั้งหมด" : f === "follower" ? "By Follower" : "By Contact"}
+              <span className={`ml-1 text-xs rounded-full px-1.5 py-0.5 ${
+                sourceFilter === f ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+              }`}>
+                {f === "all" ? segments.length : segments.filter((s) => s.source_type === f).length}
+              </span>
+            </button>
+          ))}
+        </div>
+
         {/* Loading */}
         {loading && (
           <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
@@ -81,7 +111,7 @@ export function SegmentsPage() {
         )}
 
         {/* Empty state */}
-        {!loading && segments.length === 0 && (
+        {!loading && filteredSegments.length === 0 && (
           <Card>
             <CardContent className="text-center py-12">
               <div className="text-4xl mb-3">🏷️</div>
@@ -100,9 +130,9 @@ export function SegmentsPage() {
         )}
 
         {/* List */}
-        {!loading && segments.length > 0 && (
+        {!loading && filteredSegments.length > 0 && (
           <div className="grid gap-3">
-            {segments.map((seg) => (
+            {filteredSegments.map((seg) => (
               <Card
                 key={seg.id}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -110,14 +140,26 @@ export function SegmentsPage() {
               >
                 <CardContent className="flex items-center gap-4 p-4">
                   {/* Icon */}
-                  <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                    <Users size={18} className="text-orange-600" />
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    seg.source_type === "contact" ? "bg-blue-100" : "bg-orange-100"
+                  }`}>
+                    {seg.source_type === "contact"
+                      ? <Phone size={18} className="text-blue-600" />
+                      : <Users size={18} className="text-orange-600" />
+                    }
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium truncate">{seg.name}</span>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${seg.source_type === "contact" ? "border-blue-300 text-blue-600" : "border-orange-300 text-orange-600"}`}
+                      >
+                        {seg.source_type === "contact" ? <Phone size={9} /> : <Users size={9} />}
+                        {seg.source_type === "contact" ? "Contact" : "Follower"}
+                      </Badge>
                       {seg.is_dynamic && (
                         <Badge variant="default" className="gap-1 text-xs">
                           <Zap size={10} />
@@ -130,7 +172,7 @@ export function SegmentsPage() {
                     )}
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-xs text-muted-foreground">
-                        {seg.customer_count ?? 0} followers
+                        {seg.customer_count ?? 0} {seg.source_type === "contact" ? "contacts" : "followers"}
                       </span>
                       {seg.rule?.conditions?.length > 0 && (
                         <span className="text-xs text-muted-foreground">
