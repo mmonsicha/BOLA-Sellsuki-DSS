@@ -77,6 +77,7 @@ interface PhoneContactFollowerDetail {
 interface PhoneContactDetail {
   id, phone, first_name, last_name
   source: "csv" | "webhook" | "manual"
+  lon_suppressed: boolean    // true when LINE returned 404 — skipped in LON jobs
   created_at, updated_at
   linked_oas: PhoneContactFollowerDetail[]  // one per LINE OA this phone is linked to
 }
@@ -87,6 +88,7 @@ interface PhoneContactDetail {
 ```typescript
 interface Segment {
   id, workspace_id, line_oa_id, name, description
+  source_type: "follower" | "contact"  // "follower" = LINE followers; "contact" = phone contacts
   rule: {
     operator: "AND" | "OR"
     conditions: Array<{ field: string; operator: string; value: string }>
@@ -96,6 +98,11 @@ interface Segment {
   created_at, updated_at
 }
 ```
+
+**source_type usage:**
+- `follower` — filters `followers` table (tag, follow_status, follow_date, custom_field conditions)
+- `contact` — filters `phone_contacts` table (follows_oa, pnp_count, contact_tag, etc.)
+- LON jobs and LON by phone **only support `contact` segments** — follower segments are filtered out in the UI and rejected by the backend
 
 ## Broadcast
 
@@ -282,6 +289,57 @@ interface PNPTemplate {
   created_by, created_at, updated_at: string
 }
 ```
+
+## LON Jobs (Scheduled LON Campaigns)
+
+```typescript
+type LONJobStatus = "active" | "paused"
+type LONJobScheduleType = "weekly" | "monthly"
+
+interface LONJob {
+  id, workspace_id, line_oa_id: string
+  name, description: string
+  schedule_type: LONJobScheduleType
+  schedule_weekdays: number[]    // 0=Sun..6=Sat (weekly)
+  schedule_days_of_month: number[] // 1–31 (monthly)
+  schedule_hour, schedule_minute: number
+  timezone: string               // default "Asia/Bangkok"
+  target_type: "all_contacts" | "segment"
+  target_segment_id?: string     // must be source_type="contact" segment
+  template_id: string
+  template_variables: Record<string, string>
+  status: LONJobStatus
+  next_run_at?: string | null
+  last_run_at?: string | null
+  last_run_status?: string
+  total_runs: number
+  created_by, created_at, updated_at: string
+}
+
+interface LONJobRun {
+  id, lon_job_id, workspace_id: string
+  executed_at: string
+  status: "success" | "partial" | "failed"
+  sent_count: number
+  failed_count: number
+  suppressed_count: number   // contacts skipped because lon_suppressed=true
+}
+
+interface LONJobTargetStats {
+  total: number       // all contacts with phone in the target
+  suppressed: number  // contacts with lon_suppressed=true
+  will_send: number   // contacts that will actually receive the message
+}
+
+interface BulkSendLONByPhoneResponse {
+  results: Array<{ phone: string; status: string; error?: string }>
+  suppressed_count?: number  // how many phones were newly suppressed in this send
+}
+```
+
+**Segment restriction:** Only `source_type="contact"` segments shown in LON job and LON by phone UI. Backend rejects follower segments with an error.
+
+**Suppression:** When LINE returns 404 for any phone, `lon_suppressed` is set to `true` on that `PhoneContact`. All future LON job runs skip suppressed contacts. The `suppressed_count` field on `LONJobRun` records how many were skipped per run. Use `GET /v1/lon-jobs/:id/target-stats` to preview before triggering.
 
 ## Registration Form
 
