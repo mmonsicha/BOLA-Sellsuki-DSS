@@ -11,6 +11,7 @@ export interface FlexMessage {
   workspace_id: string;
   name: string;
   description: string;
+  alt_text: string; // default preview text shown in LINE chat list
   content: string; // raw LINE Flex Message container JSON string
   variables: FlexMessageVariable[];
   created_at: string;
@@ -28,13 +29,14 @@ export const flexMessageApi = {
     workspace_id: string;
     name: string;
     description?: string;
+    alt_text?: string;
     content: string;
     variables?: FlexMessageVariable[];
   }) => api.post<{ data: FlexMessage }>("/v1/flex-messages", body),
 
   update: (
     id: string,
-    body: Partial<{ name: string; description: string; content: string; variables: FlexMessageVariable[] }>
+    body: Partial<{ name: string; description: string; alt_text: string; content: string; variables: FlexMessageVariable[] }>
   ) => api.put<{ data: FlexMessage }>(`/v1/flex-messages/${id}`, body),
 
   delete: (id: string) => api.delete<void>(`/v1/flex-messages/${id}`),
