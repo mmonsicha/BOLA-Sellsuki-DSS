@@ -109,9 +109,15 @@ Standard CRUD for flex message templates.
 > `publicSubscribeByPhone` only succeeds if the user has previously consented to notifications via LINE (LON token exists).
 > See `backend/.claude/knowledge/integrations.md` for full details and migration path.
 - `sendLONByPhone(params)` — POST `/v1/pnp/send` → returns `PNPDeliveryLog` (incl. `phone_hash`)
+- `bulkSendLONByPhone(body)` — POST `/v1/pnp/bulk-send` → returns `BulkSendLONByPhoneResponse { results: BulkSendPNPResult[] }`
 - `listLONByPhoneLogs(params)` — GET `/v1/pnp/logs`
 
 **localStorage side-effect**: after `sendLONByPhone`, `LONByPhonePage` writes `{ [phone_hash]: maskedPhone }` to `bola_lon_phone_map` so `LONDeliveryLogsPage` PNP tab can show readable masked phones.
+
+**LONByPhonePage send modes** (`/lon-by-phone`):
+- `single` — sends to one phone number via `sendLONByPhone`
+- `bulk` — picks contacts from workspace (phone-type UnifiedContacts), sends via `bulkSendLONByPhone`
+- `segment` — picks a segment (global, not per-OA), paginates `segmentApi.previewList` to collect phone numbers, sends via `bulkSendLONByPhone` with `triggered_by: "manual_segment"`. Segments are loaded once on mount (no OA filter).
 
 ### `pnpTemplateApi` (same file `src/api/lon.ts`)
 

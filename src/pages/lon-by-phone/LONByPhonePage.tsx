@@ -369,6 +369,81 @@ function ContactPickerModal({ open, onClose, workspaceId, lineOAId, onConfirm }:
   );
 }
 
+// ─── Segment Picker Modal ─────────────────────────────────────────────────────
+
+interface SegmentPickerModalProps {
+  open: boolean;
+  onClose: () => void;
+  segments: Segment[];
+  loading: boolean;
+  onSelect: (segment: Segment) => void;
+}
+
+function SegmentPickerModal({ open, onClose, segments, loading, onSelect }: SegmentPickerModalProps) {
+  const [search, setSearch] = useState("");
+
+  const filtered = segments.filter((s) =>
+    !search || s.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users size={18} />
+            Choose Segment
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="px-6 py-3 border-b">
+          <input
+            type="text"
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="Search segments…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground gap-2">
+            <RefreshCw size={14} className="animate-spin" /> Loading segments…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+            {search ? "No segments match your search." : "No segments found for this LINE OA."}
+          </div>
+        ) : (
+          <div className="overflow-y-auto max-h-72 divide-y">
+            {filtered.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => { onSelect(s); onClose(); }}
+                className="w-full flex items-start gap-3 px-6 py-3 hover:bg-muted/40 text-left transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{s.name}</p>
+                  {s.description && (
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">{s.description}</p>
+                  )}
+                </div>
+                <Badge variant="secondary" className="text-xs flex-shrink-0 mt-0.5">
+                  {s.source_type}
+                </Badge>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end px-6 py-3 border-t">
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Bulk Results Modal ────────────────────────────────────────────────────────
 
 interface BulkResultsModalProps {
@@ -579,6 +654,7 @@ export function LONByPhonePage() {
   const [selectedSegment, setSelectedSegment] = useState<Segment | null>(null);
   const [segmentCount, setSegmentCount] = useState<number | null>(null);
   const [segmentCountLoading, setSegmentCountLoading] = useState(false);
+  const [showSegmentPicker, setShowSegmentPicker] = useState(false);
 
   // Send form state
   const [phone, setPhone] = useState("");
@@ -620,17 +696,11 @@ export function LONByPhonePage() {
     segmentApi
       .list({ workspace_id: WORKSPACE_ID, page_size: 200 })
       .then((res) => {
-        const all = res.data ?? [];
-        const filtered = all.filter(
-          (s) => !selectedLineOAId || s.line_oa_id === selectedLineOAId
-        );
-        setSegments(filtered);
+        setSegments(res.data ?? []);
       })
       .catch(console.error)
       .finally(() => setSegmentsLoading(false));
-    setSelectedSegment(null);
-    setSegmentCount(null);
-  }, [selectedLineOAId]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch count when segment changes
   useEffect(() => {
@@ -922,36 +992,40 @@ export function LONByPhonePage() {
                     <label className="text-xs font-medium text-gray-700">
                       Segment
                     </label>
-                    {segmentsLoading ? (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                        <RefreshCw size={12} className="animate-spin" /> Loading segments…
-                      </div>
-                    ) : segments.length === 0 ? (
-                      <p className="text-xs text-muted-foreground py-1">
-                        No contact segments found for this LINE OA. Create one in the Segments page.
-                      </p>
-                    ) : (
-                      <select
-                        value={selectedSegment?.id ?? ""}
-                        onChange={(e) => {
-                          const seg = segments.find((s) => s.id === e.target.value) ?? null;
-                          setSelectedSegment(seg);
-                        }}
-                        className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    <div className="flex items-center justify-between">
+                      {selectedSegment ? (
+                        <div className="flex items-center gap-3 flex-1 min-w-0 rounded-lg border p-3 bg-muted/30 mr-2">
+                          <Users size={15} className="text-blue-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{selectedSegment.name}</p>
+                            {selectedSegment.description && (
+                              <p className="text-xs text-muted-foreground truncate">{selectedSegment.description}</p>
+                            )}
+                          </div>
+                          <Badge variant="secondary" className="text-xs flex-shrink-0">{selectedSegment.source_type}</Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No segment selected</span>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowSegmentPicker(true)}
+                        disabled={!selectedLineOAId}
+                        className="gap-1.5 text-xs flex-shrink-0"
                       >
-                        <option value="">— Select a segment —</option>
-                        {segments.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
-                    )}
+                        <Users size={13} />
+                        {selectedSegment ? "Change" : "Choose Segment"}
+                      </Button>
+                    </div>
                   </div>
                   {selectedSegment && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       {segmentCountLoading ? (
                         <><RefreshCw size={11} className="animate-spin" /> Counting contacts…</>
                       ) : segmentCount !== null ? (
-                        <><Users size={12} /><span><strong>{segmentCount}</strong> contact{segmentCount !== 1 ? "s" : ""} with phone numbers will be targeted</span></>
+                        <><Users size={12} /><span><strong>{segmentCount}</strong> contact{segmentCount !== 1 ? "s" : ""} will be targeted</span></>
                       ) : null}
                     </div>
                   )}
@@ -1156,6 +1230,16 @@ export function LONByPhonePage() {
         onConfirm={(contacts) => {
           setSelectedContacts(contacts);
           setShowContactPicker(false);
+        }}
+      />
+      <SegmentPickerModal
+        open={showSegmentPicker}
+        onClose={() => setShowSegmentPicker(false)}
+        segments={segments}
+        loading={segmentsLoading}
+        onSelect={(seg) => {
+          setSelectedSegment(seg);
+          setSegmentCount(null);
         }}
       />
       <BulkResultsModal
