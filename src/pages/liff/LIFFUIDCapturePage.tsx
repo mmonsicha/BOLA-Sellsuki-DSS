@@ -46,7 +46,7 @@ export function LIFFUIDCapturePage() {
   const [status, setStatus] = useState<PageStatus>("loading");
   const [errorMsg, setErrorMsg] = useState("");
 
-  useEffect(() => { document.title = "สวัสดีค่ะ"; }, []);
+  useEffect(() => { document.title = "Connecting with us…"; }, []);
 
   useEffect(() => {
     void initFlow();
