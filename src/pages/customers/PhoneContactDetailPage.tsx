@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Phone, Link2, UserCheck, UserX, Trash2, Unlink, Send, Plus, X, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Phone, Link2, UserCheck, UserX, Trash2, Unlink, Send, Plus, X, CheckCircle, XCircle, RefreshCw, Pencil, Save } from "lucide-react";
 import { maskPhone } from "@/lib/phone";
 import { followerApi } from "@/api/follower";
 import type { PhoneContactActivity } from "@/api/follower";
@@ -107,6 +107,12 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
   const [deleting, setDeleting] = useState(false);
   const [unlinkingOAId, setUnlinkingOAId] = useState<string | null>(null);
 
+  // Core fields edit state
+  const [editingCore, setEditingCore] = useState(false);
+  const [coreForm, setCoreForm] = useState({ first_name: "", last_name: "", phone: "" });
+  const [savingCore, setSavingCore] = useState(false);
+  const [saveCoreError, setSaveCoreError] = useState<string | null>(null);
+
   // Contact profile form state
   const [profileForm, setProfileForm] = useState({ email: "", note: "", tags: [] as string[], custom_fields: {} as Record<string, string> });
   const [saving, setSaving] = useState(false);
@@ -128,6 +134,11 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
           note: cp?.note ?? "",
           tags: cp?.tags ?? [],
           custom_fields: cp?.custom_fields ?? {},
+        });
+        setCoreForm({
+          first_name: c.first_name,
+          last_name: c.last_name,
+          phone: c.phone,
         });
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load contact"))
@@ -159,6 +170,22 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
     }
   };
 
+  const handleSaveCore = async () => {
+    if (!contact) return;
+    setSaveCoreError(null);
+    setSavingCore(true);
+    try {
+      const updated = await followerApi.updatePhoneContact(contact.id, coreForm);
+      setContact(updated);
+      setCoreForm({ first_name: updated.first_name, last_name: updated.last_name, phone: updated.phone });
+      setEditingCore(false);
+    } catch (err) {
+      setSaveCoreError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingCore(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!contact) return;
     setSaveError(null);
@@ -167,11 +194,18 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
     try {
       const updated = await followerApi.updatePhoneContactProfile(contact.id, profileForm);
       setContact(updated);
+      if (updated.contact_profile) {
+        setProfileForm({
+          email: updated.contact_profile.email ?? "",
+          note: updated.contact_profile.note ?? "",
+          tags: updated.contact_profile.tags ?? [],
+          custom_fields: updated.contact_profile.custom_fields ?? {},
+        });
+      }
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save");
-      setTimeout(() => setSaveError(null), 4000);
     } finally {
       setSaving(false);
     }
@@ -240,24 +274,79 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-lg font-semibold">{fullName}</h1>
-                    <span
-                      className={cn(
-                        "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
-                        sourceBadgeClass[contact.source] ?? sourceBadgeClass.manual
+                  {editingCore ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={coreForm.first_name}
+                          onChange={(e) => setCoreForm((f) => ({ ...f, first_name: e.target.value }))}
+                          className="flex-1 border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                          placeholder="First name"
+                        />
+                        <input
+                          type="text"
+                          value={coreForm.last_name}
+                          onChange={(e) => setCoreForm((f) => ({ ...f, last_name: e.target.value }))}
+                          className="flex-1 border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                          placeholder="Last name"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={coreForm.phone}
+                        onChange={(e) => setCoreForm((f) => ({ ...f, phone: e.target.value }))}
+                        className="w-full border rounded-md px-3 py-1.5 text-sm font-mono bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="+66812345678"
+                      />
+                      {saveCoreError && (
+                        <p className="text-xs text-destructive">{saveCoreError}</p>
                       )}
-                    >
-                      {contact.source}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground">
-                    <Phone size={13} />
-                    <span className="font-mono">{maskPhone(contact.phone)}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Imported {formatDate(contact.created_at)}
-                  </p>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => void handleSaveCore()} disabled={savingCore}>
+                          <Save size={13} className="mr-1" />
+                          {savingCore ? "Saving…" : "Save"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => {
+                          setEditingCore(false);
+                          setSaveCoreError(null);
+                          setCoreForm({ first_name: contact.first_name, last_name: contact.last_name, phone: contact.phone });
+                        }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h1 className="text-lg font-semibold">{fullName}</h1>
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
+                            sourceBadgeClass[contact.source] ?? sourceBadgeClass.manual
+                          )}
+                        >
+                          {contact.source}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => setEditingCore(true)}
+                        >
+                          <Pencil size={11} className="mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground">
+                        <Phone size={13} />
+                        <span className="font-mono">{maskPhone(contact.phone)}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Imported {formatDate(contact.created_at)}
+                      </p>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

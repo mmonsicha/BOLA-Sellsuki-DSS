@@ -77,9 +77,19 @@ function formatSchedule(job: LONJob): string {
   return `${job.schedule_type} at ${hh}:${mm}`;
 }
 
-function formatNextRun(dt: string | null): string {
+function formatDateTime(dt: string | null): string {
   if (!dt) return "—";
-  return new Date(dt).toLocaleString();
+  const d = new Date(dt);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
+
+function formatNextRun(dt: string | null): string {
+  return formatDateTime(dt);
 }
 
 // ─── Template Picker ──────────────────────────────────────────────────────────
@@ -247,7 +257,7 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
                   {runs.map((run) => (
                     <tr key={run.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="py-2.5 pr-4 text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(run.executed_at).toLocaleString()}
+                        {formatDateTime(run.executed_at)}
                       </td>
                       <td className="py-2.5 pr-4 text-xs font-medium">
                         {runStatusBadge(run.status)}
@@ -540,29 +550,18 @@ function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, segments, 
                 )}
 
                 {/* Time */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Hour (0–23)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={23}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      value={form.schedule_hour}
-                      onChange={(e) => set("schedule_hour", Math.min(23, Math.max(0, Number(e.target.value))))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Minute (0–59)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={59}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      value={form.schedule_minute}
-                      onChange={(e) => set("schedule_minute", Math.min(59, Math.max(0, Number(e.target.value))))}
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">Time</label>
+                  <input
+                    type="time"
+                    className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={`${String(form.schedule_hour).padStart(2, "0")}:${String(form.schedule_minute).padStart(2, "0")}`}
+                    onChange={(e) => {
+                      const [hh, mm] = e.target.value.split(":");
+                      set("schedule_hour", parseInt(hh, 10) || 0);
+                      set("schedule_minute", parseInt(mm, 10) || 0);
+                    }}
+                  />
                 </div>
                 {/* Description */}
                 <div className="space-y-1">

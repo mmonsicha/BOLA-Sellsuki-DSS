@@ -15,7 +15,7 @@ import type { LineOA, Segment, PreviewSegmentListItem } from "@/types";
 type SourceType = "follower" | "contact";
 
 type FollowerFieldType = "follow_status" | "tag" | "follow_date" | "custom_field" | "has_phone" | "has_email";
-type ContactFieldType = "follows_oa" | "pnp_count";
+type ContactFieldType = "follows_oa" | "pnp_count" | "contact_tag" | "contact_email" | "contact_note" | "contact_custom_field";
 type FieldType = FollowerFieldType | ContactFieldType;
 
 interface ConditionState {
@@ -82,7 +82,7 @@ const FIELD_CONFIG: Record<FieldType, FieldConfig> = {
     operators: [{ value: "eq", label: "Is" }],
     valueType: "boolean",
   },
-  // ── Contact fields (new) ──
+  // ── Contact fields ──
   follows_oa: {
     label: "Follows LINE OA",
     operators: [
@@ -100,6 +100,33 @@ const FIELD_CONFIG: Record<FieldType, FieldConfig> = {
     ],
     valueType: "pnp_count",
   },
+  // ── Contact profile fields ──
+  contact_tag: {
+    label: "Tag",
+    operators: [{ value: "eq", label: "Has Tag" }],
+    valueType: "text",
+  },
+  contact_email: {
+    label: "Email",
+    operators: [
+      { value: "eq", label: "Equals" },
+      { value: "contains", label: "Contains" },
+    ],
+    valueType: "text",
+  },
+  contact_note: {
+    label: "Note",
+    operators: [{ value: "contains", label: "Contains" }],
+    valueType: "text",
+  },
+  contact_custom_field: {
+    label: "Custom Field",
+    operators: [
+      { value: "eq", label: "Equals" },
+      { value: "contains", label: "Contains" },
+    ],
+    valueType: "custom_field",
+  },
 };
 
 const FOLLOWER_FIELD_OPTIONS: Array<{ value: FollowerFieldType; label: string }> = [
@@ -114,6 +141,10 @@ const FOLLOWER_FIELD_OPTIONS: Array<{ value: FollowerFieldType; label: string }>
 const CONTACT_FIELD_OPTIONS: Array<{ value: ContactFieldType; label: string }> = [
   { value: "follows_oa", label: "Follows LINE OA" },
   { value: "pnp_count", label: "PNP Sent Count" },
+  { value: "contact_tag", label: "Tag" },
+  { value: "contact_email", label: "Email" },
+  { value: "contact_note", label: "Note" },
+  { value: "contact_custom_field", label: "Custom Field" },
 ];
 
 const FOLLOW_STATUS_OPTIONS = ["following", "unfollowed", "blocked"];
