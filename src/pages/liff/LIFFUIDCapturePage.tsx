@@ -46,8 +46,7 @@ export function LIFFUIDCapturePage() {
   const [status, setStatus] = useState<PageStatus>("loading");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Set title to "--" so the browser never shows the app name or URL
-  useEffect(() => { document.title = "--"; }, []);
+  useEffect(() => { document.title = "สวัสดีค่ะ"; }, []);
 
   useEffect(() => {
     void initFlow();
