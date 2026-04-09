@@ -383,7 +383,8 @@ function SegmentPickerModal({ open, onClose, segments, loading, onSelect }: Segm
   const [search, setSearch] = useState("");
 
   const filtered = segments.filter((s) =>
-    !search || s.name.toLowerCase().includes(search.toLowerCase())
+    s.source_type === "contact" &&
+    (!search || s.name.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -412,7 +413,7 @@ function SegmentPickerModal({ open, onClose, segments, loading, onSelect }: Segm
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-            {search ? "No segments match your search." : "No segments found for this LINE OA."}
+            {search ? "No segments match your search." : "No contact segments found."}
           </div>
         ) : (
           <div className="overflow-y-auto max-h-72 divide-y">
