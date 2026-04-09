@@ -48,7 +48,7 @@ import { FlexCardPreview } from "@/components/FlexCardPreview";
 import { applyTemplateVariables } from "@/utils/pnpTemplateUtils";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import { useToast } from "@/components/ui/toast";
-import type { LONJob, LONJobRun, LineOA, PNPTemplate, Segment } from "@/types";
+import type { LONJob, LONJobRun, LONJobTargetStats, LineOA, PNPTemplate, Segment } from "@/types";
 import { getWorkspaceId } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -188,10 +188,12 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
   const [runs, setRuns] = useState<LONJobRun[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [targetStats, setTargetStats] = useState<LONJobTargetStats | null>(null);
 
   useEffect(() => {
     if (!job) return;
     setLoading(true);
+    setTargetStats(null);
     lonJobApi.runs(job.id, { page_size: 50 })
       .then((res) => {
         setRuns(res.data ?? []);
@@ -199,6 +201,9 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+    lonJobApi.targetStats(job.id)
+      .then(setTargetStats)
+      .catch(console.error);
   }, [job]);
 
   function runStatusBadge(status: LONJobRun["status"]) {
@@ -231,6 +236,13 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
           </DialogTitle>
         </DialogHeader>
 
+        {targetStats !== null && targetStats.suppressed > 0 && (
+          <div className="flex items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+            <AlertTriangle size={13} className="flex-shrink-0" />
+            <span>จะข้าม <strong>{targetStats.suppressed}</strong> เบอร์ (ไม่พบใน LINE) — จะส่งถึง <strong>{targetStats.will_send}</strong> เบอร์ จากทั้งหมด {targetStats.total} เบอร์</span>
+          </div>
+        )}
+
         {loading ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
             <RefreshCw size={18} className="animate-spin mx-auto mb-2" />
@@ -250,7 +262,8 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
                     <th className="text-left py-2 pr-4 font-medium">Executed At</th>
                     <th className="text-left py-2 pr-4 font-medium">Status</th>
                     <th className="text-right py-2 pr-4 font-medium">Sent</th>
-                    <th className="text-right py-2 font-medium">Failed</th>
+                    <th className="text-right py-2 pr-4 font-medium">Failed</th>
+                    <th className="text-right py-2 font-medium">Skipped</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -265,8 +278,11 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
                       <td className="py-2.5 pr-4 text-right text-xs font-semibold text-green-700">
                         {run.sent_count}
                       </td>
-                      <td className="py-2.5 text-right text-xs font-semibold text-destructive">
+                      <td className="py-2.5 pr-4 text-right text-xs font-semibold text-destructive">
                         {run.failed_count}
+                      </td>
+                      <td className="py-2.5 text-right text-xs font-semibold text-orange-600">
+                        {run.suppressed_count > 0 ? run.suppressed_count : "—"}
                       </td>
                     </tr>
                   ))}

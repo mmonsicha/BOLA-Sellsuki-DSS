@@ -73,6 +73,7 @@ export interface UnifiedContact {
   created_at: string;
   updated_at: string;
   linked_oa_count?: number;
+  lon_suppressed?: boolean;
 }
 
 // ---- Phone Contact Detail ----
@@ -95,6 +96,7 @@ export interface PhoneContactDetail {
   first_name: string;
   last_name: string;
   source: string;
+  lon_suppressed?: boolean;
   created_at: string;
   updated_at: string;
   linked_oas: PhoneContactFollowerDetail[];
@@ -661,6 +663,7 @@ export interface OnGreetingSentRecord {
 
 export interface BulkSendLONByPhoneResponse {
   results: BulkSendPNPResult[];
+  suppressed_count?: number;
 }
 
 // ---- LIFF UID Capture Log ----
@@ -808,6 +811,13 @@ export interface LONJobRun {
   status: "success" | "partial" | "failed";
   sent_count: number;
   failed_count: number;
+  suppressed_count: number;
+}
+
+export interface LONJobTargetStats {
+  total: number;
+  suppressed: number;
+  will_send: number;
 }
 
 // ---- CSV Import Preview ----

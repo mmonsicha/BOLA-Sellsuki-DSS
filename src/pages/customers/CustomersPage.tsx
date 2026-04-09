@@ -22,7 +22,7 @@ import { followerApi } from "@/api/follower";
 import { lineOAApi } from "@/api/lineOA";
 import { getWorkspaceId, getToken } from "@/lib/auth";
 import { maskPhone } from "@/lib/phone";
-import { Upload, Users, Phone, Search, ChevronLeft, ChevronRight, BookOpen, Trash2 } from "lucide-react";
+import { Upload, Users, Phone, Search, ChevronLeft, ChevronRight, BookOpen, Trash2, BanIcon } from "lucide-react";
 
 const WORKSPACE_ID = getWorkspaceId() ?? "";
 const PAGE_SIZE = 20;
@@ -495,6 +495,12 @@ export function ContactsPage() {
                           {contact.linked_oa_count != null && contact.linked_oa_count > 0 && (
                             <Badge variant="outline" className="text-xs text-line border-line/40">
                               {contact.linked_oa_count} OA{contact.linked_oa_count > 1 ? "s" : ""} linked
+                            </Badge>
+                          )}
+                          {contact.lon_suppressed && (
+                            <Badge variant="destructive" className="text-xs gap-1">
+                              <BanIcon size={10} />
+                              ไม่รองรับ LON
                             </Badge>
                           )}
                         </div>

@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { LONJob, LONJobRun } from "@/types";
+import type { LONJob, LONJobRun, LONJobTargetStats } from "@/types";
 import { getWorkspaceId } from "@/lib/auth";
 
 export interface ListLONJobsParams {
@@ -78,4 +78,7 @@ export const lonJobApi = {
 
   runs: (id: string, params?: { page?: number; page_size?: number }) =>
     api.get<ListLONJobRunsResponse>(`/v1/lon-jobs/${id}/runs`, params),
+
+  targetStats: (id: string) =>
+    api.get<LONJobTargetStats>(`/v1/lon-jobs/${id}/target-stats`),
 };

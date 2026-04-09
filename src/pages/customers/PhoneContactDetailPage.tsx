@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Phone, Link2, UserCheck, UserX, Trash2, Unlink, Send, Plus, X, CheckCircle, XCircle, RefreshCw, Pencil, Save } from "lucide-react";
+import { ArrowLeft, Phone, Link2, UserCheck, UserX, Trash2, Unlink, Send, Plus, X, CheckCircle, XCircle, RefreshCw, Pencil, Save, BanIcon } from "lucide-react";
 import { maskPhone } from "@/lib/phone";
 import { followerApi } from "@/api/follower";
 import type { PhoneContactActivity } from "@/api/follower";
@@ -328,6 +328,12 @@ export function PhoneContactDetailPage({ contactId }: PhoneContactDetailPageProp
                         >
                           {contact.source}
                         </span>
+                        {contact.lon_suppressed && (
+                          <Badge variant="destructive" className="text-xs gap-1">
+                            <BanIcon size={10} />
+                            ไม่รองรับ LINE Notification
+                          </Badge>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
