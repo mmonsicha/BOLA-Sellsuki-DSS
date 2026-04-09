@@ -78,7 +78,10 @@ Standard CRUD + enable/disable for APM rules.
 
 ## Flex Messages (`src/api/flexMessage.ts`)
 
-Standard CRUD for flex message templates.
+`flexMessageApi`:
+- Standard CRUD: `list`, `get`, `create`, `update`, `delete`
+- `FlexMessage` interface includes `alt_text: string` — default LINE chat list preview text shown before the user opens the message
+- `alt_text` can also be overridden per-send in broadcast `MessageItem.alt_text`; fallback chain: per-send → template `alt_text` → template `name`
 
 ## Rich Menus (`src/api/richMenu.ts`)
 
@@ -165,7 +168,13 @@ LON RGB identity consent page API calls (public, no auth required).
 
 ## Audit Log (`src/api/auditLog.ts`)
 
-- `listAuditLogs(workspaceId, params)` — paginated list
+`auditLogApi.list(params)` — paginated list, filter params: `action` (exact action string), `admin_id`, `from` (YYYY-MM-DD), `to` (YYYY-MM-DD), `page`, `page_size`
+
+**AuditLogsPage** (`src/pages/audit-logs/AuditLogsPage.tsx`) features:
+- `AUDIT_ACTION_GROUPS` — grouped dropdown of all known action types with friendly labels
+- `DATE_PRESETS` — Today / Yesterday / Last 7 days / Last 30 days / This month / Last month chips that auto-trigger search
+- Active preset is highlighted; manually editing date inputs clears preset
+- Table shows friendly label + raw action key per row
 
 ## Admin Performance (`src/api/adminPerformance.ts`)
 

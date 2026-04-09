@@ -144,6 +144,28 @@ interface AutoReply {
 }
 ```
 
+## Flex Message
+
+Defined in `src/api/flexMessage.ts` (not in `src/types/index.ts` — lives in the API module):
+
+```typescript
+interface FlexMessageVariable {
+  name: string
+  description: string
+  required: boolean
+}
+
+interface FlexMessage {
+  id, workspace_id, name, description: string
+  alt_text: string       // default LINE chat list preview text; shown before user opens the message
+  content: string        // raw LINE Flex Message container JSON string
+  variables: FlexMessageVariable[]
+  created_at, updated_at: string
+}
+```
+
+`alt_text` fallback chain when sending: per-send broadcast `MessageItem.alt_text` → template `alt_text` → template `name`.
+
 ## Media
 
 ```typescript
