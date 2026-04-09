@@ -94,6 +94,9 @@ export const followerApi = {
   updatePhoneContactProfile: (id: string, data: { email: string; note: string; tags: string[]; custom_fields: Record<string, string> }) =>
     api.put<PhoneContactDetail>(`/v1/contacts/phone/${id}/profile`, data),
 
+  updatePhoneContact: (id: string, data: { first_name: string; last_name: string; phone: string }) =>
+    api.put<PhoneContactDetail>(`/v1/contacts/phone/${id}`, data),
+
   deletePhoneContact: (id: string) =>
     api.delete<void>(`/v1/contacts/phone/${id}`),
 

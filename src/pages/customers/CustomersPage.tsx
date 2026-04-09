@@ -89,6 +89,9 @@ export function ContactsPage() {
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [deleteAlling, setDeleteAlling] = useState(false);
 
+  // Increment to force data reload after mutations
+  const [refreshKey, setRefreshKey] = useState(0);
+
   // ---- Load LINE OAs ----
   useEffect(() => {
     const load = async () => {
@@ -155,7 +158,7 @@ export function ContactsPage() {
       }
     };
     void load();
-  }, [activeTab, selectedLineOAId, search, page]);
+  }, [activeTab, selectedLineOAId, search, page, refreshKey]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -195,8 +198,7 @@ export function ContactsPage() {
       await followerApi.deleteAllPhoneContacts();
       setSelectedIds(new Set());
       setDeleteAllOpen(false);
-      setTotal(0);
-      setUnifiedContacts([]);
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete all contacts");
     } finally {
@@ -210,10 +212,7 @@ export function ContactsPage() {
       await followerApi.bulkDeletePhoneContacts(Array.from(selectedIds));
       setSelectedIds(new Set());
       setBulkDeleteOpen(false);
-      // Reload current page
-      setPage((p) => p);
-      // Force reload by toggling a dummy state — easiest is to re-trigger effect
-      setSearch((s) => s);
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete contacts");
     } finally {
