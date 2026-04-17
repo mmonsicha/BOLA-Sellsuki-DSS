@@ -321,15 +321,13 @@ function FilterBar({
 }
 
 // ─── LON Subscribers Tab (hidden — feature disabled) ─────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface LONLogsTabProps {
   lineOAs: LineOA[];
   selectedLineOAId: string;
   onOAChange: (id: string) => void;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function LONLogsTab({ lineOAs, selectedLineOAId, onOAChange }: LONLogsTabProps) {
+function _LONLogsTab({ lineOAs, selectedLineOAId, onOAChange }: LONLogsTabProps) {
   const [logs, setLogs] = useState<LONDeliveryLog[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);

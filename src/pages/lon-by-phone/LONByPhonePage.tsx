@@ -527,7 +527,7 @@ function TemplatePickerModal({
 
   useEffect(() => {
     setHoveredTemplate(custom[0] ?? null);
-  }, [templates]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [custom]);
 
   const showSplit = !loading && custom.length > 0;
 
@@ -701,7 +701,7 @@ export function LONByPhonePage() {
       })
       .catch(console.error)
       .finally(() => setSegmentsLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch count when segment changes
   useEffect(() => {
