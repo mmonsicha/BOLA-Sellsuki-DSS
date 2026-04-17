@@ -37,7 +37,7 @@ import { RichMenusPage } from "@/pages/rich-menus/RichMenusPage";
 import { RichMenuBuilderPage } from "@/pages/rich-menus/RichMenuBuilderPage";
 import { RichMenuAssignmentsPage } from "@/pages/rich-menus/RichMenuAssignmentsPage";
 import { QuickRepliesPage } from "@/pages/quick-replies/QuickRepliesPage";
-import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
+// import { LONSubscribersPage } from "@/pages/lon-subscribers/LONSubscribersPage";
 import { LONDeliveryLogsPage } from "@/pages/lon-delivery-logs/LONDeliveryLogsPage";
 import { MessageLogsPage } from "@/pages/message-logs/MessageLogsPage";
 import { LONByPhonePage } from "@/pages/lon-by-phone/LONByPhonePage";
@@ -47,6 +47,7 @@ import { LONPublicSubscribePage } from "@/pages/lon-subscribers/LONPublicSubscri
 import { RGBConsentPage } from "@/pages/lon/RGBConsentPage";
 import { PNPGreetingLIFFPage } from "@/pages/lon-by-phone/PNPGreetingLIFFPage";
 import { LIFFDebugPage } from "@/pages/lon-by-phone/LIFFDebugPage";
+import { LIFFUIDCapturePage } from "@/pages/liff/LIFFUIDCapturePage";
 import { RegistrationFormsPage } from "@/pages/registration-forms/RegistrationFormsPage";
 import { RegistrationFormBuilderPage } from "@/pages/registration-forms/RegistrationFormBuilderPage";
 import { RegistrationSubmissionsPage } from "@/pages/registration-forms/RegistrationSubmissionsPage";
@@ -142,7 +143,7 @@ function resolveProtectedRoute(path: string, segments: string[]): React.ReactEle
   if (path.startsWith("/quick-replies")) return <QuickRepliesPage />;
 
   // LON — authenticated pages
-  if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
+  // if (path.startsWith("/lon-subscribers")) return <LONSubscribersPage />;
   if (path.startsWith("/lon-delivery-logs")) return <LONDeliveryLogsPage />;
   if (path.startsWith("/message-logs")) return <MessageLogsPage />;
   if (path.startsWith("/lon-by-phone")) return <LONByPhonePage />;
@@ -199,6 +200,7 @@ function Router() {
   if (path === "/lon/rgb-consent") return <RGBConsentPage />;
   // PNP Greeting LIFF page — captures LINE UID and resolves greeting token
   if (path.startsWith("/lon/greeting")) return <PNPGreetingLIFFPage />;
+  if (path.startsWith("/liff/uid-capture")) return <LIFFUIDCapturePage />;
   // LIFF Debug page — step-by-step manual test page (dev only)
   if (path.startsWith("/lon/liff-debug")) return <LIFFDebugPage />;
   // Kratos mode: workspace chooser (public — Kratos session already proves identity)

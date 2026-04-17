@@ -97,6 +97,7 @@ export function FlexMessageDetailPage() {
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [altText, setAltText] = useState("");
   const [content, setContent] = useState("");
   const [variables, setVariables] = useState<FlexMessageVariable[]>([]);
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -119,6 +120,7 @@ export function FlexMessageDetailPage() {
         setFm(data);
         setName(data.name);
         setDescription(data.description ?? "");
+        setAltText(data.alt_text ?? "");
         setContent(data.content);
         setVariables(data.variables ?? []);
       } catch (err) {
@@ -159,6 +161,7 @@ export function FlexMessageDetailPage() {
       const res = await flexMessageApi.update(id, {
         name: name.trim(),
         description: description.trim() || undefined,
+        alt_text: altText.trim() || undefined,
         content,
         variables,
       });
@@ -319,6 +322,17 @@ export function FlexMessageDetailPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="What is this template used for?"
+                  disabled={saving}
+                />
+              </div>
+              <div className="flex-1 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Alt Text (Preview in chat list)</label>
+                <input
+                  type="text"
+                  className="w-full border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={altText}
+                  onChange={(e) => setAltText(e.target.value)}
+                  placeholder="e.g., New product available!"
                   disabled={saving}
                 />
               </div>

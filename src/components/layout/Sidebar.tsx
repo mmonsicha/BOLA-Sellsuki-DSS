@@ -21,7 +21,7 @@ import {
   Inbox,
   LayoutTemplate,
   MessageCircleDashed,
-  Bell,
+  // Bell, // unused (LON Subscribers hidden)
   ScrollText,
   ClipboardList,
   BarChart2,
@@ -31,11 +31,9 @@ import {
   LogOut,
   X,
   Lightbulb,
-  ArrowLeftRight,
 } from "lucide-react";
-import { useState } from "react";
-import { SetupProgressChecklist } from "./SetupProgressChecklist";
-import { logout, switchWorkspace, getAuthMode } from "@/lib/auth";
+import { useState, useRef, useEffect } from "react";
+import { logout } from "@/lib/auth";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 
 interface NavItem {
@@ -61,13 +59,13 @@ const BASE_NAV_SECTIONS: NavSection[] = [
       { label: "Broadcasts", href: "/broadcasts", icon: Radio, tutorialId: "broadcasts" },
       { label: "Auto Reply", href: "/auto-reply", icon: ChevronRight, tutorialId: "auto-reply" },
       { label: "Auto Push Messages", href: "/auto-push-messages", icon: Zap },
-      { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
-      { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
-      { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
       { label: "Message Logs", href: "/message-logs", icon: FileText },
+      { label: "Rich Menus", href: "/rich-menus", icon: LayoutTemplate },
+      // { label: "LON Subscribers", href: "/lon-subscribers", icon: Bell },
       { label: "LON by Phone", href: "/lon-by-phone", icon: PhoneCall },
       { label: "LON Jobs", href: "/lon-jobs", icon: CalendarDays },
       { label: "LON Templates", href: "/lon-templates", icon: LayoutTemplate },
+      { label: "LON Delivery Logs", href: "/lon-delivery-logs", icon: ScrollText },
       { label: "Registration Forms", href: "/registration-forms", icon: ClipboardList },
     ],
   },
@@ -110,6 +108,11 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
   const [collapsed, setCollapsed] = useState(false);
   const currentPath = window.location.pathname;
   const { isAdminOrAbove } = useCurrentAdmin();
+  const activeItemRef = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView({ block: "nearest" });
+  }, []);
 
   // Build the Team section dynamically so Audit Logs is only visible to admin+
   const teamSection: NavSection = {
@@ -202,6 +205,7 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
                     return (
                       <li key={item.href}>
                         <a
+                          ref={isActive ? activeItemRef : undefined}
                           href={item.href}
                           onClick={onMobileClose}
                           className={cn(
@@ -251,23 +255,8 @@ export function Sidebar({ className, mobileOpen = false, onMobileClose }: Sideba
           </div>
         </nav>
 
-        {/* Setup Progress Checklist */}
-        <SetupProgressChecklist collapsed={collapsed} />
-
         {/* Footer */}
         <div className={cn("py-3 border-t border-gray-700", collapsed ? "px-0" : "px-2")}>
-          {getAuthMode() === "kratos" && (
-            <button
-              onClick={switchWorkspace}
-              className={cn(
-                "flex items-center rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors w-full",
-                collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5"
-              )}
-            >
-              <ArrowLeftRight size={18} className="flex-shrink-0" />
-              {!collapsed && <span>Switch Workspace</span>}
-            </button>
-          )}
           <button
             onClick={() => { void logout(); }}
             className={cn(

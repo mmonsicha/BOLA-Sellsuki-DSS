@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { createPortal } from "react-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,10 +13,7 @@ import { LineOAFilter } from "@/components/common/LineOAFilter";
 import { useToast } from "@/components/ui/toast";
 import { pnpTemplateApi, lonApi } from "@/api/lon";
 import { lineOAApi } from "@/api/lineOA";
-import { flexMessageApi } from "@/api/flexMessage";
-import type { FlexMessage } from "@/api/flexMessage";
 import type { PNPTemplate, LineOA } from "@/types";
-import { FlexMessagePicker } from "@/components/common/FlexMessagePicker";
 import { getWorkspaceId } from "@/lib/auth";
 import {
   LayoutTemplate,
@@ -26,7 +22,6 @@ import {
   Plus,
   Copy,
   Code2,
-  ChevronDown,
   ChevronRight,
   Pencil,
   Download,
@@ -82,11 +77,13 @@ function hasLiffGreetingButton(jsonBody: Record<string, unknown> | null | undefi
 }
 
 /** Deep-traverse jsonBody; find the first action with uri === BOLA_PNP_LIFF_MARKER
- *  and inject __greetingLineOAID / __greetingTemplateID so ActionEditor can display them. */
+ *  and inject __greetingLineOAID / __greetingTemplateID / __greetingRedirectURL
+ *  so ActionEditor can display them. */
 function injectGreetingConfig(
   jsonBody: Record<string, unknown>,
   greetingLineOAID: string,
-  greetingTemplateID: string
+  greetingTemplateID: string,
+  greetingRedirectURL: string
 ): Record<string, unknown> {
   const json = JSON.stringify(jsonBody);
   if (!json.includes(BOLA_PNP_LIFF_MARKER)) return jsonBody;
@@ -104,6 +101,7 @@ function injectGreetingConfig(
             ...action,
             __greetingLineOAID: greetingLineOAID,
             __greetingTemplateID: greetingTemplateID,
+            __greetingRedirectURL: greetingRedirectURL,
           },
         };
       }
@@ -118,15 +116,17 @@ function injectGreetingConfig(
   return traverse(jsonBody) as Record<string, unknown>;
 }
 
-/** Deep-traverse jsonBody; extract __greetingLineOAID / __greetingTemplateID
- *  from the liff_greeting action and return a cleaned body (without those keys). */
+/** Deep-traverse jsonBody; extract __greetingLineOAID / __greetingTemplateID / __greetingRedirectURL
+ *  from the liff_greeting action and return a cleaned body (without those UI-only keys). */
 function extractAndStripGreetingConfig(jsonBody: Record<string, unknown>): {
   cleanedBody: Record<string, unknown>;
   greetingLineOAID: string;
   greetingTemplateID: string;
+  greetingRedirectURL: string;
 } {
   let greetingLineOAID = "";
   let greetingTemplateID = "";
+  let greetingRedirectURL = "";
 
   function traverse(node: unknown): unknown {
     if (!node || typeof node !== "object") return node;
@@ -137,7 +137,13 @@ function extractAndStripGreetingConfig(jsonBody: Record<string, unknown>): {
       if (action?.uri === BOLA_PNP_LIFF_MARKER) {
         greetingLineOAID = (action.__greetingLineOAID as string) || "";
         greetingTemplateID = (action.__greetingTemplateID as string) || "";
-        const { __greetingLineOAID: _oa, __greetingTemplateID: _tmpl, ...cleanAction } = action;
+        greetingRedirectURL = (action.__greetingRedirectURL as string) || "";
+        const {
+          __greetingLineOAID: _oa,
+          __greetingTemplateID: _tmpl,
+          __greetingRedirectURL: _redir,
+          ...cleanAction
+        } = action;
         return { ...obj, action: cleanAction };
       }
     }
@@ -149,7 +155,7 @@ function extractAndStripGreetingConfig(jsonBody: Record<string, unknown>): {
   }
 
   const cleanedBody = traverse(jsonBody) as Record<string, unknown>;
-  return { cleanedBody, greetingLineOAID, greetingTemplateID };
+  return { cleanedBody, greetingLineOAID, greetingTemplateID, greetingRedirectURL };
 }
 
 function MessageTypeBadge({ type }: { type: PNPTemplate["message_type"] }) {
@@ -225,123 +231,6 @@ function TemplateCard({ template, onDelete, onEdit, deletingId }: TemplateCardPr
   );
 }
 
-// ── PNPTemplatePicker ─────────────────────────────────────────────────────────
-
-interface PNPTemplatePickerProps {
-  value: string;
-  onChange: (id: string) => void;
-  templates: PNPTemplate[];
-  disabled?: boolean;
-}
-
-function PNPTemplatePicker({ value, onChange, templates, disabled }: PNPTemplatePickerProps) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  const selected = templates.find((t) => t.id === value);
-  const filtered = templates.filter(
-    (t) =>
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      (t.description ?? "").toLowerCase().includes(search.toLowerCase())
-  );
-
-  useEffect(() => {
-    if (open && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const dropdownHeight = Math.min(288, spaceBelow - 8);
-      setDropdownStyle({
-        position: "fixed",
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-        maxHeight: Math.max(dropdownHeight, 120),
-        zIndex: 9999,
-      });
-    }
-  }, [open]);
-
-  return (
-    <div className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-background text-left disabled:bg-muted disabled:cursor-not-allowed"
-        onClick={() => setOpen((o) => !o)}
-        disabled={disabled}
-      >
-        {selected ? (
-          <span className="flex items-center gap-2 min-w-0">
-            <span className="truncate font-medium">{selected.name}</span>
-            <span className="font-mono text-muted-foreground text-xs flex-shrink-0">
-              #{selected.id.slice(-8)}
-            </span>
-          </span>
-        ) : (
-          <span className="text-muted-foreground">Select a PNP Template...</span>
-        )}
-        <ChevronDown size={14} className="flex-shrink-0 text-muted-foreground ml-2" />
-      </button>
-
-      {open && createPortal(
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => setOpen(false)} />
-
-          {/* Dropdown — rendered via portal to escape dialog overflow:hidden */}
-          <div
-            className="bg-background border rounded-md shadow-lg overflow-y-auto"
-            style={dropdownStyle}
-          >
-            <div className="p-2 border-b sticky top-0 bg-background">
-              <input
-                className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="Search by name or description..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-              />
-            </div>
-            {filtered.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={cn(
-                  "w-full text-left px-3 py-2 hover:bg-muted text-sm flex items-start gap-2 border-b last:border-b-0",
-                  value === t.id && "bg-muted"
-                )}
-                onClick={() => { onChange(t.id); setOpen(false); setSearch(""); }}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-medium">{t.name}</span>
-                    <span className="font-mono text-muted-foreground text-xs">
-                      #{t.id.slice(-8)}
-                    </span>
-                  </div>
-                  {t.description && (
-                    <p className="text-xs text-muted-foreground truncate">{t.description}</p>
-                  )}
-                </div>
-                <Badge variant="outline" className="text-xs capitalize flex-shrink-0 mt-0.5">
-                  {t.message_type}
-                </Badge>
-              </button>
-            ))}
-            {filtered.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {search ? "No templates match your search." : "No templates available."}
-              </p>
-            )}
-          </div>
-        </>,
-        document.body
-      )}
-    </div>
-  );
-}
 
 // ── TemplateEditorModal ───────────────────────────────────────────────────────
 
@@ -350,13 +239,9 @@ interface TemplateEditorModalProps {
   onClose: () => void;
   onSaved: (updated: PNPTemplate) => void;
   template: PNPTemplate | null;
-  lineOAs: LineOA[];
-  pnpTemplates: PNPTemplate[];
 }
 
-type OnGreetingMsgType = "none" | "flex" | "pnp_template";
-
-function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs }: TemplateEditorModalProps) {
+function TemplateEditorModal({ open, onClose, onSaved, template }: TemplateEditorModalProps) {
   const toast = useToast();
   const previewWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -364,10 +249,6 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs }: Temp
   const [description, setDescription] = useState("");
   const [jsonBodyText, setJsonBodyText] = useState("");
   const [jsonError, setJsonError] = useState("");
-
-  // Flex messages for the on_greeting flex picker
-  const [flexMessages, setFlexMessages] = useState<FlexMessage[]>([]);
-  const [flexMessagesLoading, setFlexMessagesLoading] = useState(false);
 
   // Stable callback — avoids recreating the entire applyChange chain on every render
   const handleJsonBodyChange = useCallback((body: Record<string, unknown>) => {
@@ -378,16 +259,6 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs }: Temp
   const [saving, setSaving] = useState(false);
   const [exportingJpg, setExportingJpg] = useState(false);
 
-  // On-greeting (Approach B) state
-  const [onGreetingOpen, setOnGreetingOpen] = useState(false);
-  const [onGreetingMsgType, setOnGreetingMsgType] = useState<OnGreetingMsgType>("none");
-  const [onGreetingFlexMessageId, setOnGreetingFlexMessageId] = useState("");
-  const [onGreetingTemplateId, setOnGreetingTemplateId] = useState("");
-  const [onGreetingLineOAId, setOnGreetingLineOAId] = useState("");
-  const [onGreetingSendOnce, setOnGreetingSendOnce] = useState(true);
-  const [onGreetingRedirectURL, setOnGreetingRedirectURL] = useState("");
-  const [onGreetingPickerError, setOnGreetingPickerError] = useState("");
-
   // Initialization
   useEffect(() => {
     if (open && template) {
@@ -397,7 +268,8 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs }: Temp
       const injected = injectGreetingConfig(
         template.json_body,
         template.greeting_line_oa_id || "",
-        template.greeting_template_id || ""
+        template.greeting_template_id || "",
+        template.on_greeting_redirect_url || ""
       );
       setJsonBodyText(JSON.stringify(injected, null, 2));
       setJsonError("");
@@ -411,56 +283,8 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs }: Temp
         }))
       );
       setExampleVars({});
-
-      // Initialize on_greeting fields
-      const msgType = template.on_greeting_message_type ?? "none";
-      setOnGreetingMsgType(msgType);
-      setOnGreetingOpen(msgType !== "none");
-      if (msgType === "flex") {
-        const fmId = (template.on_greeting_payload as { flex_message_id?: string })?.flex_message_id ?? "";
-        setOnGreetingFlexMessageId(fmId);
-        setOnGreetingTemplateId("");
-      } else if (msgType === "pnp_template") {
-        setOnGreetingTemplateId(
-          (template.on_greeting_payload as { template_id?: string })?.template_id ?? ""
-        );
-        setOnGreetingFlexMessageId("");
-      } else {
-        setOnGreetingFlexMessageId("");
-        setOnGreetingTemplateId("");
-      }
-      setOnGreetingLineOAId(template.on_greeting_line_oa_id ?? "");
-      setOnGreetingSendOnce(template.on_greeting_send_once ?? true);
-      setOnGreetingRedirectURL(template.on_greeting_redirect_url ?? "");
-      setOnGreetingPickerError("");
     }
   }, [open, template]);
-
-  // Load flex messages when modal opens
-  useEffect(() => {
-    if (!open) return;
-    setFlexMessagesLoading(true);
-    flexMessageApi
-      .list({ workspace_id: WORKSPACE_ID, page_size: 200 })
-      .then((res) => setFlexMessages(res.data ?? []))
-      .catch(console.error)
-      .finally(() => setFlexMessagesLoading(false));
-  }, [open]);
-
-  // Load non-preset PNP templates for selected OA (refreshes when OA changes)
-  const [availablePnpTemplates, setAvailablePnpTemplates] = useState<PNPTemplate[]>([]);
-  const effectiveOAId = onGreetingLineOAId || template?.line_oa_id || "";
-  useEffect(() => {
-    if (!open || !effectiveOAId) return;
-    pnpTemplateApi
-      .list({ line_oa_id: effectiveOAId })
-      .then((res) =>
-        setAvailablePnpTemplates(
-          (res.data ?? []).filter((t) => !t.is_preset && t.id !== template?.id)
-        )
-      )
-      .catch(console.error);
-  }, [open, effectiveOAId, template?.id]);
 
   const jsonBodyParsed = useMemo(() => {
     try {
@@ -500,29 +324,9 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs }: Temp
     }
     setJsonError("");
 
-    // Build on_greeting payload from picker selections
-    let onGreetingPayload: Record<string, unknown> | undefined;
-    if (onGreetingMsgType === "flex") {
-      if (!onGreetingFlexMessageId) {
-        setOnGreetingPickerError("Please select a Flex Message template");
-        return;
-      }
-      onGreetingPayload = { flex_message_id: onGreetingFlexMessageId };
-      setOnGreetingPickerError("");
-    } else if (onGreetingMsgType === "pnp_template") {
-      if (!onGreetingTemplateId) {
-        setOnGreetingPickerError("Please select a PNP Template");
-        return;
-      }
-      onGreetingPayload = { template_id: onGreetingTemplateId };
-      setOnGreetingPickerError("");
-    } else {
-      setOnGreetingPickerError("");
-    }
-
     setSaving(true);
     try {
-      const { cleanedBody, greetingLineOAID, greetingTemplateID } = extractAndStripGreetingConfig(parsed);
+      const { cleanedBody, greetingRedirectURL } = extractAndStripGreetingConfig(parsed);
       const updated = await pnpTemplateApi.update(template.id, {
         name: name.trim(),
         description: description.trim(),
@@ -533,14 +337,13 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs }: Temp
           label: f.label,
           max_len: parseInt(f.max_len) || undefined,
         })),
-        // Preserve existing greeting config — only send if non-empty (dropdowns removed from UI)
-        ...(greetingTemplateID ? { greeting_template_id: greetingTemplateID } : {}),
-        ...(greetingLineOAID ? { greeting_line_oa_id: greetingLineOAID } : {}),
-        on_greeting_message_type: onGreetingMsgType,
-        on_greeting_payload: onGreetingPayload ?? null,
-        on_greeting_line_oa_id: onGreetingLineOAId || undefined,
-        on_greeting_send_once: onGreetingSendOnce,
-        on_greeting_redirect_url: onGreetingRedirectURL || undefined,
+        // Redirect URL is now configured per-button in the ActionEditor
+        // and saved here on the template so the backend can embed it in the LIFF URL at send time.
+        on_greeting_redirect_url: greetingRedirectURL || undefined,
+        // Clear legacy on_greeting message config — message-after-greeting is now handled
+        // via Auto Reply rules with liff_uid_capture trigger.
+        on_greeting_message_type: "none",
+        on_greeting_payload: null,
       });
       toast.success("Template saved", `"${name}" has been updated.`);
       onSaved(updated);
@@ -701,190 +504,32 @@ function TemplateEditorModal({ open, onClose, onSaved, template, lineOAs }: Temp
           />
         </div>
 
-        {/* On-Greeting (Approach B) — only shown when the JSON has a LIFF greeting button */}
-        {hasLiffGreetingButton(jsonBodyParsed) && <div className="border-t flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setOnGreetingOpen((v) => !v)}
-            className="w-full flex items-center gap-2 px-6 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
-          >
-            <span className={cn("transition-transform text-[10px]", onGreetingOpen ? "rotate-90" : "rotate-0")}>▶</span>
-            <span>Message 2 — On Greeting Complete</span>
-            {onGreetingMsgType !== "none" && (
-              <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] bg-primary/10 text-primary border border-primary/20">
-                {onGreetingMsgType === "flex" ? "Flex JSON" : "PNP Template"}
-              </span>
-            )}
-          </button>
-
-          {onGreetingOpen && (
-            <div className="px-6 py-4 space-y-4 bg-muted/10">
-              {/* Message type selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Message Type</span>
-                <div className="flex gap-1">
-                  {(["none", "flex", "pnp_template"] as OnGreetingMsgType[]).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => { setOnGreetingMsgType(t); setOnGreetingPickerError(""); }}
-                      className={cn(
-                        "px-3 py-1 rounded text-xs border transition-colors",
-                        onGreetingMsgType === t
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background text-muted-foreground border-border hover:border-primary/50"
-                      )}
-                    >
-                      {t === "none" ? "None" : t === "flex" ? "Flex JSON" : "PNP Template"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Flex Message picker */}
-              {onGreetingMsgType === "flex" && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Flex Message Template
-                  </label>
-                  <FlexMessagePicker
-                    value={onGreetingFlexMessageId}
-                    onChange={(id) => { setOnGreetingFlexMessageId(id); setOnGreetingPickerError(""); }}
-                    flexMessages={flexMessages}
-                    loading={flexMessagesLoading}
-                  />
-                  {onGreetingPickerError && (
-                    <p className="text-xs text-destructive">{onGreetingPickerError}</p>
-                  )}
-                </div>
-              )}
-
-              {/* PNP Template picker — OA first, then template filtered by OA */}
-              {onGreetingMsgType === "pnp_template" && (
-                <div className="space-y-3">
-                  {/* 1. LINE OA selector */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Send from OA</span>
-                    {lineOAs.length > 0 ? (
-                      <select
-                        value={onGreetingLineOAId}
-                        onChange={(e) => { setOnGreetingLineOAId(e.target.value); setOnGreetingTemplateId(""); }}
-                        className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                      >
-                        <option value="">— Same OA as this template —</option>
-                        {lineOAs.map((oa) => (
-                          <option key={oa.id} value={oa.id}>
-                            {oa.name} ({oa.basic_id || oa.id})
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        value={onGreetingLineOAId}
-                        onChange={(e) => { setOnGreetingLineOAId(e.target.value); setOnGreetingTemplateId(""); }}
-                        placeholder="LINE OA ID (optional)"
-                        className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                      />
-                    )}
-                  </div>
-                  {/* 2. Template picker filtered by OA */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      PNP Template
-                    </label>
-                    <PNPTemplatePicker
-                      value={onGreetingTemplateId}
-                      onChange={(id) => { setOnGreetingTemplateId(id); setOnGreetingPickerError(""); }}
-                      templates={availablePnpTemplates}
-                    />
-                    {onGreetingPickerError && (
-                      <p className="text-xs text-destructive">{onGreetingPickerError}</p>
-                    )}
-                    {availablePnpTemplates.length === 0 && effectiveOAId && (
-                      <p className="text-xs text-muted-foreground italic">No custom templates found for this OA.</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {onGreetingMsgType !== "none" && onGreetingMsgType !== "pnp_template" && (
-                <>
-                  {/* LINE OA selector for flex type */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Send from OA</span>
-                    {lineOAs.length > 0 ? (
-                      <select
-                        value={onGreetingLineOAId}
-                        onChange={(e) => setOnGreetingLineOAId(e.target.value)}
-                        className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                      >
-                        <option value="">— Same OA as this template —</option>
-                        {lineOAs.map((oa) => (
-                          <option key={oa.id} value={oa.id}>
-                            {oa.name} ({oa.basic_id || oa.id})
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        value={onGreetingLineOAId}
-                        onChange={(e) => setOnGreetingLineOAId(e.target.value)}
-                        placeholder="LINE OA ID (optional)"
-                        className="flex-1 border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                      />
-                    )}
-                  </div>
-                </>
-              )}
-
-              {onGreetingMsgType !== "none" && (
-                <>
-                  {/* Send once toggle */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Send Once</span>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={onGreetingSendOnce}
-                        onChange={(e) => setOnGreetingSendOnce(e.target.checked)}
-                        className="rounded"
-                      />
-                      <span className="text-xs text-muted-foreground">
-                        Send only once per phone number (skip if already sent)
-                      </span>
-                    </label>
-                  </div>
-                </>
-              )}
-
-              {onGreetingMsgType === "none" && (
-                <p className="text-xs text-muted-foreground italic">
-                  No message 2 will be sent when users complete the LIFF greeting.
+        {/* LIFF UID Capture guide — shown when the JSON has a LIFF greeting button */}
+        {hasLiffGreetingButton(jsonBodyParsed) && (
+          <div className="border-t flex-shrink-0 px-6 py-4 bg-blue-50/50 space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="text-base flex-shrink-0">📱</span>
+              <div className="space-y-1 min-w-0">
+                <p className="text-xs font-semibold text-blue-800">LIFF Track &amp; Greet</p>
+                <p className="text-xs text-blue-700">
+                  เมื่อ user กด LIFF button → BOLA จะ capture LINE UID และ link กับเบอร์โทรโดยอัตโนมัติ
                 </p>
-              )}
-
-              {/* Redirect URL — shown for all message types including none */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground w-28 flex-shrink-0">Redirect URL</span>
-                  <span className="text-xs text-muted-foreground">(optional)</span>
-                </div>
-                <input
-                  type="text"
-                  value={onGreetingRedirectURL}
-                  onChange={(e) => setOnGreetingRedirectURL(e.target.value)}
-                  placeholder="https://shop.com/order/{order_id}"
-                  className="w-full border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                />
-                <p className="text-xs text-muted-foreground">
-                  หลังจาก user กด LIFF แล้ว redirect ไปที่ URL นี้แทนการปิด LIFF — รองรับ <code className="bg-muted px-1 rounded">{"{variable_key}"}</code> จาก template_variables ที่ส่งตอน send PNP
-                </p>
+                <ul className="text-xs text-blue-700 list-disc list-inside space-y-0.5 pl-1">
+                  <li><strong>Redirect URL</strong> — ตั้งค่าบนปุ่มโดยตรง (คลิก Edit ที่ปุ่ม LIFF ในหน้าแก้ไข) รองรับ <code className="bg-blue-100 px-0.5 rounded">{"{variable_key}"}</code></li>
+                  <li><strong>Message After Greeting</strong> — สร้าง Auto Reply rule, เลือก trigger <strong>LIFF UID Capture</strong></li>
+                </ul>
+                {template?.line_oa_id && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    LIFF Endpoint URL:{" "}
+                    <code className="bg-blue-100 px-1 rounded font-mono text-[10px] break-all">
+                      {window.location.origin}/liff/uid-capture?line_oa_id={template.line_oa_id}
+                    </code>
+                  </p>
+                )}
               </div>
             </div>
-          )}
-        </div>}
+          </div>
+        )}
 
         {/* Footer bar */}
         <div className="flex items-center justify-between px-6 py-3 border-t flex-shrink-0 bg-muted/20">
@@ -1456,8 +1101,6 @@ export function LONTemplatesPage() {
           setEditingTemplate(null);
         }}
         template={editingTemplate}
-        lineOAs={lineOAs}
-        pnpTemplates={custom}
       />
     </AppLayout>
   );

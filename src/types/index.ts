@@ -40,9 +40,22 @@ export interface Follower {
   followed_at: string | null;
   created_at: string;
   updated_at: string;
+  linked_contact?: {
+    phone_contact_id: string;
+    first_name: string;
+    last_name: string;
+    phone: string;
+  } | null;
+  contact_profile?: {
+    id: string;
+    email: string;
+    note: string;
+    tags: string[];
+    custom_fields: Record<string, string>;
+  } | null;
 }
 
-export type ContactStatus = "follower" | "phone_only" | "subscriber" | "linked";
+export type ContactStatus = "follower" | "phone" | "phone_only" | "subscriber" | "linked";
 
 export interface UnifiedContact {
   id: string;
@@ -60,6 +73,7 @@ export interface UnifiedContact {
   created_at: string;
   updated_at: string;
   linked_oa_count?: number;
+  lon_suppressed?: boolean;
 }
 
 // ---- Phone Contact Detail ----
@@ -82,9 +96,17 @@ export interface PhoneContactDetail {
   first_name: string;
   last_name: string;
   source: string;
+  lon_suppressed?: boolean;
   created_at: string;
   updated_at: string;
   linked_oas: PhoneContactFollowerDetail[];
+  contact_profile?: {
+    id: string;
+    email: string;
+    note: string;
+    tags: string[];
+    custom_fields: Record<string, string>;
+  } | null;
 }
 
 // ---- PNP Templates ----
@@ -201,7 +223,7 @@ export interface BroadcastDeliveryLog {
 }
 
 // ---- Auto Reply ----
-export type TriggerType = "follow" | "unfollow" | "keyword" | "postback" | "default" | "lon_subscribed" | "pnp_delivered";
+export type TriggerType = "follow" | "unfollow" | "keyword" | "postback" | "default" | "lon_subscribed" | "pnp_delivered" | "liff_uid_capture";
 export type MatchMode = "exact" | "contains" | "prefix" | "regex";
 export type AutoReplyConditionType = "" | "lon_phone_contact" | "lon_subscriber";
 /** How a pnp_delivered rule sends message 2. */
@@ -210,6 +232,8 @@ export type AutoReplySendMethod = "pnp_hash" | "push" | "auto";
 export interface AutoReplyTriggerConfig {
   /** Applies to pnp_delivered trigger: delivery channel for message 2. */
   send_method?: AutoReplySendMethod;
+  /** Applies to liff_uid_capture trigger: when true, fires at most once per user per rule. */
+  send_once?: boolean;
 }
 
 export interface AutoReply {
@@ -639,6 +663,16 @@ export interface OnGreetingSentRecord {
 
 export interface BulkSendLONByPhoneResponse {
   results: BulkSendPNPResult[];
+  suppressed_count?: number;
+}
+
+// ---- LIFF UID Capture Log ----
+export interface LIFFUIDCaptureLog {
+  id: string;
+  line_user_id: string;
+  display_name: string;
+  picture_url: string;
+  created_at: string;
 }
 
 // ---- Registration Form ----
@@ -777,6 +811,13 @@ export interface LONJobRun {
   status: "success" | "partial" | "failed";
   sent_count: number;
   failed_count: number;
+  suppressed_count: number;
+}
+
+export interface LONJobTargetStats {
+  total: number;
+  suppressed: number;
+  will_send: number;
 }
 
 // ---- CSV Import Preview ----

@@ -180,14 +180,14 @@ export function UploadMediaDialog({ open, workspaceId, onClose, onUploaded }: Pr
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) processFile(f);
+    if (f) void processFile(f);
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
     const f = e.dataTransfer.files?.[0];
-    if (f) processFile(f);
+    if (f) void processFile(f);
   }, [processFile]);
 
   const handleUpload = async () => {
@@ -220,22 +220,36 @@ export function UploadMediaDialog({ open, workspaceId, onClose, onUploaded }: Pr
 
       const presigned = res;
 
-      // Step 2: Upload original to S3
+      // Step 2: Upload original — try direct S3 first, fall back to proxy if CORS blocked
       setProgress("Uploading file...");
+      let uploadedViaProxy = false;
       if (presigned.upload_url && !presigned.upload_url.includes("noop")) {
-        await mediaApi.uploadToS3(presigned.upload_url, uploadBlob, file.type);
+        try {
+          await mediaApi.uploadToS3(presigned.upload_url, uploadBlob, file.type);
+        } catch {
+          // Direct S3 upload failed (likely CORS) — fall back to backend proxy
+          await mediaApi.uploadViaProxy(presigned.media_id, uploadBlob, file.type, false);
+          uploadedViaProxy = true;
+        }
       }
 
       // Step 3: Upload thumbnail if image
       if (isImage && thumbBlob && presigned.thumbnail_upload_url && !presigned.thumbnail_upload_url.includes("noop")) {
         setProgress("Uploading thumbnail...");
-        await mediaApi.uploadToS3(presigned.thumbnail_upload_url, thumbBlob, "image/jpeg");
+        try {
+          await mediaApi.uploadToS3(presigned.thumbnail_upload_url, thumbBlob, "image/jpeg");
+        } catch {
+          await mediaApi.uploadViaProxy(presigned.media_id, thumbBlob, "image/jpeg", true);
+          uploadedViaProxy = true;
+        }
       }
 
-      // Step 4: Confirm upload
+      // Step 4: Confirm upload (skip if proxy already confirmed)
       setStep("confirming");
       setProgress("Finalizing...");
-      const confirmRes = await mediaApi.confirmUpload(presigned.media_id);
+      const confirmRes = uploadedViaProxy
+        ? await mediaApi.get(presigned.media_id)
+        : await mediaApi.confirmUpload(presigned.media_id);
       setStep("done");
       onUploaded(confirmRes);
       handleClose();
@@ -419,7 +433,7 @@ export function UploadMediaDialog({ open, workspaceId, onClose, onUploaded }: Pr
           <div className="px-6 py-4 border-t flex justify-end gap-2">
             <Button variant="outline" onClick={handleClose} disabled={isProcessing}>Cancel</Button>
             <Button
-              onClick={handleUpload}
+              onClick={() => void handleUpload()}
               disabled={!file || !name.trim() || isProcessing || step === "resizing"}
               className="gap-2"
             >

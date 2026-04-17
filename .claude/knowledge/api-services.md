@@ -78,7 +78,10 @@ Standard CRUD + enable/disable for APM rules.
 
 ## Flex Messages (`src/api/flexMessage.ts`)
 
-Standard CRUD for flex message templates.
+`flexMessageApi`:
+- Standard CRUD: `list`, `get`, `create`, `update`, `delete`
+- `FlexMessage` interface includes `alt_text: string` — default LINE chat list preview text shown before the user opens the message
+- `alt_text` can also be overridden per-send in broadcast `MessageItem.alt_text`; fallback chain: per-send → template `alt_text` → template `name`
 
 ## Rich Menus (`src/api/richMenu.ts`)
 
@@ -109,9 +112,15 @@ Standard CRUD for flex message templates.
 > `publicSubscribeByPhone` only succeeds if the user has previously consented to notifications via LINE (LON token exists).
 > See `backend/.claude/knowledge/integrations.md` for full details and migration path.
 - `sendLONByPhone(params)` — POST `/v1/pnp/send` → returns `PNPDeliveryLog` (incl. `phone_hash`)
+- `bulkSendLONByPhone(body)` — POST `/v1/pnp/bulk-send` → returns `BulkSendLONByPhoneResponse { results: BulkSendPNPResult[] }`
 - `listLONByPhoneLogs(params)` — GET `/v1/pnp/logs`
 
 **localStorage side-effect**: after `sendLONByPhone`, `LONByPhonePage` writes `{ [phone_hash]: maskedPhone }` to `bola_lon_phone_map` so `LONDeliveryLogsPage` PNP tab can show readable masked phones.
+
+**LONByPhonePage send modes** (`/lon-by-phone`):
+- `single` — sends to one phone number via `sendLONByPhone`
+- `bulk` — picks contacts from workspace (phone-type UnifiedContacts), sends via `bulkSendLONByPhone`
+- `segment` — picks a segment (global, not per-OA), paginates `segmentApi.previewList` to collect phone numbers, sends via `bulkSendLONByPhone` with `triggered_by: "manual_segment"`. Segments are loaded once on mount (no OA filter).
 
 ### `pnpTemplateApi` (same file `src/api/lon.ts`)
 
@@ -159,7 +168,13 @@ LON RGB identity consent page API calls (public, no auth required).
 
 ## Audit Log (`src/api/auditLog.ts`)
 
-- `listAuditLogs(workspaceId, params)` — paginated list
+`auditLogApi.list(params)` — paginated list, filter params: `action` (exact action string), `admin_id`, `from` (YYYY-MM-DD), `to` (YYYY-MM-DD), `page`, `page_size`
+
+**AuditLogsPage** (`src/pages/audit-logs/AuditLogsPage.tsx`) features:
+- `AUDIT_ACTION_GROUPS` — grouped dropdown of all known action types with friendly labels
+- `DATE_PRESETS` — Today / Yesterday / Last 7 days / Last 30 days / This month / Last month chips that auto-trigger search
+- Active preset is highlighted; manually editing date inputs clears preset
+- Table shows friendly label + raw action key per row
 
 ## Admin Performance (`src/api/adminPerformance.ts`)
 

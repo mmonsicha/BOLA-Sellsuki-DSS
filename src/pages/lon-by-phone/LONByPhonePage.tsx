@@ -28,10 +28,11 @@ import {
 import { lonApi, pnpTemplateApi } from "@/api/lon";
 import { followerApi } from "@/api/follower";
 import { lineOAApi } from "@/api/lineOA";
+import { segmentApi } from "@/api/segment";
 import { LineOAFilter } from "@/components/common/LineOAFilter";
 import { FlexCardPreview } from "@/components/FlexCardPreview";
 import { applyTemplateVariables } from "@/utils/pnpTemplateUtils";
-import type { LineOA, PNPTemplate, UnifiedContact, BulkSendPNPResult } from "@/types";
+import type { LineOA, PNPTemplate, UnifiedContact, BulkSendPNPResult, Segment } from "@/types";
 import { maskPhone } from "@/lib/phone";
 import { getWorkspaceId } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -242,7 +243,7 @@ function ContactPickerModal({ open, onClose, workspaceId, lineOAId, onConfirm }:
     setSelected(new Set());
     setSearch("");
     followerApi
-      .listUnified({ workspace_id: workspaceId, contact_status: "phone_only", page_size: 200 })
+      .listUnified({ workspace_id: workspaceId, contact_status: "phone", page_size: 200 })
       .then((res) => {
         const all = (res.data ?? []).filter((c) => c.phone && c.phone.trim() !== "");
         setContacts(all);
@@ -368,15 +369,92 @@ function ContactPickerModal({ open, onClose, workspaceId, lineOAId, onConfirm }:
   );
 }
 
+// ─── Segment Picker Modal ─────────────────────────────────────────────────────
+
+interface SegmentPickerModalProps {
+  open: boolean;
+  onClose: () => void;
+  segments: Segment[];
+  loading: boolean;
+  onSelect: (segment: Segment) => void;
+}
+
+function SegmentPickerModal({ open, onClose, segments, loading, onSelect }: SegmentPickerModalProps) {
+  const [search, setSearch] = useState("");
+
+  const filtered = segments.filter((s) =>
+    s.source_type === "contact" &&
+    (!search || s.name.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users size={18} />
+            Choose Segment
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="px-6 py-3 border-b">
+          <input
+            type="text"
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="Search segments…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground gap-2">
+            <RefreshCw size={14} className="animate-spin" /> Loading segments…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+            {search ? "No segments match your search." : "No contact segments found."}
+          </div>
+        ) : (
+          <div className="overflow-y-auto max-h-72 divide-y">
+            {filtered.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => { onSelect(s); onClose(); }}
+                className="w-full flex items-start gap-3 px-6 py-3 hover:bg-muted/40 text-left transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{s.name}</p>
+                  {s.description && (
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">{s.description}</p>
+                  )}
+                </div>
+                <Badge variant="secondary" className="text-xs flex-shrink-0 mt-0.5">
+                  {s.source_type}
+                </Badge>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end px-6 py-3 border-t">
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Bulk Results Modal ────────────────────────────────────────────────────────
 
 interface BulkResultsModalProps {
   open: boolean;
   onClose: () => void;
   results: BulkSendPNPResult[];
+  suppressedCount?: number;
 }
 
-function BulkResultsModal({ open, onClose, results }: BulkResultsModalProps) {
+function BulkResultsModal({ open, onClose, results, suppressedCount = 0 }: BulkResultsModalProps) {
   const successCount = results.filter((r) => !r.error).length;
   const failCount = results.filter((r) => r.error).length;
 
@@ -390,6 +468,12 @@ function BulkResultsModal({ open, onClose, results }: BulkResultsModalProps) {
           <span className="text-sm text-green-700 font-medium">✓ {successCount} sent</span>
           {failCount > 0 && <span className="text-sm text-destructive font-medium">✗ {failCount} failed</span>}
         </div>
+        {suppressedCount > 0 && (
+          <div className="px-6 py-2 flex items-center gap-2 text-xs text-orange-800 bg-orange-50 border-b border-orange-100">
+            <AlertTriangle size={12} className="flex-shrink-0" />
+            {suppressedCount} เบอร์ไม่พบในระบบ LINE ถูก suppress แล้ว จะไม่ส่งในครั้งต่อไปโดยอัตโนมัติ
+          </div>
+        )}
         <div className="overflow-y-auto max-h-80 divide-y">
           {results.map((r, i) => (
             <div key={i} className="flex items-center gap-3 px-6 py-2.5">
@@ -557,12 +641,21 @@ export function LONByPhonePage() {
   }, [selectedTemplate, templateVariables]);
 
   // Bulk send state
-  const [sendMode, setSendMode] = useState<"single" | "bulk">("single");
+  const [sendMode, setSendMode] = useState<"single" | "bulk" | "segment">("single");
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [selectedContacts, setSelectedContacts] = useState<UnifiedContact[]>([]);
   const [bulkSending, setBulkSending] = useState(false);
   const [bulkResults, setBulkResults] = useState<BulkSendPNPResult[]>([]);
   const [showBulkResults, setShowBulkResults] = useState(false);
+  const [bulkSuppressedCount, setBulkSuppressedCount] = useState(0);
+
+  // Segment state
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [segmentsLoading, setSegmentsLoading] = useState(false);
+  const [selectedSegment, setSelectedSegment] = useState<Segment | null>(null);
+  const [segmentCount, setSegmentCount] = useState<number | null>(null);
+  const [segmentCountLoading, setSegmentCountLoading] = useState(false);
+  const [showSegmentPicker, setShowSegmentPicker] = useState(false);
 
   // Send form state
   const [phone, setPhone] = useState("");
@@ -597,6 +690,35 @@ export function LONByPhonePage() {
     setTemplateVariables({});
   }, [selectedLineOAId]);
 
+  // Load segments when OA changes
+  useEffect(() => {
+    if (!WORKSPACE_ID) return;
+    setSegmentsLoading(true);
+    segmentApi
+      .list({ workspace_id: WORKSPACE_ID, page_size: 200 })
+      .then((res) => {
+        setSegments(res.data ?? []);
+      })
+      .catch(console.error)
+      .finally(() => setSegmentsLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch count when segment changes
+  useEffect(() => {
+    if (!selectedSegment || !selectedLineOAId) { setSegmentCount(null); return; }
+    setSegmentCountLoading(true);
+    segmentApi
+      .previewCount({
+        workspace_id: WORKSPACE_ID,
+        line_oa_id: selectedLineOAId,
+        source_type: selectedSegment.source_type,
+        rule: selectedSegment.rule,
+      })
+      .then((res) => setSegmentCount(res.count))
+      .catch(() => setSegmentCount(null))
+      .finally(() => setSegmentCountLoading(false));
+  }, [selectedSegment, selectedLineOAId]);
+
   function handleSelectTemplate(template: PNPTemplate) {
     setSelectedTemplate(template);
     // Initialize all editable fields to empty strings
@@ -625,10 +747,57 @@ export function LONByPhonePage() {
         triggered_by: "manual_bulk",
       });
       setBulkResults(res.results ?? []);
+      setBulkSuppressedCount(res.suppressed_count ?? 0);
       setShowBulkResults(true);
       setSelectedContacts([]);
     } catch (err) {
       setSendError(err instanceof Error ? err.message : "Bulk send failed.");
+    } finally {
+      setBulkSending(false);
+    }
+  }
+
+  async function handleSegmentSend() {
+    if (!selectedLineOAId) { setSendError("Please select a LINE OA."); return; }
+    if (!selectedTemplate) { setSendError("Please pick a template."); return; }
+    if (!selectedSegment) { setSendError("Please select a segment."); return; }
+    setSendError("");
+    setBulkSending(true);
+    try {
+      // Paginate through all contacts in the segment
+      const allPhones: string[] = [];
+      let page = 1;
+      const pageSize = 500;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const res = await segmentApi.previewList({
+          workspace_id: WORKSPACE_ID,
+          line_oa_id: selectedLineOAId,
+          source_type: selectedSegment.source_type,
+          rule: selectedSegment.rule,
+          page,
+          page_size: pageSize,
+        });
+        const phones = (res.data ?? []).map((c) => c.phone).filter(Boolean) as string[];
+        allPhones.push(...phones);
+        if (res.data.length < pageSize) break;
+        page++;
+      }
+      if (allPhones.length === 0) {
+        setSendError("No contacts with phone numbers found in this segment.");
+        return;
+      }
+      const res = await lonApi.bulkSendLONByPhone({
+        line_oa_id: selectedLineOAId,
+        phone_numbers: allPhones,
+        template_id: selectedTemplate.id,
+        template_variables: templateVariables,
+        triggered_by: "manual_segment",
+      });
+      setBulkResults(res.results ?? []);
+      setShowBulkResults(true);
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : "Segment send failed.");
     } finally {
       setBulkSending(false);
     }
@@ -740,7 +909,7 @@ export function LONByPhonePage() {
             <form onSubmit={(e) => void handleSend(e)} className="space-y-4">
               {/* Send mode toggle */}
               <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
-                {(["single", "bulk"] as const).map((mode) => (
+                {(["single", "bulk", "segment"] as const).map((mode) => (
                   <button
                     key={mode}
                     type="button"
@@ -752,7 +921,7 @@ export function LONByPhonePage() {
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    {mode === "single" ? "Single" : "Bulk from Contacts"}
+                    {mode === "single" ? "Single" : mode === "bulk" ? "Bulk from Contacts" : "By Segment"}
                   </button>
                 ))}
               </div>
@@ -781,7 +950,7 @@ export function LONByPhonePage() {
                   </p>
                 )}
               </div>
-              ) : (
+              ) : sendMode === "bulk" ? (
                 /* Bulk mode */
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -817,7 +986,52 @@ export function LONByPhonePage() {
                     </div>
                   )}
                 </div>
-              )}
+              ) : sendMode === "segment" ? (
+                /* Segment mode */
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-gray-700">
+                      Segment
+                    </label>
+                    <div className="flex items-center justify-between">
+                      {selectedSegment ? (
+                        <div className="flex items-center gap-3 flex-1 min-w-0 rounded-lg border p-3 bg-muted/30 mr-2">
+                          <Users size={15} className="text-blue-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{selectedSegment.name}</p>
+                            {selectedSegment.description && (
+                              <p className="text-xs text-muted-foreground truncate">{selectedSegment.description}</p>
+                            )}
+                          </div>
+                          <Badge variant="secondary" className="text-xs flex-shrink-0">{selectedSegment.source_type}</Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No segment selected</span>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowSegmentPicker(true)}
+                        disabled={!selectedLineOAId}
+                        className="gap-1.5 text-xs flex-shrink-0"
+                      >
+                        <Users size={13} />
+                        {selectedSegment ? "Change" : "Choose Segment"}
+                      </Button>
+                    </div>
+                  </div>
+                  {selectedSegment && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {segmentCountLoading ? (
+                        <><RefreshCw size={11} className="animate-spin" /> Counting contacts…</>
+                      ) : segmentCount !== null ? (
+                        <><Users size={12} /><span><strong>{segmentCount}</strong> contact{segmentCount !== 1 ? "s" : ""} will be targeted</span></>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ) : null}
 
               {/* Template Picker */}
               <div className="space-y-2">
@@ -948,7 +1162,7 @@ export function LONByPhonePage() {
                     </>
                   )}
                 </Button>
-              ) : (
+              ) : sendMode === "bulk" ? (
                 <Button
                   type="button"
                   onClick={() => void handleBulkSend()}
@@ -968,6 +1182,29 @@ export function LONByPhonePage() {
                     <>
                       <Users size={14} />
                       Send to {selectedContacts.length} Contact{selectedContacts.length !== 1 ? "s" : ""}
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={() => void handleSegmentSend()}
+                  disabled={
+                    bulkSending ||
+                    !selectedSegment ||
+                    !selectedTemplate ||
+                    !selectedLineOAId
+                  }
+                  className="gap-2"
+                >
+                  {bulkSending ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" /> Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Users size={14} />
+                      Send to Segment{segmentCount !== null ? ` (${segmentCount})` : ""}
                     </>
                   )}
                 </Button>
@@ -996,10 +1233,21 @@ export function LONByPhonePage() {
           setShowContactPicker(false);
         }}
       />
+      <SegmentPickerModal
+        open={showSegmentPicker}
+        onClose={() => setShowSegmentPicker(false)}
+        segments={segments}
+        loading={segmentsLoading}
+        onSelect={(seg) => {
+          setSelectedSegment(seg);
+          setSegmentCount(null);
+        }}
+      />
       <BulkResultsModal
         open={showBulkResults}
         onClose={() => setShowBulkResults(false)}
         results={bulkResults}
+        suppressedCount={bulkSuppressedCount}
       />
     </AppLayout>
   );

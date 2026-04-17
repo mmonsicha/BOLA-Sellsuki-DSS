@@ -5,11 +5,202 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { RefreshCw, AlertCircle, ClipboardList, Search } from "lucide-react";
 import { auditLogApi, type AuditLog } from "@/api/auditLog";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 
 const PAGE_SIZE = 20;
+
+interface AuditActionOption {
+  value: string;
+  label: string;
+  group: string;
+}
+
+const AUDIT_ACTION_GROUPS: { group: string; label: string; actions: AuditActionOption[] }[] = [
+  {
+    group: "admin",
+    label: "Admin",
+    actions: [
+      { value: "admin.invite", label: "Invite Admin", group: "admin" },
+      { value: "admin.update", label: "Update Admin", group: "admin" },
+      { value: "admin.remove", label: "Remove Admin", group: "admin" },
+      { value: "admin.activate", label: "Activate Admin", group: "admin" },
+      { value: "admin.reset_password", label: "Reset Password", group: "admin" },
+    ],
+  },
+  {
+    group: "workspace",
+    label: "Workspace",
+    actions: [
+      { value: "workspace.create", label: "Create Workspace", group: "workspace" },
+      { value: "workspace.update", label: "Update Workspace", group: "workspace" },
+      { value: "workspace.webhook_update", label: "Update Webhook", group: "workspace" },
+    ],
+  },
+  {
+    group: "line_oa",
+    label: "LINE OA",
+    actions: [
+      { value: "line_oa.create", label: "Connect LINE OA", group: "line_oa" },
+      { value: "line_oa.update", label: "Update LINE OA", group: "line_oa" },
+      { value: "line_oa.delete", label: "Delete LINE OA", group: "line_oa" },
+      { value: "line_oa.activate", label: "Activate LINE OA", group: "line_oa" },
+      { value: "line_oa.deactivate", label: "Deactivate LINE OA", group: "line_oa" },
+      { value: "line_oa.webhook_update", label: "Update OA Webhook", group: "line_oa" },
+    ],
+  },
+  {
+    group: "broadcast",
+    label: "Broadcast",
+    actions: [
+      { value: "broadcast.create", label: "Create Broadcast", group: "broadcast" },
+      { value: "broadcast.send", label: "Send Broadcast", group: "broadcast" },
+      { value: "broadcast.cancel", label: "Cancel Broadcast", group: "broadcast" },
+    ],
+  },
+  {
+    group: "segment",
+    label: "Segment",
+    actions: [
+      { value: "segment.create", label: "Create Segment", group: "segment" },
+      { value: "segment.update", label: "Update Segment", group: "segment" },
+      { value: "segment.delete", label: "Delete Segment", group: "segment" },
+    ],
+  },
+  {
+    group: "auto_reply",
+    label: "Auto Reply",
+    actions: [
+      { value: "auto_reply.create", label: "Create Auto Reply", group: "auto_reply" },
+      { value: "auto_reply.update", label: "Update Auto Reply", group: "auto_reply" },
+      { value: "auto_reply.delete", label: "Delete Auto Reply", group: "auto_reply" },
+    ],
+  },
+  {
+    group: "rich_menu",
+    label: "Rich Menu",
+    actions: [
+      { value: "rich_menu.create", label: "Create Rich Menu", group: "rich_menu" },
+      { value: "rich_menu.update", label: "Update Rich Menu", group: "rich_menu" },
+      { value: "rich_menu.delete", label: "Delete Rich Menu", group: "rich_menu" },
+      { value: "rich_menu.publish", label: "Publish Rich Menu", group: "rich_menu" },
+      { value: "rich_menu.set_default", label: "Set Default Rich Menu", group: "rich_menu" },
+      { value: "rich_menu.unset_default", label: "Unset Default Rich Menu", group: "rich_menu" },
+      { value: "rich_menu.duplicate", label: "Duplicate Rich Menu", group: "rich_menu" },
+    ],
+  },
+  {
+    group: "media",
+    label: "Media",
+    actions: [
+      { value: "media.upload", label: "Upload Media", group: "media" },
+      { value: "media.update", label: "Update Media", group: "media" },
+      { value: "media.restore", label: "Restore Media", group: "media" },
+      { value: "media.delete", label: "Delete Media", group: "media" },
+    ],
+  },
+  {
+    group: "lon",
+    label: "LON",
+    actions: [
+      { value: "lon.send_notification", label: "Send Notification", group: "lon" },
+      { value: "lon.subscribe_by_phone", label: "Subscribe by Phone", group: "lon" },
+      { value: "lon.bulk_subscribe_by_phone", label: "Bulk Subscribe by Phone", group: "lon" },
+      { value: "lon.send_consent_request", label: "Send Consent Request", group: "lon" },
+    ],
+  },
+  {
+    group: "lon_subscriber",
+    label: "LON Subscriber",
+    actions: [
+      { value: "lon_subscriber.view_phone", label: "View Phone Number", group: "lon_subscriber" },
+      { value: "lon_subscriber.revoke", label: "Revoke Subscriber", group: "lon_subscriber" },
+    ],
+  },
+  {
+    group: "lon_job",
+    label: "LON Job",
+    actions: [
+      { value: "lon_job.create", label: "Create LON Job", group: "lon_job" },
+      { value: "lon_job.update", label: "Update LON Job", group: "lon_job" },
+      { value: "lon_job.delete", label: "Delete LON Job", group: "lon_job" },
+      { value: "lon_job.pause", label: "Pause LON Job", group: "lon_job" },
+      { value: "lon_job.resume", label: "Resume LON Job", group: "lon_job" },
+      { value: "lon_job.trigger", label: "Trigger LON Job", group: "lon_job" },
+    ],
+  },
+];
+
+// Flat lookup: action value → friendly label
+const ACTION_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  AUDIT_ACTION_GROUPS.flatMap((g) => g.actions.map((a) => [a.value, a.label]))
+);
+
+// Date preset helpers
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+interface DatePreset {
+  label: string;
+  getDates: () => { from: string; to: string };
+}
+
+const DATE_PRESETS: DatePreset[] = [
+  {
+    label: "Today",
+    getDates: () => {
+      const t = toDateStr(new Date());
+      return { from: t, to: t };
+    },
+  },
+  {
+    label: "Yesterday",
+    getDates: () => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      const t = toDateStr(d);
+      return { from: t, to: t };
+    },
+  },
+  {
+    label: "Last 7 days",
+    getDates: () => {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 6);
+      return { from: toDateStr(from), to: toDateStr(to) };
+    },
+  },
+  {
+    label: "Last 30 days",
+    getDates: () => {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 29);
+      return { from: toDateStr(from), to: toDateStr(to) };
+    },
+  },
+  {
+    label: "This month",
+    getDates: () => {
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from: toDateStr(from), to: toDateStr(now) };
+    },
+  },
+  {
+    label: "Last month",
+    getDates: () => {
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const to = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { from: toDateStr(from), to: toDateStr(to) };
+    },
+  },
+];
 
 function actionBadgeClass(action: string): string {
   if (action.includes("delete") || action.includes("remove") || action.includes("deactivate")) {
@@ -57,6 +248,7 @@ export function AuditLogsPage() {
   const [filterAction, setFilterAction] = useState("");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
   const loadLogs = (p: number = 1) => {
     setLoading(true);
@@ -95,6 +287,34 @@ export function AuditLogsPage() {
     loadLogs(1);
   };
 
+  const applyPreset = (preset: DatePreset) => {
+    const { from, to } = preset.getDates();
+    setFilterFrom(from);
+    setFilterTo(to);
+    setActivePreset(preset.label);
+    // Auto-search immediately when a preset is clicked
+    setLoading(true);
+    setError(null);
+    auditLogApi.list({
+      page: 1,
+      page_size: PAGE_SIZE,
+      admin_id: filterAdminId.trim() || undefined,
+      action: filterAction.trim() || undefined,
+      from,
+      to,
+    })
+      .then((res) => {
+        setLogs(res.data ?? []);
+        setTotal(res.total ?? 0);
+        setPage(1);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load audit logs");
+        setLogs([]);
+      })
+      .finally(() => setLoading(false));
+  };
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   if (!adminLoading && !isAdminOrAbove) {
@@ -120,15 +340,29 @@ export function AuditLogsPage() {
           <CardContent className="pt-4 pb-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="filter-action" className="text-xs">Action</Label>
-                <Input
-                  id="filter-action"
-                  placeholder="e.g. broadcast.create"
-                  value={filterAction}
-                  onChange={(e) => setFilterAction(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="h-8 text-sm"
-                />
+                <Label className="text-xs">Action Type</Label>
+                <Select value={filterAction} onValueChange={setFilterAction}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="All actions">
+                      {filterAction ? (ACTION_LABEL_MAP[filterAction] ?? filterAction) : "All actions"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All actions</SelectItem>
+                    {AUDIT_ACTION_GROUPS.map((group) => (
+                      <div key={group.group}>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide border-t first:border-t-0 mt-1 first:mt-0">
+                          {group.label}
+                        </div>
+                        {group.actions.map((action) => (
+                          <SelectItem key={action.value} value={action.value}>
+                            {action.label}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="filter-admin" className="text-xs">Admin email / ID</Label>
@@ -147,7 +381,7 @@ export function AuditLogsPage() {
                   id="filter-from"
                   type="date"
                   value={filterFrom}
-                  onChange={(e) => setFilterFrom(e.target.value)}
+                  onChange={(e) => { setFilterFrom(e.target.value); setActivePreset(null); }}
                   className="h-8 text-sm"
                 />
               </div>
@@ -157,11 +391,40 @@ export function AuditLogsPage() {
                   id="filter-to"
                   type="date"
                   value={filterTo}
-                  onChange={(e) => setFilterTo(e.target.value)}
+                  onChange={(e) => { setFilterTo(e.target.value); setActivePreset(null); }}
                   className="h-8 text-sm"
                 />
               </div>
             </div>
+
+            {/* Quick date range presets */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-3">
+              <span className="text-xs text-muted-foreground mr-0.5">Quick:</span>
+              {DATE_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => applyPreset(preset)}
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border transition-colors ${
+                    activePreset === preset.label
+                      ? "bg-primary text-primary-foreground border-primary font-medium"
+                      : "bg-background text-muted-foreground border-border hover:border-primary hover:text-foreground"
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {(filterFrom || filterTo) && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterFrom(""); setFilterTo(""); setActivePreset(null); }}
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs border border-border bg-background text-muted-foreground hover:text-destructive hover:border-destructive transition-colors"
+                >
+                  Clear dates
+                </button>
+              )}
+            </div>
+
             <div className="flex justify-end mt-3">
               <Button size="sm" onClick={handleSearch} className="gap-1.5" disabled={loading}>
                 <Search size={14} />
@@ -237,8 +500,9 @@ export function AuditLogsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${actionBadgeClass(log.action)}`}>
-                            {log.action}
+                            {ACTION_LABEL_MAP[log.action] ?? log.action}
                           </span>
+                          <div className="text-xs text-muted-foreground/70 mt-0.5 font-mono">{log.action}</div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {log.resource_type && (

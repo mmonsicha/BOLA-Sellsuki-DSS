@@ -48,7 +48,7 @@ import { FlexCardPreview } from "@/components/FlexCardPreview";
 import { applyTemplateVariables } from "@/utils/pnpTemplateUtils";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import { useToast } from "@/components/ui/toast";
-import type { LONJob, LONJobRun, LineOA, PNPTemplate, Segment } from "@/types";
+import type { LONJob, LONJobRun, LONJobTargetStats, LineOA, PNPTemplate, Segment } from "@/types";
 import { getWorkspaceId } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -77,9 +77,19 @@ function formatSchedule(job: LONJob): string {
   return `${job.schedule_type} at ${hh}:${mm}`;
 }
 
-function formatNextRun(dt: string | null): string {
+function formatDateTime(dt: string | null): string {
   if (!dt) return "—";
-  return new Date(dt).toLocaleString();
+  const d = new Date(dt);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
+
+function formatNextRun(dt: string | null): string {
+  return formatDateTime(dt);
 }
 
 // ─── Template Picker ──────────────────────────────────────────────────────────
@@ -178,10 +188,12 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
   const [runs, setRuns] = useState<LONJobRun[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [targetStats, setTargetStats] = useState<LONJobTargetStats | null>(null);
 
   useEffect(() => {
     if (!job) return;
     setLoading(true);
+    setTargetStats(null);
     lonJobApi.runs(job.id, { page_size: 50 })
       .then((res) => {
         setRuns(res.data ?? []);
@@ -189,6 +201,9 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+    lonJobApi.targetStats(job.id)
+      .then(setTargetStats)
+      .catch(console.error);
   }, [job]);
 
   function runStatusBadge(status: LONJobRun["status"]) {
@@ -221,6 +236,13 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
           </DialogTitle>
         </DialogHeader>
 
+        {targetStats !== null && targetStats.suppressed > 0 && (
+          <div className="flex items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+            <AlertTriangle size={13} className="flex-shrink-0" />
+            <span>จะข้าม <strong>{targetStats.suppressed}</strong> เบอร์ (ไม่พบใน LINE) — จะส่งถึง <strong>{targetStats.will_send}</strong> เบอร์ จากทั้งหมด {targetStats.total} เบอร์</span>
+          </div>
+        )}
+
         {loading ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
             <RefreshCw size={18} className="animate-spin mx-auto mb-2" />
@@ -240,14 +262,15 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
                     <th className="text-left py-2 pr-4 font-medium">Executed At</th>
                     <th className="text-left py-2 pr-4 font-medium">Status</th>
                     <th className="text-right py-2 pr-4 font-medium">Sent</th>
-                    <th className="text-right py-2 font-medium">Failed</th>
+                    <th className="text-right py-2 pr-4 font-medium">Failed</th>
+                    <th className="text-right py-2 font-medium">Skipped</th>
                   </tr>
                 </thead>
                 <tbody>
                   {runs.map((run) => (
                     <tr key={run.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="py-2.5 pr-4 text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(run.executed_at).toLocaleString()}
+                        {formatDateTime(run.executed_at)}
                       </td>
                       <td className="py-2.5 pr-4 text-xs font-medium">
                         {runStatusBadge(run.status)}
@@ -255,8 +278,11 @@ function RunHistoryModal({ job, onClose }: RunHistoryModalProps) {
                       <td className="py-2.5 pr-4 text-right text-xs font-semibold text-green-700">
                         {run.sent_count}
                       </td>
-                      <td className="py-2.5 text-right text-xs font-semibold text-destructive">
+                      <td className="py-2.5 pr-4 text-right text-xs font-semibold text-destructive">
                         {run.failed_count}
+                      </td>
+                      <td className="py-2.5 text-right text-xs font-semibold text-orange-600">
+                        {run.suppressed_count > 0 ? run.suppressed_count : "—"}
                       </td>
                     </tr>
                   ))}
@@ -540,29 +566,18 @@ function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, segments, 
                 )}
 
                 {/* Time */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Hour (0–23)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={23}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      value={form.schedule_hour}
-                      onChange={(e) => set("schedule_hour", Math.min(23, Math.max(0, Number(e.target.value))))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Minute (0–59)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={59}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      value={form.schedule_minute}
-                      onChange={(e) => set("schedule_minute", Math.min(59, Math.max(0, Number(e.target.value))))}
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">Time</label>
+                  <input
+                    type="time"
+                    className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={`${String(form.schedule_hour).padStart(2, "0")}:${String(form.schedule_minute).padStart(2, "0")}`}
+                    onChange={(e) => {
+                      const [hh, mm] = e.target.value.split(":");
+                      set("schedule_hour", parseInt(hh, 10) || 0);
+                      set("schedule_minute", parseInt(mm, 10) || 0);
+                    }}
+                  />
                 </div>
                 {/* Description */}
                 <div className="space-y-1">
@@ -612,21 +627,15 @@ function JobFormDialog({ open, onClose, onSave, initialData, lineOAs, segments, 
                           onChange={(e) => set("target_segment_id", e.target.value)}
                         >
                           <option value="">Select a segment…</option>
-                          {segments.map((s) => (
+                          {segments.filter((s) => s.source_type === "contact").map((s) => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                           ))}
                         </select>
                       </div>
                       {selectedSeg && (
                         <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs">
-                          {selectedSeg.source_type === "follower" ? (
-                            <Users size={13} className="text-violet-500 flex-shrink-0" />
-                          ) : (
-                            <Phone size={13} className="text-blue-500 flex-shrink-0" />
-                          )}
-                          <span className="text-muted-foreground">
-                            {selectedSeg.source_type === "follower" ? "Followers" : "Phone Contacts"}
-                          </span>
+                          <Phone size={13} className="text-blue-500 flex-shrink-0" />
+                          <span className="text-muted-foreground">Phone Contacts</span>
                           <span className="ml-auto font-semibold tabular-nums">
                             {selectedSeg.customer_count.toLocaleString()} คน
                           </span>

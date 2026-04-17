@@ -87,6 +87,7 @@ interface CreateFormProps {
 function CreateForm({ template, workspaceId, onBack, onClose }: CreateFormProps) {
   const [name, setName] = useState(template.name);
   const [description, setDescription] = useState(template.description);
+  const [altText, setAltText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,6 +103,7 @@ function CreateForm({ template, workspaceId, onBack, onClose }: CreateFormProps)
         workspace_id: workspaceId,
         name: name.trim(),
         description: description.trim(),
+        alt_text: altText.trim() || undefined,
         content: template.content,
       });
       window.location.href = `/flex-messages/${res.data.id}`;
@@ -161,6 +163,18 @@ function CreateForm({ template, workspaceId, onBack, onClose }: CreateFormProps)
             rows={2}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            disabled={saving}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Alt Text (Preview in chat list)</label>
+          <input
+            type="text"
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="e.g., New product available!"
+            value={altText}
+            onChange={(e) => setAltText(e.target.value)}
             disabled={saving}
           />
         </div>
