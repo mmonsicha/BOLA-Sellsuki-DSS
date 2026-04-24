@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AdvancedDataTable,
   Alert,
   Badge,
   Breadcrumb,
@@ -9,12 +8,10 @@ import {
   ConfirmDialog,
   DSButton,
   EmptyState,
-  FeaturePageScaffold,
-  PageHeader,
   StatCard,
   toast,
-  type AdvancedColumn,
 } from "@uxuissk/design-system";
+import { AdvancedDataTable, FeaturePageScaffold, PageHeader, type AdvancedColumn } from "@/components/ui/ds-compat";
 import { AlertTriangle, Plus, Tag, Trash2, Users, Zap } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { broadcastApi } from "@/api/broadcast";

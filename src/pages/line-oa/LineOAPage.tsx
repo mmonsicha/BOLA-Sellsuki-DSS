@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AdvancedDataTable,
   Badge,
   Breadcrumb,
   Card,
   CardBody,
   DSButton,
   EmptyState,
-  FeaturePageScaffold,
-  PageHeader,
   StatCard,
   toast,
-  type AdvancedColumn,
 } from "@uxuissk/design-system";
+import { AdvancedDataTable, FeaturePageScaffold, PageHeader, type AdvancedColumn } from "@/components/ui/ds-compat";
 import { Copy, Link2, MessageCircle, Plus, Users } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { lineOAApi } from "@/api/lineOA";

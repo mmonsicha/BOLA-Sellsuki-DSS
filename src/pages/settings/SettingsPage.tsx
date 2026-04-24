@@ -9,12 +9,11 @@ import {
   DSButton,
   DSInput,
   EmptyState,
-  FeaturePageScaffold,
   Notification,
-  PageHeader,
   Switch,
   toast,
 } from "@uxuissk/design-system";
+import { FeaturePageScaffold, PageHeader } from "@/components/ui/ds-compat";
 import {
   Building2,
   Eye,

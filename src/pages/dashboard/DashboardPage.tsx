@@ -6,14 +6,11 @@ import {
   Card,
   CardBody,
   CardHeader,
-  ChoiceCard,
-  ChoiceCardGroup,
   DSButton,
   EmptyState,
-  FeaturePageScaffold,
-  PageHeader,
   Spinner,
 } from "@uxuissk/design-system";
+import { ChoiceCard, ChoiceCardGroup, FeaturePageScaffold, PageHeader } from "@/components/ui/ds-compat";
 import {
   ArrowRight,
   Bell,
@@ -113,7 +110,9 @@ function DashboardPanel({
     <Card elevation="none" className="h-full">
       <CardHeader action={action}>
         <div className="space-y-1">
-          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
+          <h3 className="font-[var(--font-h4)] text-[var(--text-h4)] font-medium text-[var(--Colors--Text--text-primary)]">
+            {title}
+          </h3>
         </div>
       </CardHeader>
       <CardBody>{children}</CardBody>
@@ -143,18 +142,20 @@ function LineOAList({ lineOAs }: { lineOAs: LineOA[] }) {
         <a
           key={oa.id}
           href={`/line-oa/${oa.id}`}
-          className="flex items-center gap-4 rounded-xl border border-[var(--border-default)] bg-white p-4 transition hover:border-sky-300 hover:bg-sky-50/40"
+          className="flex items-center gap-[var(--Spacing--Spacing-3xl)] rounded-[var(--Border-radius--radius-xl)] border border-[var(--Colors--Stroke--stroke-primary)] bg-[var(--Colors--Background--bg-primary)] p-[var(--Spacing--Spacing-3xl)] transition hover:border-[var(--Colors--Stroke--stroke-brand)] hover:bg-[var(--Colors--Background--bg-brand-primary)]"
         >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sky-100 bg-sky-50">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--Colors--Stroke--stroke-brand-lighter)] bg-[var(--Colors--Background--bg-brand-primary)]">
             {oa.picture_url ? (
               <img src={oa.picture_url} alt={oa.name} className="h-full w-full object-cover" />
             ) : (
-              <span className="text-lg font-semibold text-sky-600">{oa.name[0]?.toUpperCase()}</span>
+              <span className="text-[var(--text-label)] font-semibold text-[var(--Colors--Text--text-brand-primary)]">
+                {oa.name[0]?.toUpperCase()}
+              </span>
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold text-[var(--text-primary)]">{oa.name}</div>
-            <div className="truncate text-sm text-[var(--text-secondary)]">{oa.basic_id || oa.channel_id}</div>
+            <div className="truncate text-[var(--text-label)] font-semibold text-[var(--Colors--Text--text-primary)]">{oa.name}</div>
+            <div className="truncate text-[var(--text-caption)] text-[var(--Colors--Text--text-secondary)]">{oa.basic_id || oa.channel_id}</div>
           </div>
           <Badge
             variant={oa.status === "active" ? "success" : oa.status === "error" ? "destructive" : "secondary"}
@@ -190,14 +191,14 @@ function BroadcastList({ broadcasts }: { broadcasts: Broadcast[] }) {
         <a
           key={broadcast.id}
           href={`/broadcasts/${broadcast.id}`}
-          className="flex items-center gap-4 rounded-xl border border-[var(--border-default)] bg-white p-4 transition hover:border-sky-300 hover:bg-sky-50/40"
+          className="flex items-center gap-[var(--Spacing--Spacing-3xl)] rounded-[var(--Border-radius--radius-xl)] border border-[var(--Colors--Stroke--stroke-primary)] bg-[var(--Colors--Background--bg-primary)] p-[var(--Spacing--Spacing-3xl)] transition hover:border-[var(--Colors--Stroke--stroke-brand)] hover:bg-[var(--Colors--Background--bg-brand-primary)]"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--Colors--Background--bg-brand-primary)] text-[var(--Colors--Text--text-brand-primary)]">
             <Radio size={18} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold text-[var(--text-primary)]">{broadcast.name}</div>
-            <div className="text-sm text-[var(--text-secondary)]">
+            <div className="truncate text-[var(--text-label)] font-semibold text-[var(--Colors--Text--text-primary)]">{broadcast.name}</div>
+            <div className="text-[var(--text-caption)] text-[var(--Colors--Text--text-secondary)]">
               {broadcast.sent_at
                 ? `Sent ${new Date(broadcast.sent_at).toLocaleDateString()}`
                 : broadcast.scheduled_at
@@ -359,7 +360,7 @@ export function DashboardPage() {
           <div className="space-y-6">
             {featureGroups.map((group) => (
               <section key={group.title} className="space-y-3">
-                <div className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                <div className="text-[var(--text-caption)] font-semibold uppercase tracking-[0.12em] text-[var(--Colors--Text--text-secondary)]">
                   {group.title}
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -369,13 +370,13 @@ export function DashboardPage() {
                       <a key={item.href} href={item.href} className="block">
                         <Card hover elevation="none" className="h-full">
                           <CardBody>
-                            <div className="flex items-start gap-4">
-                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
+                            <div className="flex items-start gap-[var(--Spacing--Spacing-3xl)]">
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--Border-radius--radius-xl)] bg-[var(--Colors--Background--bg-brand-primary)] text-[var(--Colors--Text--text-brand-primary)]">
                                 <Icon size={20} />
                               </div>
                               <div className="min-w-0 space-y-2">
-                                <div className="font-semibold text-[var(--text-primary)]">{item.label}</div>
-                                <p className="text-sm leading-6 text-[var(--text-secondary)]">{item.desc}</p>
+                                <div className="text-[var(--text-label)] font-semibold text-[var(--Colors--Text--text-primary)]">{item.label}</div>
+                                <p className="text-[var(--text-caption)] leading-6 text-[var(--Colors--Text--text-secondary)]">{item.desc}</p>
                               </div>
                             </div>
                           </CardBody>

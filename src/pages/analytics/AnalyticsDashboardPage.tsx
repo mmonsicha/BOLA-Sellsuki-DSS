@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AdvancedDataTable,
-  BarChart,
   Breadcrumb,
   Card,
   CardBody,
-  DonutChart,
   EmptyState,
-  FeaturePageScaffold,
-  FilterBar,
   Notification,
-  PageHeader,
   StatCard,
   Tabs,
+} from "@uxuissk/design-system";
+import {
+  AdvancedDataTable,
+  BarChart,
+  DonutChart,
+  FeaturePageScaffold,
+  FilterBar,
+  PageHeader,
   type AdvancedColumn,
   type FilterBarValue,
-} from "@uxuissk/design-system";
+} from "@/components/ui/ds-compat";
 import { BarChart2, Eye, MousePointerClick, RefreshCw, TrendingUp, Users } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { analyticsApi } from "@/api/analytics";

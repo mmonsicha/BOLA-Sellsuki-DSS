@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AdvancedDataTable,
   Badge,
   Breadcrumb,
   Card,
   CardBody,
   DSButton,
   EmptyState,
+  Notification,
+  Tabs,
+} from "@uxuissk/design-system";
+import {
+  AdvancedDataTable,
   FeaturePageScaffold,
   FilterBar,
-  Notification,
   PageHeader,
-  Tabs,
   type AdvancedColumn,
   type FilterBarValue,
-} from "@uxuissk/design-system";
+} from "@/components/ui/ds-compat";
 import { Phone, RefreshCw, Upload, Users } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { followerApi } from "@/api/follower";

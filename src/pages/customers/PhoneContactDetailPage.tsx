@@ -9,11 +9,10 @@ import {
   ConfirmDialog,
   DSButton,
   EmptyState,
-  FeaturePageScaffold,
-  PageHeader,
   Spinner,
   StatCard,
 } from "@uxuissk/design-system";
+import { FeaturePageScaffold, PageHeader } from "@/components/ui/ds-compat";
 import { ArrowLeft, Link2, Phone, Send, Trash2, Unlink, UserCheck, UserX } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { maskPhone } from "@/lib/phone";

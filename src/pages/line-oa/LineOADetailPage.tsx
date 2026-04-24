@@ -12,14 +12,13 @@ import {
   DSInput,
   DSTextarea,
   EmptyState,
-  FeaturePageScaffold,
   FormField,
-  PageHeader,
   Spinner,
   StatCard,
   Switch,
   toast,
 } from "@uxuissk/design-system";
+import { FeaturePageScaffold, PageHeader } from "@/components/ui/ds-compat";
 import {
   ArrowLeft,
   Copy,

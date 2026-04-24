@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { User, Shield, AlertCircle, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Badge, DSButton } from "@uxuissk/design-system";
+import { AlertCircle, RefreshCw, Shield, User } from "lucide-react";
 import { getAuthMode } from "@/lib/auth";
 
 type SessionState =
@@ -12,12 +13,9 @@ export function AuthStatusBar() {
   const [session, setSession] = useState<SessionState>({ status: "loading" });
   const authMode = getAuthMode();
 
-  const checkSession = () => {
+  const checkSession = useCallback(() => {
     setSession({ status: "loading" });
 
-    // Call /v1/me/workspaces through same-origin (Caddy routes to bola-backend).
-    // Backend validates Kratos session cookie and returns workspaces.
-    // 401 = not authenticated, 405 = auth mode doesn't support this, 200 = OK
     fetch("/v1/me/workspaces", { credentials: "include" })
       .then(async (res) => {
         if (res.status === 401) {
@@ -50,76 +48,77 @@ export function AuthStatusBar() {
       .catch((err) => {
         setSession({ status: "error", message: err.message ?? "Network error" });
       });
-  };
+  }, [authMode]);
 
   useEffect(() => {
     checkSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [checkSession]);
 
   return (
-    <div className="w-full max-w-sm mx-auto mb-4">
-      <div className="rounded-lg border px-3 py-2 text-xs bg-white shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            {/* Status dot */}
+    <div className="mx-auto mb-[var(--Spacing--Spacing-3xl)] w-full max-w-sm">
+      <div className="rounded-[var(--Border-radius--radius-md)] border border-[var(--Colors--Stroke--stroke-primary)] bg-[var(--Colors--Background--bg-primary)] px-[var(--Spacing--Spacing-xl)] py-[var(--Spacing--Spacing-lg)] shadow-[var(--elevation-sm)]">
+        <div className="flex items-center justify-between gap-[var(--Spacing--Spacing-lg)]">
+          <div className="flex min-w-0 items-center gap-[var(--Spacing--Spacing-lg)]">
             {session.status === "loading" && (
-              <span className="w-2 h-2 rounded-full bg-gray-300 animate-pulse flex-shrink-0" />
+              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[var(--Colors--Background--bg-disabled)]" />
             )}
             {session.status === "authenticated" && (
-              <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--Colors--Background--bg-success-solid)]" />
             )}
             {session.status === "unauthenticated" && (
-              <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--Colors--Background--bg-danger-solid)]" />
             )}
             {session.status === "error" && (
-              <span className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" />
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--Colors--Background--bg-warning-solid)]" />
             )}
 
-            {/* Identity info */}
             {session.status === "loading" && (
-              <span className="text-gray-400">Checking session...</span>
+              <span className="text-[var(--text-caption)] text-[var(--Colors--Text--text-secondary)]">
+                Checking session...
+              </span>
             )}
             {session.status === "authenticated" && (
-              <div className="flex items-center gap-1.5 min-w-0">
-                <User className="w-3 h-3 text-green-600 flex-shrink-0" />
-                <span className="text-green-700 font-medium">
-                  Session valid · {session.email}
+              <div className="flex min-w-0 items-center gap-[var(--Spacing--Spacing-sm)]">
+                <User className="h-3 w-3 shrink-0 text-[var(--Colors--Icon--icon-success)]" />
+                <span className="text-[var(--text-caption)] font-medium text-[var(--Colors--Text--text-success-primary)]">
+                  Session valid • {session.email}
                 </span>
               </div>
             )}
             {session.status === "unauthenticated" && (
-              <div className="flex items-center gap-1.5">
-                <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
-                <span className="text-red-600">
+              <div className="flex items-center gap-[var(--Spacing--Spacing-sm)]">
+                <AlertCircle className="h-3 w-3 shrink-0 text-[var(--Colors--Icon--icon-error)]" />
+                <span className="text-[var(--text-caption)] text-[var(--Colors--Text--text-danger-primary)]">
                   Not authenticated
                   {session.detail && (
-                    <span className="text-red-400 ml-1">({session.detail})</span>
+                    <span className="ml-1 text-[var(--Colors--Text--text-secondary)]">({session.detail})</span>
                   )}
                 </span>
               </div>
             )}
             {session.status === "error" && (
-              <div className="flex items-center gap-1.5 min-w-0">
-                <AlertCircle className="w-3 h-3 text-yellow-600 flex-shrink-0" />
-                <span className="text-yellow-700 truncate">{session.message}</span>
+              <div className="flex min-w-0 items-center gap-[var(--Spacing--Spacing-sm)]">
+                <AlertCircle className="h-3 w-3 shrink-0 text-[var(--Colors--Icon--icon-warning)]" />
+                <span className="truncate text-[var(--text-caption)] text-[var(--Colors--Text--text-warning-primary)]">
+                  {session.message}
+                </span>
               </div>
             )}
           </div>
 
-          {/* Right side: auth mode badge + refresh */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <button
+          <div className="flex shrink-0 items-center gap-[var(--Spacing--Spacing-sm)]">
+            <DSButton
               onClick={checkSession}
-              className="p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-              title="Refresh"
+              variant="ghost"
+              size="sm"
+              aria-label="Refresh auth status"
             >
-              <RefreshCw className="w-3 h-3" />
-            </button>
-            <Shield className="w-3 h-3 text-gray-400" />
-            <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-mono">
+              <RefreshCw className="h-3 w-3" />
+            </DSButton>
+            <Shield className="h-3 w-3 text-[var(--Colors--Icon--icon-primary)]" />
+            <Badge variant="secondary" size="sm">
               {authMode}
-            </span>
+            </Badge>
           </div>
         </div>
       </div>

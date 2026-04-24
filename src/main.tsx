@@ -4,6 +4,9 @@ import './index.css'
 import '@sellsuki-org/sellsuki-components/style.css'
 import App from './App.tsx'
 
+document.documentElement.setAttribute("data-product", "sellsuki");
+document.documentElement.setAttribute("data-app-shell", "sellsuki");
+
 // Log active env config on startup so it's easy to verify after restart
 // eslint-disable-next-line no-console
 console.log("[BOLA] env:", {

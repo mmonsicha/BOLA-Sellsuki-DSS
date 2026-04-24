@@ -60,20 +60,20 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(6,199,85,0.10),_transparent_35%),linear-gradient(180deg,_#f8fafc_0%,_#eef5f1_100%)] px-4 py-10">
+    <div className="min-h-screen bg-[linear-gradient(180deg,var(--Colors--Background--bg-brand-primary)_0%,var(--Colors--Background--bg-quaternary)_38%,var(--Colors--Background--bg-primary)_100%)] px-4 py-10">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-5xl items-center justify-center">
         <div className="grid w-full gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-          <section className="hidden rounded-[28px] border border-white/60 bg-white/75 p-8 shadow-sm backdrop-blur lg:flex lg:flex-col lg:justify-between">
+          <section className="hidden rounded-[var(--Border-radius--radius-4xl)] border border-[var(--Colors--Stroke--stroke-primary)] bg-[var(--Colors--Background--bg-primary)] p-[var(--Spacing--Spacing-6xl)] shadow-[var(--elevation-sm)] lg:flex lg:flex-col lg:justify-between">
             <div className="space-y-6">
-              <div className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-[#06C755] shadow-sm">
+              <div className="inline-flex h-16 w-16 items-center justify-center rounded-[var(--Border-radius--radius-3xl)] bg-[var(--Colors--Background--bg-brand-solid)] shadow-[var(--elevation-sm)]">
                 <img src="/bola-logo.svg" alt="BOLA" className="h-10 w-10 rounded-xl" />
               </div>
               <div className="space-y-3">
-                <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#06C755]">BOLA Workspace</p>
-                <h1 className="max-w-md text-4xl font-semibold leading-tight text-[var(--foreground)]">
+                <p className="text-[var(--text-caption)] font-semibold uppercase tracking-[0.14em] text-[var(--Colors--Text--text-brand-primary)]">BOLA Workspace</p>
+                <h1 className="max-w-md text-[var(--text-h2)] font-normal leading-[1.15] text-[var(--foreground)]">
                   Back Office of LINE API built on the latest Sellsuki Design System.
                 </h1>
-                <p className="max-w-xl text-base leading-7 text-[var(--muted-foreground)]">
+                <p className="max-w-xl text-[var(--text-caption)] leading-6 text-[var(--muted-foreground)]">
                   Sign in to manage broadcasts, contacts, LINE OA connections, and automation flows from one
                   admin workspace.
                 </p>
@@ -86,11 +86,11 @@ export function LoginPage() {
                 { label: "Contacts", value: "Follower CRM" },
                 { label: "Automation", value: "Always-on flows" },
               ].map((item) => (
-                <Card key={item.label} elevation="none" className="border-[var(--border)]/80 bg-white/90">
+                <Card key={item.label} elevation="none" className="border-[var(--Colors--Stroke--stroke-primary)] bg-[var(--Colors--Background--bg-primary)]">
                   <CardBody>
                     <div className="space-y-1">
-                      <div className="text-sm font-medium text-[var(--muted-foreground)]">{item.label}</div>
-                      <div className="text-base font-semibold text-[var(--foreground)]">{item.value}</div>
+                      <div className="text-[var(--text-caption)] font-medium text-[var(--muted-foreground)]">{item.label}</div>
+                      <div className="text-[var(--text-label)] font-semibold text-[var(--foreground)]">{item.value}</div>
                     </div>
                   </CardBody>
                 </Card>
@@ -99,21 +99,21 @@ export function LoginPage() {
           </section>
 
           <section className="w-full">
-            <Card className="border-white/60 bg-white/92 shadow-sm backdrop-blur" elevation="none">
+            <Card className="border-[var(--Colors--Stroke--stroke-primary)] bg-[var(--Colors--Background--bg-primary)] shadow-[var(--elevation-sm)]" elevation="none">
               <CardHeader>
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#06C755]/10 text-[#06C755]">
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--Colors--Background--bg-brand-primary)] text-[var(--Colors--Text--text-brand-primary)]">
                       <LogIn size={20} />
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-[var(--muted-foreground)]">BOLA</div>
-                      <h2 className="text-2xl font-semibold text-[var(--foreground)]">
+                      <div className="text-[var(--text-caption)] font-medium text-[var(--muted-foreground)]">BOLA</div>
+                      <h2 className="text-[var(--text-h4)] font-medium text-[var(--foreground)]">
                         {step === "credentials" ? "Sign in" : "Choose workspace"}
                       </h2>
                     </div>
                   </div>
-                  <p className="text-sm leading-6 text-[var(--muted-foreground)]">
+                  <p className="text-[var(--text-caption)] leading-6 text-[var(--muted-foreground)]">
                     {step === "credentials"
                       ? "Use your workspace credentials to access the latest DS-first BOLA admin."
                       : "Pick the workspace you want to enter for this session."}
@@ -161,10 +161,10 @@ export function LoginPage() {
                       </DSButton>
 
                       <div className="space-y-1 text-center">
-                        <a href="/forgot-password" className="text-sm text-[var(--primary)] hover:underline">
+                        <a href="/forgot-password" className="text-[var(--text-caption)] text-[var(--primary)] hover:underline">
                           Forgot password?
                         </a>
-                        <p className="text-xs text-[var(--muted-foreground)]">
+                        <p className="text-[var(--text-caption)] text-[var(--muted-foreground)]">
                           Contact your workspace admin if you need access.
                         </p>
                       </div>
@@ -177,14 +177,14 @@ export function LoginPage() {
                         key={ws.id}
                         type="button"
                         onClick={() => handleSelectWorkspace(ws)}
-                        className="flex w-full items-center gap-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-4 text-left transition-colors hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/5"
+                        className="flex w-full items-center gap-[var(--Spacing--Spacing-3xl)] rounded-[var(--Border-radius--radius-md)] border border-[var(--Colors--Stroke--stroke-primary)] bg-[var(--Colors--Background--bg-primary)] px-[var(--Spacing--Spacing-3xl)] py-[var(--Spacing--Spacing-3xl)] text-left transition-colors hover:border-[var(--Colors--Stroke--stroke-brand)] hover:bg-[var(--Colors--Background--bg-brand-primary)]"
                       >
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#06C755]/10 text-[#06C755]">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--Colors--Background--bg-brand-primary)] text-[var(--Colors--Text--text-brand-primary)]">
                           <Building2 size={18} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-semibold text-[var(--foreground)]">{ws.name}</div>
-                          <div className="truncate text-sm text-[var(--muted-foreground)]">
+                          <div className="truncate text-[var(--text-label)] font-semibold text-[var(--foreground)]">{ws.name}</div>
+                          <div className="truncate text-[var(--text-caption)] text-[var(--muted-foreground)]">
                             Access workspace and continue to dashboard
                           </div>
                         </div>

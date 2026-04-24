@@ -7,10 +7,9 @@ import {
   CardBody,
   DSButton,
   EmptyState,
-  FeaturePageScaffold,
-  PageHeader,
   Tabs,
 } from "@uxuissk/design-system";
+import { FeaturePageScaffold, PageHeader } from "@/components/ui/ds-compat";
 import {
   Ban,
   CheckCircle,

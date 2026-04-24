@@ -13,14 +13,13 @@ import {
   DSTextarea,
   Dropdown,
   EmptyState,
-  FeaturePageScaffold,
   FormField,
-  PageHeader,
   Spinner,
   StatCard,
   Tabs,
   toast,
 } from "@uxuissk/design-system";
+import { ChoiceCard, FeaturePageScaffold, PageHeader } from "@/components/ui/ds-compat";
 import {
   AlertCircle,
   ArrowLeft,

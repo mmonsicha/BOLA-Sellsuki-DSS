@@ -32,17 +32,18 @@ import {
   Zap,
 } from "lucide-react";
 import {
-  sellsukiBrandConfig,
-  type NavItem,
   type ProductBrandConfig,
-  type ShellSidebarGroup,
+  type SidebarGroup,
   type SidebarItem,
 } from "@uxuissk/design-system";
 
-interface BolaNavItem {
+export interface BolaSidebarItem extends SidebarItem {
+  href?: string;
+}
+
+interface BolaNavItem extends BolaSidebarItem {
   id: string;
   label: string;
-  href: string;
   icon: ReactNode;
   badge?: string;
 }
@@ -99,7 +100,7 @@ const BASE_NAV_SECTIONS: BolaNavSection[] = [
   },
 ];
 
-function withHref(items: BolaNavItem[]): NavItem[] {
+function withHref(items: BolaNavItem[]): BolaSidebarItem[] {
   return items.map((item) => ({
     id: item.id,
     label: item.label,
@@ -110,24 +111,36 @@ function withHref(items: BolaNavItem[]): NavItem[] {
 }
 
 export const bolaProductConfig: ProductBrandConfig = {
-  ...sellsukiBrandConfig,
   brand: {
-    ...sellsukiBrandConfig.brand,
     name: "BOLA",
+    theme: "sellsuki",
     logo: "/bola-logo.svg",
     logoFull: (
-      <div className="flex items-center gap-3">
-        <img src="/bola-logo.svg" alt="BOLA" className="h-10 w-10 rounded-xl" />
+      <div className="flex items-center gap-[var(--Spacing--Spacing-lg)]">
+        <img
+          src="/bola-logo.svg"
+          alt="BOLA"
+          className="h-10 w-10 rounded-[var(--Border-radius--radius-xl)]"
+        />
         <div className="min-w-0 leading-tight">
-          <div className="text-sm font-semibold text-[var(--text-primary)]">BOLA</div>
-          <div className="text-xs text-[var(--text-secondary)]">Back Office LINE API</div>
+          <div className="font-[var(--font-label)] text-[var(--text-label)] font-normal text-[var(--Colors--Text--text-primary)]">
+            BOLA
+          </div>
+          <div className="font-[var(--font-caption)] text-[var(--text-caption)] text-[var(--Colors--Text--text-secondary)]">
+            Back Office LINE API
+          </div>
         </div>
       </div>
     ),
   },
+  shell: {
+    sidebarCollapsible: true,
+    sidebarDefaultOpen: true,
+    contentMaxWidth: "100%",
+  },
 };
 
-export function buildBolaNavGroups(isAdminOrAbove: boolean): ShellSidebarGroup[] {
+export function buildBolaNavGroups(isAdminOrAbove: boolean): SidebarGroup[] {
   const teamItems: BolaNavItem[] = [
     { id: "admins", label: "Team Members", href: "/admins", icon: <Users size={18} /> },
     ...(isAdminOrAbove ? [{ id: "audit-logs", label: "Audit Logs", href: "/audit-logs", icon: <ClipboardList size={18} /> }] : []),
@@ -140,17 +153,17 @@ export function buildBolaNavGroups(isAdminOrAbove: boolean): ShellSidebarGroup[]
 
   return [
     ...BASE_NAV_SECTIONS.map((section) => ({
-      title: section.title,
+      label: section.title || "Main",
       items: withHref(section.items),
     })),
     {
-      title: "Team",
+      label: "Team",
       items: withHref(teamItems),
     },
   ];
 }
 
-export function buildBolaUtilityItems(isKratos: boolean): SidebarItem[] {
+export function buildBolaUtilityItems(isKratos: boolean): BolaSidebarItem[] {
   return [
     ...(isKratos
       ? [{ id: "switch-workspace", label: "Switch Workspace", icon: <ArrowLeftRight size={18} /> }]

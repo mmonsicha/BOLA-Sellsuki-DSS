@@ -1,61 +1,153 @@
+@import "@uxuissk/design-tokens/css";
 @tailwind base;
-@import "@uxuissk/design-system/styles.css";
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 143 72% 39%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 143 72% 39%;
-    --radius: 0.5rem;
+    /* MCP typography overrides for Phase 1 foundation */
+    --font-h1: "DB HeaventRounded", sans-serif;
+    --font-h2: "DB HeaventRounded", sans-serif;
+    --font-h3: "DB HeaventRounded", sans-serif;
+    --font-h4: "DB HeaventRounded", sans-serif;
+    --font-p: "DB HeaventRounded", sans-serif;
+    --font-label: "DB HeaventRounded", sans-serif;
+    --font-caption: "DB HeaventRounded", sans-serif;
+    --font-button: "DB HeaventRounded", sans-serif;
+    --text-h1: 48px;
+    --text-h2: 40px;
+    --text-h3: 28px;
+    --text-h4: 24px;
+    --text-p: 20px;
+    --text-label: 18px;
+    --text-button: 18px;
+    --text-caption: 14px;
+    --weight-h1: 400;
+    --weight-h2: 400;
+    --weight-h3: 400;
+    --weight-h4: 500;
+    --weight-p: 400;
+    --weight-label: 400;
+    --weight-button: 600;
+    --weight-caption: 400;
+
+    /* Primitive tokens */
+    --background: var(--Colors--Background--bg-quaternary);
+    --foreground: var(--Colors--Text--text-primary);
+    --card: var(--Colors--Background--bg-primary);
+    --card-foreground: var(--Colors--Text--text-primary);
+    --popover: var(--Colors--Background--bg-primary);
+    --popover-foreground: var(--Colors--Text--text-primary);
+    --primary: var(--Colors--Button--Solid--button-solid-bg);
+    --primary-foreground: var(--Colors--Button--Solid--button-solid-fg);
+    --secondary: var(--Colors--Background--bg-secondary);
+    --secondary-foreground: var(--Colors--Text--text-primary);
+    --muted: var(--Colors--Background--bg-disabled);
+    --muted-foreground: var(--Colors--Text--text-secondary);
+    --accent: var(--Colors--Background--bg-brand-primary);
+    --accent-foreground: var(--Colors--Text--text-brand-primary);
+    --destructive: var(--Colors--Button--Solid_Danger--button-solid_danger-bg);
+    --destructive-foreground: var(--Colors--Button--Solid_Danger--button-solid_danger-fg);
+    --border: var(--Colors--Stroke--stroke-primary);
+    --input: var(--Colors--Background--bg-primary);
+    --ring: var(--Colors--Stroke--stroke-brand-solid);
+    --radius: var(--Border-radius--radius-md);
+
+    /* Semantic aliases used across the existing app */
+    --text-primary: var(--Colors--Text--text-primary);
+    --text-secondary: var(--Colors--Text--text-secondary);
+    --text-brand: var(--Colors--Text--text-brand-primary);
+    --bg-primary: var(--Colors--Background--bg-primary);
+    --bg-primary-hover: var(--Colors--Background--bg-primary_hover);
+    --bg-secondary: var(--Colors--Background--bg-secondary);
+    --bg-brand-primary: var(--Colors--Background--bg-brand-primary);
+    --bg-brand-solid: var(--Colors--Background--bg-brand-solid);
+    --bg-brand-solid-hover: var(--Colors--Background--bg-brand-solid-hover);
+    --bg-success: var(--Colors--Background--bg-success-primary);
+    --bg-warning: var(--Colors--Background--bg-warning-primary);
+    --bg-danger: var(--Colors--Background--bg-error-primary);
+    --border-default: var(--Colors--Stroke--stroke-primary);
+    --border-strong: var(--Colors--Stroke--stroke-secondary);
+    --icon-brand: var(--Colors--Icon--icon-brand);
+    --icon-success: var(--Colors--Icon--icon-success);
+    --icon-warning: var(--Colors--Icon--icon-warning);
+    --icon-danger: var(--Colors--Icon--icon-error);
+
+    /* Component/AppShell aliases */
+    --app-page-padding: var(--Spacing--Spacing-5xl);
+    --app-page-padding-mobile: var(--Spacing--Spacing-3xl);
+    --app-card-gap: var(--Spacing--Spacing-3xl);
+    --app-section-gap: var(--Spacing--Spacing-6xl);
+    --app-shell-bg: var(--sidebar);
+    --app-shell-fg: var(--sidebar-foreground);
+    --app-shell-border: var(--sidebar-border);
+    --app-shell-active-bg: var(--sidebar-accent);
+    --app-shell-active-fg: var(--sidebar-accent-foreground);
+    --app-shell-brand: var(--sidebar-primary);
+    --app-shell-radius: var(--Border-radius--radius-md);
+    --app-shell-nav-height: var(--shell-nav-height);
+    --app-shell-sidebar-width: var(--shell-sidebar-width);
   }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 143 72% 39%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 143 72% 39%;
-  }
-}
-
-@layer base {
   * {
     @apply border-border;
   }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-p);
+    font-size: var(--text-caption);
+    line-height: 1.5;
+    font-weight: var(--weight-p);
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1 {
+    color: var(--Colors--Text--text-primary);
+    font-family: var(--font-h1);
+    font-size: var(--text-h1);
+    line-height: 1.1;
+    font-weight: var(--weight-h1);
+  }
+
+  h2 {
+    color: var(--Colors--Text--text-primary);
+    font-family: var(--font-h2);
+    font-size: var(--text-h2);
+    line-height: 1.15;
+    font-weight: var(--weight-h2);
+  }
+
+  h3 {
+    color: var(--Colors--Text--text-primary);
+    font-family: var(--font-h3);
+    font-size: var(--text-h3);
+    line-height: 1.2;
+    font-weight: var(--weight-h3);
+  }
+
+  h4 {
+    color: var(--Colors--Text--text-primary);
+    font-family: var(--font-h4);
+    font-size: var(--text-h4);
+    line-height: 1.25;
+    font-weight: var(--weight-h4);
+  }
+
+  a {
+    color: inherit;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font-family: var(--font-p);
   }
 }
