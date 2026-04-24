@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { Alert, DSButton, Sidebar, TopNavbar, type SidebarGroup, type TopNavbarUser } from "@uxuissk/design-system";
+import {
+  Alert,
+  DSButton,
+  Sidebar,
+  TopNavbar,
+  type BreadcrumbItem,
+  type SidebarGroup,
+  type TopNavbarUser,
+} from "@uxuissk/design-system";
 import { Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useCurrentAdmin } from "@/hooks/useCurrentAdmin";
 import { useHealthCheck } from "@/hooks/useHealthCheck";
@@ -17,6 +25,7 @@ interface AppLayoutProps {
   children: React.ReactNode;
   title?: string;
   fullHeight?: boolean;
+  icon?: React.ReactNode;
 }
 
 function buildSidebarGroups(navGroups: SidebarGroup[], utilityItems: BolaSidebarItem[]): SidebarGroup[] {
@@ -46,6 +55,39 @@ export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
     () => buildSidebarGroups(navGroups, utilityItems),
     [navGroups, utilityItems],
   );
+  const activeItemId = resolveBolaActiveItem(currentPath);
+  const activeGroupContext = useMemo(() => {
+    for (const group of sidebarGroups) {
+      const item = group.items.find((entry) => entry.id === activeItemId);
+      if (item) {
+        return {
+          groupLabel: group.label,
+          itemLabel: item.label,
+          href: item.href,
+        };
+      }
+    }
+
+    return {
+      groupLabel: "Main",
+      itemLabel: pageTitle,
+      href: currentPath,
+    };
+  }, [activeItemId, currentPath, pageTitle, sidebarGroups]);
+  const breadcrumbs = useMemo<BreadcrumbItem[]>(() => {
+    const items: BreadcrumbItem[] = [{ label: "BOLA", href: "/" }];
+
+    if (activeGroupContext.groupLabel !== "Main") {
+      items.push({ label: activeGroupContext.groupLabel });
+    }
+
+    const currentLabel = title || activeGroupContext.itemLabel;
+    if (currentLabel) {
+      items.push({ label: currentLabel, href: activeGroupContext.href });
+    }
+
+    return items;
+  }, [activeGroupContext.groupLabel, activeGroupContext.href, activeGroupContext.itemLabel, title]);
 
   const shellUser: TopNavbarUser = {
     name: currentAdmin?.name || "BOLA Admin",
@@ -96,7 +138,7 @@ export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
         <Sidebar
           brand={sidebarBrand}
           groups={sidebarGroups}
-          activeItem={resolveBolaActiveItem(currentPath)}
+          activeItem={activeItemId}
           onNavigate={(item) => handleNavigate(item as BolaSidebarItem)}
           collapsed={collapsed}
           onCollapsedChange={setCollapsed}
@@ -114,7 +156,7 @@ export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
         <Sidebar
           brand={sidebarBrand}
           groups={sidebarGroups}
-          activeItem={resolveBolaActiveItem(currentPath)}
+          activeItem={activeItemId}
           onNavigate={(item) => handleNavigate(item as BolaSidebarItem)}
           width="var(--shell-sidebar-width)"
           className="h-full"
@@ -131,15 +173,12 @@ export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
       >
         <div className="sticky top-0 z-[var(--z-shell-nav)] border-b border-[var(--Colors--Stroke--stroke-primary)] bg-[var(--Colors--Background--bg-primary)]">
           <TopNavbar
-            brand={{
-              name: bolaProductConfig.brand.name,
-              logo: <img src="/bola-logo.svg" alt="BOLA" className="h-9 w-9 rounded-[var(--Border-radius--radius-xl)]" />,
-            }}
+            breadcrumbs={breadcrumbs}
             actions={(
               <div className="flex items-center gap-[var(--Spacing--Spacing-sm)]">
                 <DSButton
                   variant="ghost"
-                  size="sm"
+                  size="md"
                   className="hidden md:inline-flex"
                   onClick={() => setCollapsed((value) => !value)}
                 >
@@ -147,7 +186,7 @@ export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
                 </DSButton>
                 <DSButton
                   variant="ghost"
-                  size="sm"
+                  size="md"
                   className="inline-flex md:hidden"
                   onClick={() => setMobileOpen(true)}
                 >
@@ -156,7 +195,13 @@ export function AppLayout({ children, title, fullHeight }: AppLayoutProps) {
               </div>
             )}
             user={shellUser}
+            height="var(--shell-nav-height)"
             onMobileMenuClick={() => setMobileOpen(true)}
+            onBreadcrumbClick={(item) => {
+              if (item.href) {
+                window.location.href = item.href;
+              }
+            }}
             className="bg-[var(--Colors--Background--bg-primary)]"
           />
         </div>

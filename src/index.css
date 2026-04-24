@@ -31,6 +31,16 @@
     --weight-button: 600;
     --weight-caption: 400;
 
+    /* App shell sizing */
+    --shell-sidebar-width: 256px;
+    --shell-sidebar-collapsed: 64px;
+    --shell-nav-height: 64px;
+    --shell-content-padding: var(--Spacing--Spacing-5xl);
+    --shell-content-padding-sm: var(--Spacing--Spacing-3xl);
+    --z-shell-overlay: 40;
+    --z-shell-sidebar: 50;
+    --z-shell-nav: 45;
+
     /* Primitive tokens */
     --background: var(--Colors--Background--bg-quaternary);
     --foreground: var(--Colors--Text--text-primary);
@@ -73,6 +83,15 @@
     --icon-warning: var(--Colors--Icon--icon-warning);
     --icon-danger: var(--Colors--Icon--icon-error);
 
+    /* AppShell semantic tokens */
+    --sidebar: var(--Colors--Background--bg-primary);
+    --sidebar-foreground: var(--Colors--Text--text-primary);
+    --sidebar-border: var(--Colors--Stroke--stroke-primary);
+    --sidebar-accent: var(--Colors--Background--bg-brand-primary);
+    --sidebar-accent-foreground: var(--Colors--Text--text-brand-primary);
+    --sidebar-primary: var(--Colors--Icon--icon-brand);
+    --sidebar-ring: var(--Colors--Stroke--stroke-brand-solid);
+
     /* Component/AppShell aliases */
     --app-page-padding: var(--Spacing--Spacing-5xl);
     --app-page-padding-mobile: var(--Spacing--Spacing-3xl);
@@ -102,7 +121,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-p);
-    font-size: var(--text-caption);
+    font-size: var(--text-p);
     line-height: 1.5;
     font-weight: var(--weight-p);
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -149,5 +168,6 @@
   select,
   textarea {
     font-family: var(--font-p);
+    font-size: var(--text-p);
   }
 }
